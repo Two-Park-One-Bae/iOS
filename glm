@@ -1,0 +1,78 @@
+#!/bin/bash
+
+# GLM (Global Model) Configuration Script
+# Usage: ./GLM on|off
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SETTINGS_FILE="$SCRIPT_DIR/.claude/settings.json"
+
+# Ensure .claude directory exists
+mkdir -p "$(dirname "$SETTINGS_FILE")"
+
+show_help() {
+    echo "Usage: ./GLM on|off"
+    echo ""
+    echo "Commands:"
+    echo "  on   - Enable GLM configuration with custom API settings"
+    echo "  off  - Disable GLM configuration (clear settings)"
+    echo ""
+    echo "This script manages .claude/settings.json configuration."
+}
+
+enable_glm() {
+    echo "🔧 Enabling GLM configuration..."
+
+    cat > "$SETTINGS_FILE" << 'EOF'
+{
+    "env": {
+        "ANTHROPIC_AUTH_TOKEN": "2663b0d05f4c4c87927f416bdc57d3ad.IJcMnhCV1paczsDa",
+        "ANTHROPIC_BASE_URL": "https://api.z.ai/api/anthropic",
+        "ANTHROPIC_DEFAULT_OPUS_MODEL": "GLM-5.2",
+        "ANTHROPIC_DEFAULT_SONNET_MODEL": "GLM-5.2",
+        "ANTHROPIC_DEFAULT_HAIKU_MODEL": "GLM-5.2",
+        "API_TIMEOUT_MS": "3000000"
+    }
+}
+EOF
+
+    echo "✅ GLM configuration enabled"
+    echo "📁 Settings saved to: $SETTINGS_FILE"
+}
+
+disable_glm() {
+    echo "🔧 Disabling GLM configuration..."
+
+    cat > "$SETTINGS_FILE" << 'EOF'
+{}
+EOF
+
+    echo "✅ GLM configuration disabled"
+    echo "📁 Settings cleared in: $SETTINGS_FILE"
+}
+
+# Main logic
+case "${1:-}" in
+    "on")
+        enable_glm
+        ;;
+    "off")
+        disable_glm
+        ;;
+    "help"|"-h"|"--help")
+        show_help
+        ;;
+    "")
+        echo "❌ Error: Missing command"
+        echo ""
+        show_help
+        exit 1
+        ;;
+    *)
+        echo "❌ Error: Unknown command '$1'"
+        echo ""
+        show_help
+        exit 1
+        ;;
+esac
