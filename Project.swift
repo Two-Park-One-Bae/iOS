@@ -4,6 +4,7 @@ import ProjectDescription
 let appName = "Application"
 let bundleId = "app.kyulabs.template"
 let deploymentTarget = "26.0"
+let watchOSDeploymentTarget = "11.0"
 let destinations: Set<Destination> = [.iPhone, .iPad]
 
 // MARK: - Project
@@ -26,8 +27,8 @@ let project = Project(
             bundleId: "\(bundleId).shared",
             deploymentTargets: .iOS(deploymentTarget),
             infoPlist: .default,
+            sources: ["Sources/Shared/**"],
             resources: ["Sources/Shared/Resources/**"],
-            buildableFolders: ["Sources/Shared"],
             dependencies: []
         ),
         // MARK: - Feature
@@ -38,7 +39,7 @@ let project = Project(
             bundleId: "\(bundleId).feature",
             deploymentTargets: .iOS(deploymentTarget),
             infoPlist: .default,
-            buildableFolders: ["Sources/Feature"],
+            sources: ["Sources/Feature/**"],
             dependencies: [
                 .target(name: "Shared"),
             ]
@@ -59,10 +60,11 @@ let project = Project(
                     "UIInterfaceOrientationPortrait",
                 ],
             ]),
+            sources: ["Sources/ServiceApp/**"],
             resources: ["Resources/**"],
-            buildableFolders: ["Sources/ServiceApp"],
             dependencies: [
                 .target(name: "Feature"),
+                .target(name: "WatchApp"),
             ],
             settings: .settings(
                 base: [
@@ -81,6 +83,53 @@ let project = Project(
                         "UIInterfaceOrientationLandscapeLeft",
                         "UIInterfaceOrientationLandscapeRight",
                     ],
+                ]
+            )
+        ),
+
+        // MARK: - WatchApp (stub)
+        .target(
+            name: "WatchApp",
+            destinations: [.appleWatch],
+            product: .watch2App,
+            bundleId: "\(bundleId).watchapp",
+            deploymentTargets: .watchOS(watchOSDeploymentTarget),
+            infoPlist: .extendingDefault(with: [
+                "WKApplication": true,
+                "WKCompanionAppBundleIdentifier": .string(bundleId),
+            ]),
+            resources: ["WatchApp/Resources/**"],
+            dependencies: [
+                .target(name: "WatchExtension"),
+            ],
+            settings: .settings(
+                base: [
+                    "DEVELOPMENT_TEAM": "QD353RFHM5",
+                ]
+            )
+        ),
+
+        // MARK: - WatchExtension
+        .target(
+            name: "WatchExtension",
+            destinations: [.appleWatch],
+            product: .watch2Extension,
+            bundleId: "\(bundleId).watchapp.watchkitextension",
+            deploymentTargets: .watchOS(watchOSDeploymentTarget),
+            infoPlist: .extendingDefault(with: [
+                "NSExtension": .dictionary([
+                    "NSExtensionPointIdentifier": .string("com.apple.watchkit"),
+                    "NSExtensionAttributes": .dictionary([
+                        "WKAppBundleIdentifier": .string("\(bundleId).watchapp"),
+                    ]),
+                ]),
+            ]),
+            sources: ["WatchExtension/Sources/**"],
+            resources: ["WatchExtension/Resources/**"],
+            dependencies: [],
+            settings: .settings(
+                base: [
+                    "DEVELOPMENT_TEAM": "QD353RFHM5",
                 ]
             )
         ),
