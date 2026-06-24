@@ -1,0 +1,94 @@
+default_platform(:ios)
+
+API_KEY_PATH = "/tmp/AuthKey.p8"
+
+platform :ios do
+  before_all do
+    setup_ci if ENV["CI"]
+  end
+
+  def api_key
+    if ENV["CI"]
+      app_store_connect_api_key(
+        key_id: ENV["APP_STORE_CONNECT_API_KEY_ID"],
+        issuer_id: ENV["APP_STORE_CONNECT_API_KEY_ISSUER_ID"],
+        key_filepath: API_KEY_PATH,
+        in_house: false
+      )
+    else
+      require "json"
+      key_data = JSON.parse(File.read(File.expand_path("../api_key.json", __FILE__)))
+      app_store_connect_api_key(
+        key_id: key_data["key_id"],
+        issuer_id: key_data["issuer_id"],
+        key_content: key_data["key"],
+        in_house: false
+      )
+    end
+  end
+
+  desc "Run unit tests"
+  lane :test do
+    run_tests(
+      workspace: "Application.xcworkspace",
+      scheme: "App",
+      device: "iPhone 16",
+      result_bundle: true,
+      output_directory: "fastlane/test_output"
+    )
+  end
+
+  desc "Build and upload to TestFlight (internal testers)"
+  lane :beta_internal do
+    match(
+      type: "appstore",
+      api_key: api_key,
+      readonly: true
+    )
+
+    build_app(
+      workspace: "Application.xcworkspace",
+      scheme: "App",
+      configuration: "Release",
+      export_method: "app-store",
+      output_directory: "build",
+      xcargs: "CURRENT_PROJECT_VERSION=#{ENV.fetch('BUILD_NUMBER', '1')} DEVELOPMENT_TEAM=#{ENV.fetch('DEVELOPER_PORTAL_TEAM_ID', '')} -allowProvisioningUpdates -authenticationKeyPath #{API_KEY_PATH} -authenticationKeyID #{ENV.fetch('APP_STORE_CONNECT_API_KEY_ID', '')} -authenticationKeyIssuerID #{ENV.fetch('APP_STORE_CONNECT_API_KEY_ISSUER_ID', '')}",
+      export_options: {
+        method: "app-store",
+        signingStyle: "automatic"
+      }
+    )
+
+    upload_to_testflight(
+      api_key: api_key,
+      skip_waiting_for_build_processing: true
+    )
+  end
+
+  desc "Build and submit to App Store"
+  lane :release do
+    match(
+      type: "appstore",
+      api_key: api_key,
+      readonly: true
+    )
+
+    build_app(
+      workspace: "Application.xcworkspace",
+      scheme: "App",
+      configuration: "Release",
+      export_method: "app-store",
+      output_directory: "build",
+      xcargs: "CURRENT_PROJECT_VERSION=#{ENV.fetch('BUILD_NUMBER', '1')} DEVELOPMENT_TEAM=#{ENV.fetch('DEVELOPER_PORTAL_TEAM_ID', '')} -allowProvisioningUpdates -authenticationKeyPath #{API_KEY_PATH} -authenticationKeyID #{ENV.fetch('APP_STORE_CONNECT_API_KEY_ID', '')} -authenticationKeyIssuerID #{ENV.fetch('APP_STORE_CONNECT_API_KEY_ISSUER_ID', '')}",
+      export_options: {
+        method: "app-store",
+        signingStyle: "automatic"
+      }
+    )
+
+    upload_to_testflight(
+      api_key: api_key,
+      skip_waiting_for_build_processing: false
+    )
+  end
+end

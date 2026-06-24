@@ -37,5 +37,23 @@ let project = Project(
             ],
             settings: .settings(base: XCConfig.base)
         ),
+        .target(
+            name: "AppTests",
+            destinations: .iOS,
+            product: .unitTests,
+            bundleId: "\(Environment.bundlePrefix).app.tests",
+            deploymentTargets: Environment.deploymentTarget,
+            sources: ["Tests/**"],
+            dependencies: [],
+            settings: .settings(base: ["TEST_HOST": ""])
+        ),
+    ],
+    schemes: [
+        .scheme(
+            name: "App",
+            buildAction: .buildAction(targets: [.target("App")]),
+            testAction: .targets([.testableTarget(target: .target("AppTests"))]),
+            runAction: .runAction(executable: .target("App"))
+        )
     ]
 )
