@@ -1,0 +1,6 @@
+git_url(ENV["MATCH_GIT_URL"] || "https://github.com/Two-Park-One-Bae/certificates")
+storage_mode("git")
+type("appstore")
+app_identifier(["app.nursemate.app"])
+username("qwqwqw4756@gmail.com")
+api_key_path("fastlane/api_key.json") if File.exist?("fastlane/api_key.json")
