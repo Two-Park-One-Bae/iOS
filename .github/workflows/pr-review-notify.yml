@@ -1,14 +1,18 @@
-name: PR Review Request Notify
+name: PR Review Notify
 
 on:
   pull_request:
     types: [review_requested]
+  pull_request_review:
+    types: [submitted]
+  issue_comment:
+    types: [created]
 
 jobs:
   notify:
     runs-on: ubuntu-latest
     steps:
-      - name: Send Discord mention notification
+      - name: Send Discord notification
         run: |
           # ── GitHub username → Discord 숫자 ID 매핑 ──
           declare -A USER_MAP
@@ -16,32 +20,91 @@ jobs:
           USER_MAP["ParkMazorika"]="267170642313478144"
           USER_MAP["byb0823"]="790070051482763275"
 
-          # ── 리뷰 요청받은 사람 ──
-          REVIEWER="${{ github.event.requested_reviewer.login }}"
-          DISCORD_ID="${USER_MAP[$REVIEWER]}"
-
-          # ── PR 정보 ──
-          PR_TITLE="${{ github.event.pull_request.title }}"
-          PR_URL="${{ github.event.pull_request.html_url }}"
-          PR_AUTHOR="${{ github.event.pull_request.user.login }}"
           REPO_NAME="${{ github.event.repository.name }}"
+          EVENT="${{ github.event_name }}"
 
-          # ── 멘션 처리 (매핑 없으면 GitHub 이름만 표시) ──
-          if [ -n "$DISCORD_ID" ]; then
-            MENTION="<@${DISCORD_ID}>"
+          # ── 멘션 헬퍼 함수 ──
+          mention() {
+            local gh_user="$1"
+            local discord_id="${USER_MAP[$gh_user]}"
+            if [ -n "$discord_id" ]; then
+              echo "<@${discord_id}>"
+            else
+              echo "@${gh_user}"
+            fi
+          }
+
+          # ── 이벤트별 분기 ──
+          if [ "$EVENT" = "pull_request" ]; then
+            # 1. 리뷰 요청 → 리뷰어에게 알림
+            REVIEWER="${{ github.event.requested_reviewer.login }}"
+            [ -z "$REVIEWER" ] && exit 0
+            TARGET=$(mention "$REVIEWER")
+            PR_TITLE="${{ github.event.pull_request.title }}"
+            PR_URL="${{ github.event.pull_request.html_url }}"
+            AUTHOR="${{ github.event.pull_request.user.login }}"
+            CONTENT="${TARGET} 님, 리뷰 요청이 도착했어요! 👀"
+            TITLE="리뷰 요청: ${PR_TITLE}"
+            DESC="**저장소:** ${REPO_NAME}\n**작성자:** ${AUTHOR}"
+            COLOR=5814783
+
+          elif [ "$EVENT" = "pull_request_review" ]; then
+            # 2. 리뷰 제출 → PR 작성자에게 알림
+            STATE="${{ github.event.review.state }}"
+            AUTHOR="${{ github.event.pull_request.user.login }}"
+            REVIEWER="${{ github.event.review.user.login }}"
+            # 본인이 본인 PR에 남긴 리뷰는 알림 제외
+            [ "$AUTHOR" = "$REVIEWER" ] && exit 0
+            TARGET=$(mention "$AUTHOR")
+            PR_TITLE="${{ github.event.pull_request.title }}"
+            PR_URL="${{ github.event.review.html_url }}"
+
+            case "$STATE" in
+              approved)
+                CONTENT="${TARGET} 님, PR이 승인됐어요! ✅"
+                TITLE="승인: ${PR_TITLE}"
+                COLOR=5763719 ;;
+              changes_requested)
+                CONTENT="${TARGET} 님, 변경 요청이 있어요! 📝"
+                TITLE="변경 요청: ${PR_TITLE}"
+                COLOR=15548997 ;;
+              commented)
+                CONTENT="${TARGET} 님, 리뷰 코멘트가 달렸어요! 💬"
+                TITLE="리뷰 코멘트: ${PR_TITLE}"
+                COLOR=16776960 ;;
+              *)
+                exit 0 ;;
+            esac
+            DESC="**저장소:** ${REPO_NAME}\n**리뷰어:** ${REVIEWER}"
+
+          elif [ "$EVENT" = "issue_comment" ]; then
+            # 3. PR 일반 코멘트 → PR 작성자에게 알림 (이슈 코멘트는 제외)
+            IS_PR="${{ github.event.issue.pull_request.url }}"
+            [ -z "$IS_PR" ] && exit 0
+            AUTHOR="${{ github.event.issue.user.login }}"
+            COMMENTER="${{ github.event.comment.user.login }}"
+            # 본인이 본인 PR에 남긴 코멘트는 알림 제외
+            [ "$AUTHOR" = "$COMMENTER" ] && exit 0
+            TARGET=$(mention "$AUTHOR")
+            PR_TITLE="${{ github.event.issue.title }}"
+            PR_URL="${{ github.event.comment.html_url }}"
+            CONTENT="${TARGET} 님, PR에 코멘트가 달렸어요! 💬"
+            TITLE="코멘트: ${PR_TITLE}"
+            DESC="**저장소:** ${REPO_NAME}\n**작성자:** ${COMMENTER}"
+            COLOR=10070709
           else
-            MENTION="@${REVIEWER}"
+            exit 0
           fi
 
           # ── 메시지 전송 ──
           curl -H "Content-Type: application/json" \
             -d "{
-              \"content\": \"${MENTION} 님, 리뷰 요청이 도착했어요! 👀\",
+              \"content\": \"${CONTENT}\",
               \"embeds\": [{
-                \"title\": \"${PR_TITLE}\",
+                \"title\": \"${TITLE}\",
                 \"url\": \"${PR_URL}\",
-                \"description\": \"**저장소:** ${REPO_NAME}\n**작성자:** ${PR_AUTHOR}\",
-                \"color\": 5814783
+                \"description\": \"${DESC}\",
+                \"color\": ${COLOR}
               }]
             }" \
             "${{ secrets.DISCORD_WEBHOOK }}"
