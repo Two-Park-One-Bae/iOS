@@ -12,5 +12,6 @@ public extension TargetDependency {
         public static let FirebaseCrashlytics = TargetDependency.external(name: "FirebaseCrashlytics")
         public static let Lottie = TargetDependency.external(name: "Lottie")
         public static let Then = TargetDependency.external(name: "Then")
+        public static let Clarity = TargetDependency.external(name: "Clarity")
     }
 }

@@ -9,5 +9,6 @@ let project = Project.makeModule(
         .SPM.FirebaseAnalytics,
         .SPM.FirebaseCrashlytics,
         .SPM.AmplitudeSwift,
+        .SPM.Clarity,
     ]
 )

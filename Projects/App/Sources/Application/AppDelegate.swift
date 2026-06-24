@@ -10,6 +10,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
     ) -> Bool {
         RegisterDependencies.register()
         FirebaseService.configure()
+        ClarityService.configure()
         AmplitudeService.track(AppLaunchEvent())
         return true
     }
