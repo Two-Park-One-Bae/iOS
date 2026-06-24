@@ -7,14 +7,6 @@ import ConfigPlugin
 let project = Project(
     name: "App",
     settings: .settings(base: XCConfig.base, configurations: XCConfig.app),
-    schemes: [
-        .scheme(
-            name: "App",
-            buildAction: .buildAction(targets: [.target("App")]),
-            testAction: .targets([.testableTarget(target: .target("AppTests"))]),
-            runAction: .runAction(executable: .target("App"))
-        )
-    ],
     targets: [
         .target(
             name: "App",
@@ -55,5 +47,13 @@ let project = Project(
             dependencies: [.target(name: "App")],
             settings: .settings(base: XCConfig.base)
         ),
+    ],
+    schemes: [
+        .scheme(
+            name: "App",
+            buildAction: .buildAction(targets: [.target("App")]),
+            testAction: .targets([.testableTarget(target: .target("AppTests"))]),
+            runAction: .runAction(executable: .target("App"))
+        )
     ]
 )
