@@ -5,7 +5,7 @@ import Then
 import DSKit
 import Domain
 
-final class HomeVC: UIViewController {
+public final class HomeVC: UIViewController {
 
     // MARK: - Properties
     private let viewModel: HomeViewModel
@@ -27,7 +27,7 @@ final class HomeVC: UIViewController {
     private let loadingIndicator = UIActivityIndicatorView(style: .medium)
 
     // MARK: - Init
-    init(viewModel: HomeViewModel) {
+    public init(viewModel: HomeViewModel) {
         self.viewModel = viewModel
         super.init(nibName: nil, bundle: nil)
     }
@@ -35,7 +35,7 @@ final class HomeVC: UIViewController {
     required init?(coder: NSCoder) { fatalError() }
 
     // MARK: - Lifecycle
-    override func viewDidLoad() {
+    public override func viewDidLoad() {
         super.viewDidLoad()
         setUI()
         setLayout()
@@ -88,11 +88,11 @@ final class HomeVC: UIViewController {
 
 // MARK: - UITableViewDataSource
 extension HomeVC: UITableViewDataSource {
-    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+    public func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         items.count
     }
 
-    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+    public func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         guard let cell = tableView.dequeueReusableCell(
             withIdentifier: HomeCell.identifier,
             for: indexPath
@@ -104,7 +104,7 @@ extension HomeVC: UITableViewDataSource {
 
 // MARK: - UITableViewDelegate
 extension HomeVC: UITableViewDelegate {
-    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+    public func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
         itemSelectedSubject.send(indexPath.row)
         coordinator?.pushDetail(id: items[indexPath.row].id)

@@ -1,4 +1,5 @@
 import Domain
+import Networks
 
 extension HomeItemDTO {
     func toDomain() -> HomeEntity {

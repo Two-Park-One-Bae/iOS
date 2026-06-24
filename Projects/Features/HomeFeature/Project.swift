@@ -12,6 +12,8 @@ let project = Project.makeModule(
         Dep.Modules.DSKit.DSKit,
         Dep.Modules.Networks.Networks,
         Dep.Features.Base.Base,
+        .SPM.SnapKit,
+        .SPM.Then,
     ],
     interfaceDependencies: [
         Dep.Features.Base.Base,
