@@ -55,6 +55,9 @@ jobs:
           mkdir -p ~/.appstoreconnect/private_keys
           cp /tmp/AuthKey_raw.p8 ~/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_API_KEY_ID}.p8
 
+      - name: Install Tuist
+        run: curl -Ls https://install.tuist.io | bash
+
       - name: Tuist install
         run: tuist install
 
