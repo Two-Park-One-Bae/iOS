@@ -6,7 +6,7 @@ import ConfigPlugin
 
 let project = Project(
     name: "App",
-    settings: .settings(configurations: XCConfig.app),
+    settings: .settings(base: XCConfig.base, configurations: XCConfig.app),
     targets: [
         .target(
             name: "App",
@@ -15,6 +15,9 @@ let project = Project(
             bundleId: "\(Environment.bundlePrefix).app",
             deploymentTargets: Environment.deploymentTarget,
             infoPlist: .extendingDefault(with: [
+                "AMPLITUDE_API_KEY": "$(AMPLITUDE_API_KEY)",
+                "BASE_URL": "$(BASE_URL)",
+                "CLARITY_PROJECT_ID": "$(CLARITY_PROJECT_ID)",
                 "UILaunchScreen": ["UIColorName": "", "UIImageName": ""],
                 "UIApplicationSceneManifest": [
                     "UIApplicationSupportsMultipleScenes": false,
@@ -31,9 +34,8 @@ let project = Project(
             dependencies: [
                 Dep.Features.Home.Feature,
                 Dep.Core.Core,
-                .project(target: "WatchApp", path: .relativeToRoot("Projects/Watch")),
             ],
-            settings: .settings(base: ["DEVELOPMENT_TEAM": "QD353RFHM5"])
+            settings: .settings(base: XCConfig.base)
         ),
     ]
 )

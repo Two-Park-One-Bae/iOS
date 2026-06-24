@@ -1,11 +1,13 @@
 import ProjectDescription
 import EnvPlugin
+import ConfigPlugin
 
 private let bundleId = "\(Environment.bundlePrefix).app"
 private let watchBundleId = "\(bundleId).watchapp"
 
 let project = Project(
     name: "Watch",
+    settings: .settings(base: XCConfig.base, configurations: XCConfig.framework),
     targets: [
         .target(
             name: "WatchApp",
@@ -14,14 +16,14 @@ let project = Project(
             bundleId: watchBundleId,
             deploymentTargets: .watchOS("10.0"),
             infoPlist: .extendingDefault(with: [
-                "WKApplication": true,
                 "WKCompanionAppBundleIdentifier": "\(bundleId)",
             ]),
             sources: [],
             resources: ["WatchApp/Resources/**"],
             dependencies: [
                 .target(name: "WatchExtension"),
-            ]
+            ],
+            settings: .settings(base: XCConfig.base)
         ),
         .target(
             name: "WatchExtension",
@@ -38,7 +40,8 @@ let project = Project(
                 ],
             ]),
             sources: ["WatchExtension/Sources/**"],
-            resources: ["WatchExtension/Resources/**"]
+            resources: ["WatchExtension/Resources/**"],
+            settings: .settings(base: XCConfig.base)
         ),
     ]
 )
