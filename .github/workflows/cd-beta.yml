@@ -47,16 +47,14 @@ jobs:
           DEVELOPMENT_TEAM = ${DEVELOPMENT_TEAM}
           EOF
 
-      - name: Convert API Key (PKCS#8 → EC 형식)
+      - name: Write API Key
         env:
           APP_STORE_CONNECT_API_KEY_CONTENT: ${{ secrets.APP_STORE_CONNECT_API_KEY_CONTENT }}
           APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
         run: |
-          echo "$APP_STORE_CONNECT_API_KEY_CONTENT" | base64 --decode > /tmp/AuthKey_raw.p8
-          /opt/homebrew/opt/openssl@3/bin/openssl pkey -traditional \
-            -in /tmp/AuthKey_raw.p8 -out /tmp/AuthKey.p8
+          echo "$APP_STORE_CONNECT_API_KEY_CONTENT" | base64 --decode > /tmp/AuthKey.p8
           mkdir -p ~/.appstoreconnect/private_keys
-          cp /tmp/AuthKey_raw.p8 ~/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_API_KEY_ID}.p8
+          cp /tmp/AuthKey.p8 ~/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_API_KEY_ID}.p8
 
       - name: Cache SPM packages
         uses: actions/cache@v4
