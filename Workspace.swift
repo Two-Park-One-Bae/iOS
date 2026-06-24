@@ -5,5 +5,8 @@ let workspace = Workspace(
     name: Environment.workspaceName,
     projects: [
         "Projects/**"
+    ],
+    additionalFiles: [
+        "XCConfig/**"
     ]
 )

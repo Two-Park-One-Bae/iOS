@@ -1,26 +1,30 @@
 import Combine
 import Domain
 
-final class HomeViewModel {
-    struct Input {
-        let viewDidLoad: AnyPublisher<Void, Never>
-        let itemSelected: AnyPublisher<Int, Never>
+public final class HomeViewModel {
+    public struct Input {
+        public let viewDidLoad: AnyPublisher<Void, Never>
+        public let itemSelected: AnyPublisher<Int, Never>
+        public init(viewDidLoad: AnyPublisher<Void, Never>, itemSelected: AnyPublisher<Int, Never>) {
+            self.viewDidLoad = viewDidLoad
+            self.itemSelected = itemSelected
+        }
     }
 
-    struct Output {
-        let items: AnyPublisher<[HomeEntity], Never>
-        let isLoading: AnyPublisher<Bool, Never>
-        let error: AnyPublisher<String, Never>
+    public struct Output {
+        public let items: AnyPublisher<[HomeEntity], Never>
+        public let isLoading: AnyPublisher<Bool, Never>
+        public let error: AnyPublisher<String, Never>
     }
 
     private let useCase: HomeUseCaseProtocol
     private var cancelBag = Set<AnyCancellable>()
 
-    init(useCase: HomeUseCaseProtocol) {
+    public init(useCase: HomeUseCaseProtocol) {
         self.useCase = useCase
     }
 
-    func transform(input: Input) -> Output {
+    public func transform(input: Input) -> Output {
         let items = PassthroughSubject<[HomeEntity], Never>()
         let isLoading = PassthroughSubject<Bool, Never>()
         let error = PassthroughSubject<String, Never>()
