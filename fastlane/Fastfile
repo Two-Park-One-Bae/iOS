@@ -31,7 +31,7 @@ platform :ios do
   lane :test do
     run_tests(
       workspace: "Application.xcworkspace",
-      scheme: "App",
+      scheme: "AppTests",
       device: "iPhone 16",
       result_bundle: true,
       output_directory: "fastlane/test_output"

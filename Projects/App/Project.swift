@@ -37,5 +37,15 @@ let project = Project(
             ],
             settings: .settings(base: XCConfig.base)
         ),
+        .target(
+            name: "AppTests",
+            destinations: .iOS,
+            product: .unitTests,
+            bundleId: "\(Environment.bundlePrefix).app.tests",
+            deploymentTargets: Environment.deploymentTarget,
+            sources: ["Tests/**"],
+            dependencies: [.target(name: "App")],
+            settings: .settings(base: XCConfig.base)
+        ),
     ]
 )
