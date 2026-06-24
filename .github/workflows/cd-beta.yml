@@ -48,6 +48,12 @@ jobs:
           DEVELOPMENT_TEAM = ${DEVELOPMENT_TEAM}
           EOF
 
+      - name: Write GoogleService-Info.plist
+        env:
+          GOOGLE_SERVICE_INFO_PLIST: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST }}
+        run: |
+          echo "$GOOGLE_SERVICE_INFO_PLIST" | base64 --decode > Projects/App/Resources/GoogleService-Info.plist
+
       - name: Write API Key
         env:
           APP_STORE_CONNECT_API_KEY_CONTENT: ${{ secrets.APP_STORE_CONNECT_API_KEY_CONTENT }}
