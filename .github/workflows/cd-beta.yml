@@ -64,7 +64,7 @@ jobs:
           path: |
             .build
             ~/.tuist/Cache
-          key: ${{ runner.os }}-spm-${{ hashFiles('Tuist/Package.resolved') }}
+          key: ${{ runner.os }}-spm-${{ hashFiles('Tuist/Package.swift') }}
           restore-keys: |
             ${{ runner.os }}-spm-
 
