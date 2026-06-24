@@ -46,6 +46,16 @@ jobs:
           DEVELOPMENT_TEAM = ${DEVELOPMENT_TEAM}
           EOF
 
+      - name: Cache SPM packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            .build
+            ~/.tuist/Cache
+          key: ${{ runner.os }}-spm-${{ hashFiles('Tuist/Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-
+
       - name: Install Swift Packages
         run: tuist install
 

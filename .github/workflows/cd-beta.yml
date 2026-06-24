@@ -58,6 +58,16 @@ jobs:
           mkdir -p ~/.appstoreconnect/private_keys
           cp /tmp/AuthKey_raw.p8 ~/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_API_KEY_ID}.p8
 
+      - name: Cache SPM packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            .build
+            ~/.tuist/Cache
+          key: ${{ runner.os }}-spm-${{ hashFiles('Tuist/Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-
+
       - name: Install Swift Packages
         run: tuist install
 
