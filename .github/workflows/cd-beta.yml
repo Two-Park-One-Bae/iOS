@@ -23,6 +23,9 @@ jobs:
         with:
           xcode-version: "latest-stable"
 
+      - name: Install mise
+        uses: jdx/mise-action@v2
+
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
@@ -55,10 +58,7 @@ jobs:
           mkdir -p ~/.appstoreconnect/private_keys
           cp /tmp/AuthKey_raw.p8 ~/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_API_KEY_ID}.p8
 
-      - name: Install Tuist
-        run: brew install tuist/tuist/tuist
-
-      - name: Tuist install
+      - name: Install Swift Packages
         run: tuist install
 
       - name: Tuist generate
