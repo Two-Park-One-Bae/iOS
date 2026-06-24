@@ -27,7 +27,8 @@ public extension Project {
                     deploymentTargets: Environment.deploymentTarget,
                     sources: ["Sources/**"],
                     resources: hasResources ? ["Resources/**"] : nil,
-                    dependencies: allDependencies
+                    dependencies: allDependencies,
+                    settings: .settings(base: XCConfig.base)
                 )
             )
         }
@@ -41,7 +42,8 @@ public extension Project {
                     bundleId: "\(bundleId).interface",
                     deploymentTargets: Environment.deploymentTarget,
                     sources: ["Interface/Sources/**"],
-                    dependencies: interfaceDependencies
+                    dependencies: interfaceDependencies,
+                    settings: .settings(base: XCConfig.base)
                 )
             )
         }
@@ -55,7 +57,8 @@ public extension Project {
                     bundleId: "\(bundleId).tests",
                     deploymentTargets: Environment.deploymentTarget,
                     sources: ["Tests/Sources/**"],
-                    dependencies: [.target(name: name)]
+                    dependencies: [.target(name: name)],
+                    settings: .settings(base: XCConfig.base)
                 )
             )
         }
@@ -68,16 +71,20 @@ public extension Project {
                     product: .app,
                     bundleId: "\(bundleId).demo",
                     deploymentTargets: Environment.deploymentTarget,
-                    infoPlist: .default,
+                    infoPlist: .extendingDefault(with: [
+                        "UIRequiresFullScreen": true,
+                        "UILaunchScreen": ["UIColorName": "", "UIImageName": ""],
+                    ]),
                     sources: ["Demo/Sources/**"],
-                    dependencies: [.target(name: name)]
+                    dependencies: [.target(name: name)],
+                    settings: .settings(base: XCConfig.base)
                 )
             )
         }
 
         return Project(
             name: name,
-            settings: .settings(configurations: XCConfig.framework),
+            settings: .settings(base: XCConfig.base, configurations: XCConfig.framework),
             targets: projectTargets
         )
     }
