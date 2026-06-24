@@ -30,8 +30,8 @@ platform :ios do
   desc "Run unit tests"
   lane :test do
     run_tests(
-      project: "Projects/App/App.xcodeproj",
-      scheme: "AppTests",
+      workspace: "Application.xcworkspace",
+      scheme: "App",
       device: "iPhone 16",
       result_bundle: true,
       output_directory: "fastlane/test_output"
