@@ -30,7 +30,7 @@ platform :ios do
   desc "Run unit tests"
   lane :test do
     run_tests(
-      workspace: "Application.xcworkspace",
+      project: "Projects/App/App.xcodeproj",
       scheme: "AppTests",
       device: "iPhone 16",
       result_bundle: true,
