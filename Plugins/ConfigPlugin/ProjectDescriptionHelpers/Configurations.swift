@@ -10,6 +10,8 @@ public struct XCConfig {
         "ENABLE_USER_SCRIPT_SANDBOXING": "NO",
         "ENABLE_MODULE_VERIFIER": "YES",
         "SWIFT_EMIT_LOC_STRINGS": "YES",
+        "VERSIONING_SYSTEM": "apple-generic",
+        "CURRENT_PROJECT_VERSION": "1",
     ]
 
     public static let framework: [Configuration] = [
