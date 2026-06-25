@@ -45,8 +45,7 @@ let project = Project(
             bundleId: "\(Environment.bundlePrefix).app.tests",
             deploymentTargets: Environment.deploymentTarget,
             sources: ["Tests/**"],
-            dependencies: [],
-            settings: .settings(base: ["TEST_HOST": ""])
+            dependencies: [.target(name: "App")]
         ),
     ],
     schemes: [
