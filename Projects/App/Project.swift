@@ -15,6 +15,7 @@ let project = Project(
             bundleId: "\(Environment.bundlePrefix).app",
             deploymentTargets: Environment.deploymentTarget,
             infoPlist: .extendingDefault(with: [
+                "ITSAppUsesNonExemptEncryption": false,
                 "AMPLITUDE_API_KEY": "$(AMPLITUDE_API_KEY)",
                 "BASE_URL": "$(BASE_URL)",
                 "CLARITY_PROJECT_ID": "$(CLARITY_PROJECT_ID)",
