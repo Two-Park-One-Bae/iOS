@@ -41,11 +41,19 @@ platform :ios do
 
   desc "Build and upload to TestFlight (internal testers)"
   lane :beta_internal do
+    key = api_key
+
     match(
       type: "appstore",
-      api_key: api_key,
+      api_key: key,
       readonly: true
     )
+
+    build_number = latest_testflight_build_number(
+      api_key: key,
+      app_identifier: "app.nursemate.app",
+      initial_build_number: 1
+    ) + 1
 
     build_app(
       workspace: "Application.xcworkspace",
@@ -53,7 +61,7 @@ platform :ios do
       configuration: "Release",
       export_method: "app-store",
       output_directory: "build",
-      xcargs: "CURRENT_PROJECT_VERSION=#{ENV.fetch('BUILD_NUMBER', '1')} DEVELOPMENT_TEAM=#{ENV.fetch('DEVELOPMENT_TEAM', '')} -allowProvisioningUpdates -authenticationKeyPath #{API_KEY_PATH} -authenticationKeyID #{ENV.fetch('APP_STORE_CONNECT_API_KEY_ID', '')} -authenticationKeyIssuerID #{ENV.fetch('APP_STORE_CONNECT_API_KEY_ISSUER_ID', '')}",
+      xcargs: "CURRENT_PROJECT_VERSION=#{build_number} DEVELOPMENT_TEAM=#{ENV.fetch('DEVELOPMENT_TEAM', '')} -allowProvisioningUpdates -authenticationKeyPath #{API_KEY_PATH} -authenticationKeyID #{ENV.fetch('APP_STORE_CONNECT_API_KEY_ID', '')} -authenticationKeyIssuerID #{ENV.fetch('APP_STORE_CONNECT_API_KEY_ISSUER_ID', '')}",
       export_options: {
         method: "app-store",
         signingStyle: "automatic"
@@ -73,11 +81,19 @@ platform :ios do
 
   desc "Build and submit to App Store"
   lane :release do
+    key = api_key
+
     match(
       type: "appstore",
-      api_key: api_key,
+      api_key: key,
       readonly: true
     )
+
+    build_number = latest_testflight_build_number(
+      api_key: key,
+      app_identifier: "app.nursemate.app",
+      initial_build_number: 1
+    ) + 1
 
     build_app(
       workspace: "Application.xcworkspace",
@@ -85,7 +101,7 @@ platform :ios do
       configuration: "Release",
       export_method: "app-store",
       output_directory: "build",
-      xcargs: "CURRENT_PROJECT_VERSION=#{ENV.fetch('BUILD_NUMBER', '1')} DEVELOPMENT_TEAM=#{ENV.fetch('DEVELOPMENT_TEAM', '')} -allowProvisioningUpdates -authenticationKeyPath #{API_KEY_PATH} -authenticationKeyID #{ENV.fetch('APP_STORE_CONNECT_API_KEY_ID', '')} -authenticationKeyIssuerID #{ENV.fetch('APP_STORE_CONNECT_API_KEY_ISSUER_ID', '')}",
+      xcargs: "CURRENT_PROJECT_VERSION=#{build_number} DEVELOPMENT_TEAM=#{ENV.fetch('DEVELOPMENT_TEAM', '')} -allowProvisioningUpdates -authenticationKeyPath #{API_KEY_PATH} -authenticationKeyID #{ENV.fetch('APP_STORE_CONNECT_API_KEY_ID', '')} -authenticationKeyIssuerID #{ENV.fetch('APP_STORE_CONNECT_API_KEY_ISSUER_ID', '')}",
       export_options: {
         method: "app-store",
         signingStyle: "automatic"
