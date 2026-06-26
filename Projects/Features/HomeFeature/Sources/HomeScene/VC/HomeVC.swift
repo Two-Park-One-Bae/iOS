@@ -19,7 +19,7 @@ public final class HomeVC: UIViewController {
     private lazy var tableView = UITableView(frame: .zero, style: .plain).then {
         $0.register(HomeCell.self, forCellReuseIdentifier: HomeCell.identifier)
         $0.separatorStyle = .none
-        $0.backgroundColor = DSColor.background
+        $0.backgroundColor = DSColor.bgApp
         $0.dataSource = self
         $0.delegate = self
     }
@@ -69,7 +69,7 @@ public final class HomeVC: UIViewController {
 
     // MARK: - Setup
     private func setUI() {
-        view.backgroundColor = DSColor.background
+        view.backgroundColor = DSColor.bgApp
         navigationItem.title = "홈"
     }
 

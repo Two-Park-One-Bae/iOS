@@ -9,12 +9,12 @@ final class HomeCell: UITableViewCell {
 
     private let titleLabel = UILabel().then {
         $0.font = UIFont.MDS.title.font
-        $0.textColor = DSColor.text
+        $0.textColor = DSColor.textPrimary
     }
 
     private let descriptionLabel = UILabel().then {
         $0.font = UIFont.MDS.body.font
-        $0.textColor = DSColor.subtext
+        $0.textColor = DSColor.textSecondary
         $0.numberOfLines = 2
     }
 
