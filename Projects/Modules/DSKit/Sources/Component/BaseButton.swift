@@ -13,9 +13,9 @@ open class BaseButton: UIButton {
 
 public final class PrimaryButton: BaseButton {
     public override func configure() {
-        backgroundColor = DSColor.primary
+        backgroundColor = DSColor.Primary._100
         setTitleColor(.white, for: .normal)
-        titleLabel?.font = DSFont.semibold(size: 16)
+        titleLabel?.font = UIFont.MDS.body.font
         layer.cornerRadius = 12
     }
 }

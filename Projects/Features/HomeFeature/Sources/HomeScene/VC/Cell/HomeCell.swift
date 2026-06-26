@@ -8,12 +8,12 @@ final class HomeCell: UITableViewCell {
     static let identifier = "HomeCell"
 
     private let titleLabel = UILabel().then {
-        $0.font = DSFont.semibold(size: 16)
+        $0.font = UIFont.MDS.title.font
         $0.textColor = DSColor.text
     }
 
     private let descriptionLabel = UILabel().then {
-        $0.font = DSFont.regular(size: 14)
+        $0.font = UIFont.MDS.body.font
         $0.textColor = DSColor.subtext
         $0.numberOfLines = 2
     }
