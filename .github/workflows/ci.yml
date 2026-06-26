@@ -30,6 +30,7 @@ jobs:
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: "3.1"
+          bundler: "latest"
           bundler-cache: true
 
       - name: Create Secrets.xcconfig
@@ -47,6 +48,12 @@ jobs:
           DEVELOPMENT_TEAM = ${DEVELOPMENT_TEAM}
           EOF
 
+      - name: Write GoogleService-Info.plist
+        env:
+          GOOGLE_SERVICE_INFO_PLIST: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST }}
+        run: |
+          echo "$GOOGLE_SERVICE_INFO_PLIST" | base64 --decode > Projects/App/Resources/GoogleService-Info.plist
+
       - name: Cache SPM packages
         uses: actions/cache@v4
         with:
@@ -62,12 +69,6 @@ jobs:
 
       - name: Tuist generate
         run: tuist generate --no-open
-
-      - name: Boot Simulator
-        run: |
-          UDID=$(xcrun simctl list devices available | grep "iPhone 16" | grep -v "Plus\|Pro" | head -1 | grep -oE '[A-F0-9-]{36}')
-          xcrun simctl boot "$UDID" || true
-          xcrun simctl bootstatus "$UDID" -b
 
       - name: Run tests
         run: bundle exec fastlane test
