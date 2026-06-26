@@ -66,10 +66,13 @@ platform :ios do
       configuration: "Release",
       export_method: "app-store",
       output_directory: "build",
-      xcargs: "DEVELOPMENT_TEAM=#{ENV.fetch('DEVELOPMENT_TEAM', '')} -allowProvisioningUpdates -authenticationKeyPath #{API_KEY_PATH} -authenticationKeyID #{ENV.fetch('APP_STORE_CONNECT_API_KEY_ID', '')} -authenticationKeyIssuerID #{ENV.fetch('APP_STORE_CONNECT_API_KEY_ISSUER_ID', '')}",
+      xcargs: "DEVELOPMENT_TEAM=#{ENV.fetch('DEVELOPMENT_TEAM', '')}",
       export_options: {
         method: "app-store",
-        signingStyle: "automatic"
+        signingStyle: "manual",
+        provisioningProfiles: {
+          "app.nursemate.app" => "match AppStore app.nursemate.app"
+        }
       }
     )
 
@@ -111,10 +114,13 @@ platform :ios do
       configuration: "Release",
       export_method: "app-store",
       output_directory: "build",
-      xcargs: "DEVELOPMENT_TEAM=#{ENV.fetch('DEVELOPMENT_TEAM', '')} -allowProvisioningUpdates -authenticationKeyPath #{API_KEY_PATH} -authenticationKeyID #{ENV.fetch('APP_STORE_CONNECT_API_KEY_ID', '')} -authenticationKeyIssuerID #{ENV.fetch('APP_STORE_CONNECT_API_KEY_ISSUER_ID', '')}",
+      xcargs: "DEVELOPMENT_TEAM=#{ENV.fetch('DEVELOPMENT_TEAM', '')}",
       export_options: {
         method: "app-store",
-        signingStyle: "automatic"
+        signingStyle: "manual",
+        provisioningProfiles: {
+          "app.nursemate.app" => "match AppStore app.nursemate.app"
+        }
       }
     )
 
