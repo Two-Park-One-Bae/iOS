@@ -62,3 +62,8 @@ Package.resolved
 
 # GLM
 *.glm
+glm
+
+# Secrets
+XCConfig/Secrets.xcconfig
+Projects/App/Resources/GoogleService-Info.plist

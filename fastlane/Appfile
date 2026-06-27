@@ -1,0 +1,5 @@
+app_identifier("app.nursemate.app")
+apple_id("qwqwqw4756@gmail.com")
+
+itc_team_id(ENV["APP_STORE_CONNECT_TEAM_ID"] || "MHD24ZMA79")
+team_id(ENV["DEVELOPER_PORTAL_TEAM_ID"] || "MHD24ZMA79")

@@ -1,0 +1,6 @@
+#include "Secrets.xcconfig"
+
+CODE_SIGN_STYLE = Automatic
+ENABLE_USER_SCRIPT_SANDBOXING = NO
+SWIFT_EMIT_LOC_STRINGS = YES
+BASE_URL = https:$()/your-dev-api.com
