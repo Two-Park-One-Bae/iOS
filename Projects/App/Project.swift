@@ -19,7 +19,8 @@ let project = Project(
                 "AMPLITUDE_API_KEY": "$(AMPLITUDE_API_KEY)",
                 "BASE_URL": "$(BASE_URL)",
                 "CLARITY_PROJECT_ID": "$(CLARITY_PROJECT_ID)",
-"UILaunchScreen": ["UIColorName": "", "UIImageName": ""],
+                "NSCameraUsageDescription": "알약 사진 촬영을 위해 카메라 접근이 필요합니다.",
+                "UILaunchScreen": ["UIColorName": "", "UIImageName": ""],
                 "UIApplicationSceneManifest": [
                     "UIApplicationSupportsMultipleScenes": false,
                     "UISceneConfigurations": [
