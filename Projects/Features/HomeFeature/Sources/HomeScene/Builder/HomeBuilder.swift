@@ -1,4 +1,5 @@
 import UIKit
+import HomeFeatureInterface
 import BaseFeatureDependency
 
 public final class HomeBuilder: HomeFeatureBuildable {

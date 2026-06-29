@@ -6,6 +6,7 @@ let project = Project.makeModule(
     name: "HomeFeature",
     targets: [.staticFramework, .interface, .unitTest, .demo],
     internalDependencies: [
+        Dep.Features.Home.Interface,
         Dep.Core.Core,
         Dep.Domain.Domain,
         Dep.Data.Data,
