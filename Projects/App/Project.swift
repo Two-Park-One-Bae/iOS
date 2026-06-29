@@ -19,7 +19,7 @@ let project = Project(
                 "AMPLITUDE_API_KEY": "$(AMPLITUDE_API_KEY)",
                 "BASE_URL": "$(BASE_URL)",
                 "CLARITY_PROJECT_ID": "$(CLARITY_PROJECT_ID)",
-                "UILaunchScreen": ["UIColorName": "", "UIImageName": ""],
+"UILaunchScreen": ["UIColorName": "", "UIImageName": ""],
                 "UIApplicationSceneManifest": [
                     "UIApplicationSupportsMultipleScenes": false,
                     "UISceneConfigurations": [
@@ -34,6 +34,7 @@ let project = Project(
             resources: ["Resources/**"],
             dependencies: [
                 Dep.Features.Home.Feature,
+                Dep.Features.TabBar.Feature,
                 Dep.Core.Core,
             ],
             settings: .settings(base: XCConfig.base)

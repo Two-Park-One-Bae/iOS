@@ -82,10 +82,22 @@ public extension Project {
             )
         }
 
+        var schemes: [Scheme] = []
+        if targets.contains(.demo) {
+            schemes.append(
+                .scheme(
+                    name: "\(name)Demo",
+                    buildAction: .buildAction(targets: [.target("\(name)Demo")]),
+                    runAction: .runAction(executable: .target("\(name)Demo"))
+                )
+            )
+        }
+
         return Project(
             name: name,
             settings: .settings(base: XCConfig.base, configurations: XCConfig.framework),
-            targets: projectTargets
+            targets: projectTargets,
+            schemes: schemes
         )
     }
 }
