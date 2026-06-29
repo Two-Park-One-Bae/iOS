@@ -3,30 +3,62 @@ import Combine
 import SnapKit
 import Then
 import DSKit
-import Domain
 
 public final class HomeVC: UIViewController {
 
     // MARK: - Properties
+
     private let viewModel: HomeViewModel
     private var cancelBag = Set<AnyCancellable>()
-    weak var coordinator: HomeCoordinator?
 
-    private let itemSelectedSubject = PassthroughSubject<Int, Never>()
-    private var items: [HomeEntity] = []
+    private let drugIdentifySubject = PassthroughSubject<Void, Never>()
+    private let treatmentTimerSubject = PassthroughSubject<Void, Never>()
 
     // MARK: - UI
-    private lazy var tableView = UITableView(frame: .zero, style: .plain).then {
-        $0.register(HomeCell.self, forCellReuseIdentifier: HomeCell.identifier)
-        $0.separatorStyle = .none
-        $0.backgroundColor = DSColor.bgApp
-        $0.dataSource = self
-        $0.delegate = self
+
+    private let scrollView = UIScrollView().then {
+        $0.showsVerticalScrollIndicator = false
     }
 
-    private let loadingIndicator = UIActivityIndicatorView(style: .medium)
+    private let contentStack = UIStackView().then {
+        $0.axis = .vertical
+        $0.spacing = 20
+    }
+
+    private let greetingLabel = UILabel().then {
+        $0.text = "안녕하세요,"
+        $0.font = DSKitFontFamily.Pretendard.bold.font(size: 28)
+        $0.textColor = DSColor.textSecondary
+    }
+
+    private let roleLabel = UILabel().then {
+        $0.text = "간호사님"
+        $0.font = DSKitFontFamily.Pretendard.bold.font(size: 28)
+        $0.textColor = DSColor.textPrimary
+    }
+
+    private lazy var greetingStack = UIStackView(arrangedSubviews: [greetingLabel, roleLabel]).then {
+        $0.axis = .vertical
+        $0.spacing = 2
+    }
+
+    private let chipsStack = UIStackView().then {
+        $0.axis = .horizontal
+        $0.spacing = 8
+    }
+
+    private let cardsStack = UIStackView().then {
+        $0.axis = .vertical
+        $0.spacing = 12
+    }
+
+    private let activityStack = UIStackView().then {
+        $0.axis = .vertical
+        $0.spacing = 12
+    }
 
     // MARK: - Init
+
     public init(viewModel: HomeViewModel) {
         self.viewModel = viewModel
         super.init(nibName: nil, bundle: nil)
@@ -35,78 +67,119 @@ public final class HomeVC: UIViewController {
     required init?(coder: NSCoder) { fatalError() }
 
     // MARK: - Lifecycle
+
     public override func viewDidLoad() {
         super.viewDidLoad()
+        navigationController?.setNavigationBarHidden(true, animated: false)
         setUI()
         setLayout()
+        buildContent()
         bind()
     }
 
-    // MARK: - Binding
-    private func bind() {
-        let input = HomeViewModel.Input(
-            viewDidLoad: Just(()).eraseToAnyPublisher(),
-            itemSelected: itemSelectedSubject.eraseToAnyPublisher()
-        )
-        let output = viewModel.transform(input: input)
-
-        output.items
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] items in
-                self?.items = items
-                self?.tableView.reloadData()
-            }
-            .store(in: &cancelBag)
-
-        output.isLoading
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] isLoading in
-                isLoading ? self?.loadingIndicator.startAnimating()
-                          : self?.loadingIndicator.stopAnimating()
-            }
-            .store(in: &cancelBag)
-    }
-
     // MARK: - Setup
+
     private func setUI() {
         view.backgroundColor = DSColor.bgApp
-        navigationItem.title = "홈"
     }
 
     private func setLayout() {
-        view.addSubview(tableView)
-        view.addSubview(loadingIndicator)
+        view.addSubview(scrollView)
+        scrollView.addSubview(contentStack)
 
-        tableView.snp.makeConstraints {
-            $0.edges.equalTo(view.safeAreaLayoutGuide)
+        scrollView.snp.makeConstraints {
+            $0.top.equalTo(view.safeAreaLayoutGuide)
+            $0.leading.trailing.bottom.equalToSuperview()
         }
-        loadingIndicator.snp.makeConstraints {
-            $0.center.equalToSuperview()
+
+        contentStack.snp.makeConstraints {
+            $0.edges.equalToSuperview().inset(UIEdgeInsets(top: 20, left: 20, bottom: 20, right: 20))
+            $0.width.equalToSuperview().offset(-40)
         }
     }
-}
 
-// MARK: - UITableViewDataSource
-extension HomeVC: UITableViewDataSource {
-    public func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        items.count
+    // MARK: - Content
+
+    private func buildContent() {
+        contentStack.addArrangedSubview(greetingStack)
+        contentStack.addArrangedSubview(makeChipsRow())
+        contentStack.addArrangedSubview(makeCardsSection())
+        contentStack.addArrangedSubview(makeActivitySection())
     }
 
-    public func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        guard let cell = tableView.dequeueReusableCell(
-            withIdentifier: HomeCell.identifier,
-            for: indexPath
-        ) as? HomeCell else { return UITableViewCell() }
-        cell.configure(with: items[indexPath.row])
-        return cell
-    }
-}
+    private func makeChipsRow() -> UIView {
+        let wardChip = DSChip(text: "병동 다이어 2")
+        let recentChip = DSChip(text: "최근 작업 9")
+        let spacer = UIView()
 
-// MARK: - UITableViewDelegate
-extension HomeVC: UITableViewDelegate {
-    public func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        tableView.deselectRow(at: indexPath, animated: true)
-        itemSelectedSubject.send(indexPath.row)
-        coordinator?.pushDetail(id: items[indexPath.row].id)
+        let stack = UIStackView(arrangedSubviews: [wardChip, recentChip, spacer]).then {
+            $0.axis = .horizontal
+            $0.spacing = 8
+        }
+        return stack
+    }
+
+    private func makeCardsSection() -> UIView {
+        let drugCard = DSListRow(
+            icon: .search,
+            title: "약물 식별",
+            subtitle: "장기 처방약을 간편히 식별하고 성분 정보를 확인하세요."
+        )
+        drugCard.setIconBackground(DSColor.Primary._50)
+        drugCard.setIconTint(DSColor.Primary._500)
+        drugCard.onTap { [weak self] in self?.drugIdentifySubject.send() }
+
+        let timerCard = DSListRow(
+            icon: .clock,
+            title: "처치 타이머",
+            subtitle: "투약일 처치 시간을 체계적으로 관리하세요."
+        )
+        timerCard.setIconBackground(DSColor.Secondary._50)
+        timerCard.setIconTint(DSColor.Secondary._500)
+        timerCard.onTap { [weak self] in self?.treatmentTimerSubject.send() }
+
+        let stack = UIStackView(arrangedSubviews: [drugCard, timerCard]).then {
+            $0.axis = .vertical
+            $0.spacing = 12
+        }
+        return stack
+    }
+
+    private func makeActivitySection() -> UIView {
+        let titleLabel = UILabel().then {
+            $0.text = "최근 활동"
+            $0.font = DSKitFontFamily.Pretendard.semiBold.font(size: 18)
+            $0.textColor = DSColor.textPrimary
+            $0.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        }
+        let moreBtn = UIButton(type: .system).then {
+            $0.setTitle("전체보기", for: .normal)
+            $0.titleLabel?.font = DSKitFontFamily.Pretendard.medium.font(size: 13)
+            $0.setTitleColor(DSColor.Primary._500, for: .normal)
+        }
+        let headerRow = UIStackView(arrangedSubviews: [titleLabel, moreBtn]).then {
+            $0.axis = .horizontal
+            $0.alignment = .center
+        }
+
+        let row = DSListRow(icon: .search, title: "이부프로펜 200mg", subtitle: "오늘 오전 9:21")
+        row.setChevronHidden(true)
+
+        let stack = UIStackView(arrangedSubviews: [headerRow, row]).then {
+            $0.axis = .vertical
+            $0.spacing = 12
+        }
+        return stack
+    }
+
+    // MARK: - Bind
+
+    private func bind() {
+        let input = HomeViewModel.Input(
+            viewDidLoad: Just(()).eraseToAnyPublisher(),
+            drugIdentifyTapped: drugIdentifySubject.eraseToAnyPublisher(),
+            treatmentTimerTapped: treatmentTimerSubject.eraseToAnyPublisher()
+        )
+        _ = viewModel.transform(input: input)
     }
 }

@@ -56,5 +56,15 @@ public struct Dep {
                 path: .relativeToRoot("Projects/Features/HomeFeature")
             )
         }
+        public struct TabBar {
+            public static let Feature = TargetDependency.project(
+                target: "TabBarFeature",
+                path: .relativeToRoot("Projects/Features/TabBarFeature")
+            )
+            public static let Interface = TargetDependency.project(
+                target: "TabBarFeatureInterface",
+                path: .relativeToRoot("Projects/Features/TabBarFeature")
+            )
+        }
     }
 }
