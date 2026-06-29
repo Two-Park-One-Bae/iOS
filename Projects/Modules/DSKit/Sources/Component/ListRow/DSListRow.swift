@@ -133,6 +133,31 @@ extension DSListRow {
     public func setChevronHidden(_ hidden: Bool) {
         chevronView.isHidden = hidden
     }
+
+    public func setIconBackground(_ color: UIColor) {
+        iconBackground.backgroundColor = color
+    }
+
+    public func setIconTint(_ color: UIColor) {
+        iconImageView.tintColor = color
+    }
+
+    public func onTap(_ handler: @escaping () -> Void) {
+        isUserInteractionEnabled = true
+        let recognizer = DSListRowTapRecognizer(target: self, action: #selector(handleTap))
+        recognizer.handler = handler
+        addGestureRecognizer(recognizer)
+    }
+
+    @objc private func handleTap(_ recognizer: DSListRowTapRecognizer) {
+        recognizer.handler?()
+    }
+}
+
+// MARK: - Tap Recognizer
+
+private final class DSListRowTapRecognizer: UITapGestureRecognizer {
+    var handler: (() -> Void)?
 }
 
 // MARK: - Preview
