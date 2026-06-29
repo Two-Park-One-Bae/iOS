@@ -1,5 +1,4 @@
 import UIKit
-import HomeFeature
 import BaseFeatureDependency
 
 final class SceneDelegate: UIResponder, UIWindowSceneDelegate {

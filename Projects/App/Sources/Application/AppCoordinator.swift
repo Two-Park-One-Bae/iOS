@@ -1,15 +1,18 @@
 import UIKit
 import BaseFeatureDependency
-import HomeFeature
+import TabBarFeature
 
 final class AppCoordinator: BaseCoordinator {
     override func start() {
-        showHome()
+        showTabBar()
     }
 
-    private func showHome() {
-        let homeCoordinator = HomeCoordinator(navigationController: navigationController)
-        addChild(homeCoordinator)
-        homeCoordinator.start()
+    private func showTabBar() {
+        let tabBarCoordinator = TabBarCoordinator(
+            navigationController: navigationController,
+            homeBuilder: HomeFeatureBuilder()
+        )
+        addChild(tabBarCoordinator)
+        tabBarCoordinator.start()
     }
 }
