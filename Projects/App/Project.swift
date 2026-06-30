@@ -20,6 +20,7 @@ let project = Project(
                 "BASE_URL": "$(BASE_URL)",
                 "CLARITY_PROJECT_ID": "$(CLARITY_PROJECT_ID)",
                 "NSCameraUsageDescription": "알약 사진 촬영을 위해 카메라 접근이 필요합니다.",
+                "NSPhotoLibraryUsageDescription": "앨범에서 알약 사진을 선택하기 위해 접근이 필요합니다.",
                 "UILaunchScreen": ["UIColorName": "", "UIImageName": ""],
                 "UIApplicationSceneManifest": [
                     "UIApplicationSupportsMultipleScenes": false,
@@ -36,6 +37,7 @@ let project = Project(
             dependencies: [
                 Dep.Features.Home.Feature,
                 Dep.Features.TabBar.Feature,
+                Dep.Features.DrugIdentification.Feature,
                 Dep.Core.Core,
             ],
             settings: .settings(base: XCConfig.base)

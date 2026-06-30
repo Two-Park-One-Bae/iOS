@@ -2,6 +2,8 @@ import Core
 import Domain
 import Data
 import Networks
+import DrugIdentificationFeatureInterface
+import DrugIdentificationFeature
 
 enum RegisterDependencies {
     static func register() {
@@ -18,6 +20,11 @@ enum RegisterDependencies {
         // UseCases
         container.register(HomeUseCaseProtocol.self) {
             DefaultHomeUseCase(repository: container.resolve(HomeRepositoryProtocol.self))
+        }
+
+        // Feature Builders
+        container.register(DrugIdentificationFeatureBuildable.self) {
+            DrugIdentificationBuilder()
         }
     }
 }
