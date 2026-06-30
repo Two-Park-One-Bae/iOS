@@ -66,5 +66,15 @@ public struct Dep {
                 path: .relativeToRoot("Projects/Features/TabBarFeature")
             )
         }
+        public struct DrugIdentification {
+            public static let Feature = TargetDependency.project(
+                target: "DrugIdentificationFeature",
+                path: .relativeToRoot("Projects/Features/DrugIdentificationFeature")
+            )
+            public static let Interface = TargetDependency.project(
+                target: "DrugIdentificationFeatureInterface",
+                path: .relativeToRoot("Projects/Features/DrugIdentificationFeature")
+            )
+        }
     }
 }
