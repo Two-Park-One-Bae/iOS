@@ -6,10 +6,14 @@ public final class CameraPicker: NSObject {
 
     // MARK: - Callbacks
 
-    /// 이미지 선택 완료 시 호출
     public var onImageSelected: ((UIImage) -> Void)?
-    /// 카메라 권한 거부 시 호출
     public var onPermissionDenied: ((Source) -> Void)?
+    public var onCancelled: (() -> Void)?
+
+    // MARK: - Options
+
+    public var squareMode: Bool = false
+    public var customOverlay: UIView?
 
     // MARK: - Types
 
@@ -20,14 +24,15 @@ public final class CameraPicker: NSObject {
 
     // MARK: - Private
 
-    /// 순환 참조 방지를 위해 weak 참조
     private weak var presenter: UIViewController?
+    private weak var activePicker: UIImagePickerController?
+    private var isGalleryTransition = false
 
     // MARK: - Init
 
     public override init() {}
 
-    // MARK: - Public
+    // MARK: - Present
 
     public func present(from viewController: UIViewController, source: Source) {
         self.presenter = viewController
@@ -44,15 +49,45 @@ public final class CameraPicker: NSObject {
         }
     }
 
+    // MARK: - Camera Controls (외부 오버레이용)
+
+    public func takePicture() {
+        activePicker?.takePicture()
+    }
+
+    public func dismissCamera() {
+        activePicker?.dismiss(animated: true)
+        onCancelled?()
+    }
+
+    @discardableResult
+    public func toggleFlash() -> Bool {
+        guard let picker = activePicker else { return false }
+        switch picker.cameraFlashMode {
+        case .off:
+            picker.cameraFlashMode = .on
+            return true
+        default:
+            picker.cameraFlashMode = .off
+            return false
+        }
+    }
+
+    public func openGallery() {
+        isGalleryTransition = true
+        activePicker?.dismiss(animated: true) { [weak self] in
+            self?.isGalleryTransition = false
+            self?.showPhotoLibrary()
+        }
+    }
+
     // MARK: - Camera
 
-    /// 카메라 권한 상태 확인 후 요청
     private func requestCameraPermission(completion: @escaping (Bool) -> Void) {
         switch AVCaptureDevice.authorizationStatus(for: .video) {
         case .authorized:
             completion(true)
         case .notDetermined:
-            // 최초 진입 시 권한 팝업 표시
             AVCaptureDevice.requestAccess(for: .video, completionHandler: completion)
         default:
             completion(false)
@@ -64,12 +99,18 @@ public final class CameraPicker: NSObject {
         let picker = UIImagePickerController()
         picker.sourceType = .camera
         picker.delegate = self
+        activePicker = picker
+
+        if squareMode, let overlay = customOverlay {
+            picker.showsCameraControls = false
+            picker.cameraOverlayView = overlay
+        }
+
         presenter?.present(picker, animated: true)
     }
 
     // MARK: - Photo Library
 
-    /// PHPickerViewController 사용 — iOS 14+, 별도 권한 요청 불필요
     private func showPhotoLibrary() {
         var config = PHPickerConfiguration(photoLibrary: .shared())
         config.selectionLimit = 1
@@ -77,6 +118,18 @@ public final class CameraPicker: NSObject {
         let picker = PHPickerViewController(configuration: config)
         picker.delegate = self
         presenter?.present(picker, animated: true)
+    }
+
+    // MARK: - Square Crop
+
+    private func cropToSquare(_ image: UIImage) -> UIImage {
+        guard let cgImage = image.cgImage else { return image }
+        let side = min(CGFloat(cgImage.width), CGFloat(cgImage.height))
+        let x = (CGFloat(cgImage.width) - side) / 2
+        let y = (CGFloat(cgImage.height) - side) / 2
+        let cropRect = CGRect(x: x, y: y, width: side, height: side)
+        guard let cropped = cgImage.cropping(to: cropRect) else { return image }
+        return UIImage(cgImage: cropped, scale: image.scale, orientation: image.imageOrientation)
     }
 }
 
@@ -89,11 +142,15 @@ extension CameraPicker: UIImagePickerControllerDelegate, UINavigationControllerD
     ) {
         picker.dismiss(animated: true)
         guard let image = info[.originalImage] as? UIImage else { return }
-        onImageSelected?(image)
+        let result = squareMode ? cropToSquare(image) : image
+        onImageSelected?(result)
     }
 
     public func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
         picker.dismiss(animated: true)
+        if !isGalleryTransition {
+            onCancelled?()
+        }
     }
 }
 
@@ -105,11 +162,11 @@ extension CameraPicker: PHPickerViewControllerDelegate {
         guard let provider = results.first?.itemProvider,
               provider.canLoadObject(ofClass: UIImage.self) else { return }
 
-        /// loadObject는 백그라운드 스레드에서 실행되므로 메인 스레드로 전환
         provider.loadObject(ofClass: UIImage.self) { [weak self] object, _ in
-            guard let image = object as? UIImage else { return }
+            guard let self, let image = object as? UIImage else { return }
+            let result = self.squareMode ? self.cropToSquare(image) : image
             DispatchQueue.main.async {
-                self?.onImageSelected?(image)
+                self.onImageSelected?(result)
             }
         }
     }
