@@ -104,6 +104,14 @@ public final class CameraPicker: NSObject {
         if squareMode, let overlay = customOverlay {
             picker.showsCameraControls = false
             picker.cameraOverlayView = overlay
+
+            let screen = UIScreen.main.bounds
+            let screenRatio = screen.height / screen.width
+            let cameraRatio: CGFloat = 4.0 / 3.0
+            if screenRatio > cameraRatio {
+                let scale = screenRatio / cameraRatio
+                picker.cameraViewTransform = CGAffineTransform(scaleX: scale, y: scale)
+            }
         }
 
         presenter?.present(picker, animated: true)
