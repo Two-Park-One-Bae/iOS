@@ -37,6 +37,12 @@ public struct Dep {
                 path: .relativeToRoot("Projects/Modules/DSKit")
             )
         }
+        public struct SegmentationKit {
+            public static let SegmentationKit = TargetDependency.project(
+                target: "SegmentationKit",
+                path: .relativeToRoot("Projects/Modules/SegmentationKit")
+            )
+        }
     }
 
     public struct Features {

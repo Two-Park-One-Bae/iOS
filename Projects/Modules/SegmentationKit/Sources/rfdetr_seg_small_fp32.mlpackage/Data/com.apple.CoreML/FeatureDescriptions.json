@@ -1,0 +1,24 @@
+{
+  "Inputs" : {
+    "image" : {
+      "MLFeatureShortDescription" : "--"
+    }
+  },
+  "Outputs" : {
+    "pred_boxes" : {
+      "MLFeatureShortDescription" : "--"
+    },
+    "pred_masks" : {
+      "MLFeatureShortDescription" : "--"
+    },
+    "pred_logits" : {
+      "MLFeatureShortDescription" : "--"
+    }
+  },
+  "TrainingInputs" : {
+
+  },
+  "States" : {
+
+  }
+}
