@@ -40,7 +40,7 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
 
     private func setupCameraPickerCallbacks() {
         cameraPicker.onImageSelected = { [weak self] image in
-            self?.showResult(image: image)
+            self?.showPreview(image: image)
         }
         cameraPicker.onPermissionDenied = { [weak self] _ in
             self?.showPermissionDenied()
@@ -48,6 +48,22 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
     }
 
     // MARK: - Navigation
+
+    private func showPreview(image: UIImage) {
+        let vc = PhotoPreviewVC(image: image)
+        vc.onBackTapped = { [weak self] in
+            self?.navigationController.popViewController(animated: true)
+        }
+        vc.onRetake = { [weak self] in
+            guard let self else { return }
+            self.navigationController.popViewController(animated: false)
+            self.cameraPicker.present(from: self.navigationController, source: .camera)
+        }
+        vc.onUsePhoto = { [weak self] in
+            self?.showResult(image: image)
+        }
+        navigationController.pushViewController(vc, animated: true)
+    }
 
     private func showPermissionDenied() {
         let vc = PermissionDeniedVC()
