@@ -21,6 +21,7 @@ let project = Project(
                 "CLARITY_PROJECT_ID": "$(CLARITY_PROJECT_ID)",
                 "NSCameraUsageDescription": "알약 사진 촬영을 위해 카메라 접근이 필요합니다.",
                 "NSPhotoLibraryUsageDescription": "앨범에서 알약 사진을 선택하기 위해 접근이 필요합니다.",
+                "UIUserInterfaceStyle": "Light",
                 "UILaunchScreen": ["UIColorName": "", "UIImageName": ""],
                 "UIApplicationSceneManifest": [
                     "UIApplicationSupportsMultipleScenes": false,
