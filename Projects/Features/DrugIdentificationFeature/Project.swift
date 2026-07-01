@@ -12,6 +12,7 @@ let project = Project.makeModule(
         Dep.Data.Data,
         Dep.Modules.DSKit.DSKit,
         Dep.Modules.Networks.Networks,
+        Dep.Modules.SegmentationKit.SegmentationKit,
         Dep.Features.Base.Base,
         .SPM.SnapKit,
         .SPM.Then,

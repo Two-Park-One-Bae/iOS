@@ -25,7 +25,12 @@ public extension Project {
                     product: product,
                     bundleId: bundleId,
                     deploymentTargets: Environment.deploymentTarget,
-                    sources: ["Sources/**"],
+                    // .mlpackage는 디렉토리 번들이라 ** 글로브가 내부 파일까지 펼쳐 빌드 페이즈 오류 발생.
+                    // 내부 파일을 제외하고 .mlpackage 폴더 자체를 CoreML 컴파일 페이즈에 올리기 위해 excluding 처리.
+                    sources: [
+                        .glob("Sources/**", excluding: ["Sources/*.mlpackage", "Sources/*.mlpackage/**"]),
+                        .glob("Sources/*.mlpackage"),
+                    ],
                     resources: hasResources ? ["Resources/**"] : nil,
                     dependencies: allDependencies,
                     settings: .settings(base: XCConfig.base)
