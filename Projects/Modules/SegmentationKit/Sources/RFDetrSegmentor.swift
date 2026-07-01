@@ -47,7 +47,7 @@ public struct CroppedDetection: Identifiable {
     public let pixelSize: CGSize
 }
 
-public final class RFDETRRunner: @unchecked Sendable {
+public final class RFDetrSegmentor: @unchecked Sendable {
     public static let inputSize  = 576
     public static let queryCount = 100
     public static let maskSize   = 144
@@ -177,7 +177,7 @@ public final class RFDETRRunner: @unchecked Sendable {
     }
 
     public init() throws {
-        guard let url = Bundle(for: RFDETRRunner.self).url(forResource: "rfdetr_seg_small_fp32", withExtension: "mlmodelc") else {
+        guard let url = Bundle(for: RFDetrSegmentor.self).url(forResource: "rfdetr_seg_small_fp32", withExtension: "mlmodelc") else {
             throw RFDETRError.missingModel
         }
         let config = MLModelConfiguration()
