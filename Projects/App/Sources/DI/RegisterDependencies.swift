@@ -11,8 +11,7 @@ enum RegisterDependencies {
 
         // Network Services
         let homeAPIService = DefaultHomeAPIService()
-        // TODO: 인증 구현 후 AccessTokenPlugin + ReissueInterceptor 추가
-        let pillService = DefaultPillService(plugins: [NetworkLoggerPlugin()])
+        let pillService = DefaultPillService.standard
 
         // Repositories
         container.register(HomeRepositoryProtocol.self) {
