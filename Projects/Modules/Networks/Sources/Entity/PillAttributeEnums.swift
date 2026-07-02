@@ -8,7 +8,7 @@
 import Foundation
 
 // 서버가 새 케이스를 추가해도 앱이 크래시 나지 않도록 unknown 처리
-public enum PillColor: String, Decodable {
+public enum PillColor: String, Codable {
     case white      = "WHITE"
     case yellow     = "YELLOW"
     case orange     = "ORANGE"
@@ -33,7 +33,7 @@ public enum PillColor: String, Decodable {
     }
 }
 
-public enum PillShape: String, Decodable {
+public enum PillShape: String, Codable {
     case round       = "ROUND"
     case oval        = "OVAL"
     case oblong      = "OBLONG"
@@ -53,7 +53,7 @@ public enum PillShape: String, Decodable {
     }
 }
 
-public enum PillFormulation: String, Decodable {
+public enum PillFormulation: String, Codable {
     case tablet      = "TABLET"
     case hardCapsule = "HARD_CAPSULE"
     case softCapsule = "SOFT_CAPSULE"
@@ -67,7 +67,7 @@ public enum PillFormulation: String, Decodable {
 }
 
 // 구분선. 각인 텍스트에서 파생 (십자분할선 → PLUS, 분할선 → MINUS)
-public enum DividingLine: String, Decodable {
+public enum DividingLine: String, Codable {
     case plus  = "PLUS"
     case minus = "MINUS"
     case unknown
