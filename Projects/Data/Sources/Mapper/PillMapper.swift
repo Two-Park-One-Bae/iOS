@@ -110,8 +110,7 @@ extension PillCandidateEntity {
             pillCode:     pillCode,
             pillName:     pillName,
             companyName:  companyName,
-            pillImageUrl: pillImageUrl,
-            matchScore:   matchScore
+            pillImageUrl: pillImageUrl
         )
     }
 }
