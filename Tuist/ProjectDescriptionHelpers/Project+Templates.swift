@@ -79,6 +79,19 @@ public extension Project {
                     infoPlist: .extendingDefault(with: [
                         "UIRequiresFullScreen": true,
                         "UILaunchScreen": ["UIColorName": "", "UIImageName": ""],
+                        "NSCameraUsageDescription": "카메라로 알약을 촬영합니다.",
+                        "NSPhotoLibraryUsageDescription": "갤러리에서 알약 사진을 선택합니다.",
+                        "UIApplicationSceneManifest": .dictionary([
+                            "UIApplicationSupportsMultipleScenes": .boolean(false),
+                            "UISceneConfigurations": .dictionary([
+                                "UIWindowSceneSessionRoleApplication": .array([
+                                    .dictionary([
+                                        "UISceneConfigurationName": .string("Default Configuration"),
+                                        "UISceneDelegateClassName": .string("$(PRODUCT_MODULE_NAME).SceneDelegate"),
+                                    ])
+                                ])
+                            ])
+                        ]),
                     ]),
                     sources: ["Demo/Sources/**"],
                     dependencies: [.target(name: name)],
