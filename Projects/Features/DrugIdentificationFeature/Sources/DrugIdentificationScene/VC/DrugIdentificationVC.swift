@@ -2,6 +2,7 @@ import UIKit
 import SnapKit
 import Then
 import DSKit
+import Domain
 
 // ⑤ 인식 결과 — 촬영 사진(bbox 오버레이) + 알약 목록 + 결과 확인 푸터
 public final class DrugIdentificationVC: UIViewController {
@@ -21,6 +22,7 @@ public final class DrugIdentificationVC: UIViewController {
     private var rowViews: [Int: PillResultRowView] = [:]
     private var identifiedIndices = Set<Int>()
     private var deletedIndices = Set<Int>()
+    private var selectedCandidates: [Int: PillCandidateModel] = [:]
 
     // MARK: - UI
 
@@ -232,10 +234,18 @@ public final class DrugIdentificationVC: UIViewController {
 
     // MARK: - Selection
 
-    func applySelection(pillIndex: Int, name: String) {
-        rowViews[pillIndex]?.showSelected(name: name)
+    func applySelection(pillIndex: Int, candidate: PillCandidateModel) {
+        rowViews[pillIndex]?.showSelected(name: candidate.pillName ?? "이름 미상")
+        selectedCandidates[pillIndex] = candidate
         identifiedIndices.insert(pillIndex)
         updateProgress()
+    }
+
+    // 최종 결과 리스트에 넘길 확정 결과 (삭제 제외 + 선택된 후보 매핑)
+    func finalizedResults() -> [(pill: IdentifiedPill, candidate: PillCandidateModel)] {
+        pills
+            .filter { !deletedIndices.contains($0.index) }
+            .compactMap { pill in selectedCandidates[pill.index].map { (pill, $0) } }
     }
 
     private func updateProgress() {

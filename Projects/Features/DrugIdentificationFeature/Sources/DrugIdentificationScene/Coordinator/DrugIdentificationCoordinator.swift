@@ -100,10 +100,35 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
         vc.onSelectPill = { [weak self] pill in
             self?.showEdit(pill: pill)
         }
-        vc.onConfirm = {
-            // TODO: 최종 결과 확인
+        vc.onConfirm = { [weak self] in
+            self?.showFinalResult()
         }
         replace(loadingVC, with: vc)
+    }
+
+    // MARK: - ⑨ 최종 결과
+
+    private func showFinalResult() {
+        guard let resultVC else { return }
+        let results = resultVC.finalizedResults()
+        guard !results.isEmpty else { return }
+
+        let pills = results.map(\.pill)
+        let candidates = Dictionary(uniqueKeysWithValues: results.map { ($0.pill.index, $0.candidate) })
+
+        let vc = FinalResultVC(pills: pills, candidates: candidates)
+        vc.onBackTapped = { [weak self] in
+            self?.navigationController.popViewController(animated: true)
+        }
+        // 스펙 NM-136: 공유는 텍스트 복사(MVP·화면 유지)
+        vc.onShare = {
+            let text = results.map { "\($0.pill.index). \($0.candidate.pillName ?? "이름 미상")" }
+                .joined(separator: "\n")
+            UIPasteboard.general.string = text
+        }
+        // 완료 → 홈 이동. 메인 앱 연동 시 Coordinator 종료/디스미스 처리
+        vc.onComplete = { /* TODO: 홈 화면으로 이동 */ }
+        navigationController.pushViewController(vc, animated: true)
     }
 
     // MARK: - ⑧ 알약 수정
@@ -124,7 +149,7 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
         vc.onConfirm = { [weak self] candidate in
             self?.resultVC?.applySelection(
                 pillIndex: pill.index,
-                name: candidate.pillName ?? "이름 미상"
+                candidate: candidate
             )
             self?.navigationController.popViewController(animated: true)
         }
