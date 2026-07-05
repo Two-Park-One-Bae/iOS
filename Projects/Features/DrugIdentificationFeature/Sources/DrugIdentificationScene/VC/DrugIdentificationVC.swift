@@ -18,6 +18,9 @@ public final class DrugIdentificationVC: UIViewController {
     private let capturedImage: UIImage
     private let photoSize: CGFloat = 300
 
+    private var rowViews: [Int: PillResultRowView] = [:]
+    private var identifiedIndices = Set<Int>()
+
     // MARK: - UI
 
     private let navBar = DSNavBar(title: "인식 결과").then {
@@ -157,10 +160,36 @@ public final class DrugIdentificationVC: UIViewController {
         for pill in pills {
             let row = PillResultRowView(pill: pill)
             row.onTap = { [weak self] in self?.onSelectPill?(pill) }
+            rowViews[pill.index] = row
             listStack.addArrangedSubview(row)
         }
 
         contentStack.addArrangedSubview(listStack)
+
+        updateProgress()
+    }
+
+    // MARK: - Selection
+
+    func applySelection(pillIndex: Int, name: String) {
+        rowViews[pillIndex]?.showSelected(name: name)
+        identifiedIndices.insert(pillIndex)
+        updateProgress()
+    }
+
+    private func updateProgress() {
+        let total = pills.count
+        let done = identifiedIndices.count
+
+        if done == total {
+            progressLabel.text = "모든 알약을 식별했어요"
+            progressLabel.textColor = DSColor.Primary._500
+            confirmButton.setEnabled(true)
+        } else {
+            progressLabel.text = "알약을 모두 식별해주세요 · \(done)/\(total)"
+            progressLabel.textColor = DSColor.textTertiary
+            confirmButton.setEnabled(false)
+        }
     }
 
     // 사진 위 bbox + 번호 태그

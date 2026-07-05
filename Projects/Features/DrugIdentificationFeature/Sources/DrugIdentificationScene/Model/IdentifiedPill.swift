@@ -64,6 +64,17 @@ extension PillFormulationModel {
         case .unknown:     return "미상"
         }
     }
+
+    // 결과행 칩용 축약명
+    var shortName: String {
+        switch self {
+        case .tablet:      return "정제"
+        case .hardCapsule: return "경질"
+        case .softCapsule: return "연질"
+        case .other:       return "기타"
+        case .unknown:     return "미상"
+        }
+    }
 }
 
 extension DividingLineModel {
