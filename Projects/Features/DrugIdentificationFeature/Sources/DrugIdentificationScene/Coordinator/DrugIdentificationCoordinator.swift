@@ -1,6 +1,7 @@
 import UIKit
 import BaseFeatureDependency
 import Core
+import Domain
 
 public final class DrugIdentificationCoordinator: BaseCoordinator {
 
@@ -100,6 +101,9 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
         vc.onSelectPill = { [weak self] pill in
             self?.showEdit(pill: pill)
         }
+        vc.onAddPill = { [weak self] in
+            self?.showManualAdd()
+        }
         vc.onConfirm = { [weak self] in
             self?.showFinalResult()
         }
@@ -151,6 +155,27 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
                 pillIndex: pill.index,
                 candidate: candidate
             )
+            self?.navigationController.popViewController(animated: true)
+        }
+        navigationController.pushViewController(vc, animated: true)
+    }
+
+    // MARK: - ⑧ 알약 수동 추가 (NM-187)
+
+    private func showManualAdd() {
+        guard let resultVC else { return }
+        let index = resultVC.nextManualIndex()
+        let empty = PillAttributeModel(
+            pillId: "manual-\(index)", colors: [], isTransparent: false,
+            shape: nil, formulation: nil, front: nil, back: nil, error: nil
+        )
+        let viewModel = PillEditViewModel(pillIndex: index, attribute: empty, thumbnail: nil)
+        let vc = PillEditVC(viewModel: viewModel)
+        vc.onBackTapped = { [weak self] in self?.navigationController.popViewController(animated: true) }
+        vc.onCancel = { [weak self] in self?.navigationController.popViewController(animated: true) }
+        // 빈 입력으로 후보 선택·확정 시에만 결과 목록에 새 카드로 추가 (취소 시 미추가)
+        vc.onConfirm = { [weak self] candidate in
+            self?.resultVC?.addManualPill(index: index, candidate: candidate)
             self?.navigationController.popViewController(animated: true)
         }
         navigationController.pushViewController(vc, animated: true)
