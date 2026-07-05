@@ -10,6 +10,7 @@ public final class DrugIdentificationVC: UIViewController {
     // MARK: - Callbacks
 
     var onSelectPill: ((IdentifiedPill) -> Void)?
+    var onAddPill: (() -> Void)?
     var onConfirm: (() -> Void)?
     var onBackTapped: (() -> Void)?
 
@@ -23,6 +24,7 @@ public final class DrugIdentificationVC: UIViewController {
     private var identifiedIndices = Set<Int>()
     private var deletedIndices = Set<Int>()
     private var selectedCandidates: [Int: PillCandidateModel] = [:]
+    private var manualPills: [IdentifiedPill] = []
 
     // MARK: - UI
 
@@ -40,6 +42,13 @@ public final class DrugIdentificationVC: UIViewController {
     }
 
     private let photoCard = PhotoCardView()
+
+    private let listStack = UIStackView().then {
+        $0.axis = .vertical
+        $0.spacing = 10
+        $0.isLayoutMarginsRelativeArrangement = true
+        $0.layoutMargins = UIEdgeInsets(top: 20, left: 20, bottom: 20, right: 20)
+    }
 
     private let footer = UIView().then {
         $0.backgroundColor = DSColor.bgApp
@@ -152,13 +161,7 @@ public final class DrugIdentificationVC: UIViewController {
             $0.font = DSKitFontFamily.Pretendard.bold.font(size: 15)
             $0.textColor = DSColor.textPrimary
         }
-
-        let listStack = UIStackView(arrangedSubviews: [listTitle]).then {
-            $0.axis = .vertical
-            $0.spacing = 10
-            $0.isLayoutMarginsRelativeArrangement = true
-            $0.layoutMargins = UIEdgeInsets(top: 20, left: 20, bottom: 20, right: 20)
-        }
+        listStack.addArrangedSubview(listTitle)
 
         for pill in pills {
             let row = PillResultRowView(pill: pill)
@@ -167,6 +170,10 @@ public final class DrugIdentificationVC: UIViewController {
             rowViews[pill.index] = row
             listStack.addArrangedSubview(row)
         }
+
+        let addButton = AddPillButton()
+        addButton.addTarget(self, action: #selector(addTapped), for: .touchUpInside)
+        listStack.addArrangedSubview(addButton)
 
         contentStack.addArrangedSubview(listStack)
 
@@ -241,15 +248,48 @@ public final class DrugIdentificationVC: UIViewController {
         updateProgress()
     }
 
+    // NM-187 수동 추가: 다음 신규 알약 번호
+    func nextManualIndex() -> Int {
+        let allIndices = Set(pills.map(\.index)).union(manualPills.map(\.index))
+        return (allIndices.max() ?? 0) + 1
+    }
+
+    // NM-187 수동 추가: 빈 입력으로 선택·확정된 후보를 새 카드로 추가 (추가 버튼 앞에 삽입)
+    func addManualPill(index: Int, candidate: PillCandidateModel) {
+        let pill = IdentifiedPill(
+            index: index,
+            thumbnail: nil,
+            boundingBox: .zero,
+            attribute: PillAttributeModel(
+                pillId: "manual-\(index)", colors: [], isTransparent: false,
+                shape: nil, formulation: nil, front: nil, back: nil, error: nil
+            )
+        )
+        manualPills.append(pill)
+        let row = PillResultRowView(pill: pill)
+        row.onTap = { [weak self] in self?.onSelectPill?(pill) }
+        row.onMenu = { [weak self] in self?.showRowMenu(for: pill, anchor: row) }
+        rowViews[index] = row
+        selectedCandidates[index] = candidate
+        identifiedIndices.insert(index)
+        row.showSelected(name: candidate.pillName ?? "이름 미상")
+        let insertAt = max(0, listStack.arrangedSubviews.count - 1)
+        listStack.insertArrangedSubview(row, at: insertAt)
+        updateProgress()
+    }
+
     // 최종 결과 리스트에 넘길 확정 결과 (삭제 제외 + 선택된 후보 매핑)
     func finalizedResults() -> [(pill: IdentifiedPill, candidate: PillCandidateModel)] {
-        pills
+        let base = pills
             .filter { !deletedIndices.contains($0.index) }
             .compactMap { pill in selectedCandidates[pill.index].map { (pill, $0) } }
+        let manual = manualPills
+            .compactMap { pill in selectedCandidates[pill.index].map { (pill, $0) } }
+        return base + manual
     }
 
     private func updateProgress() {
-        let total = pills.count - deletedIndices.count
+        let total = pills.count - deletedIndices.count + manualPills.count
         let done = identifiedIndices.count
 
         if done == total {
@@ -318,6 +358,10 @@ public final class DrugIdentificationVC: UIViewController {
 
     @objc private func confirmTapped() {
         onConfirm?()
+    }
+
+    @objc private func addTapped() {
+        onAddPill?()
     }
 }
 
