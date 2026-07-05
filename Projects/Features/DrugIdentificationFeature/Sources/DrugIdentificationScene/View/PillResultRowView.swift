@@ -8,8 +8,10 @@ import Domain
 final class PillResultRowView: UIView {
 
     var onTap: (() -> Void)?
+    var onMenu: (() -> Void)?
 
     private let pill: IdentifiedPill
+    private var isFailed: Bool { pill.attribute.error != nil }
 
     private let titleLabel = UILabel().then {
         $0.text = "알약을 선택해주세요"
@@ -26,15 +28,20 @@ final class PillResultRowView: UIView {
     required init?(coder: NSCoder) { fatalError() }
 
     private func setup() {
-        backgroundColor = DSColor.Neutral._0
+        backgroundColor = isFailed ? DSColor.Warning._50 : DSColor.Neutral._0
         layer.cornerRadius = 14
         layer.masksToBounds = false
         layer.shadowColor = DSColor.textPrimary.cgColor
-        layer.shadowOpacity = 0.04
+        layer.shadowOpacity = isFailed ? 0.04 : 0.04
         layer.shadowOffset = CGSize(width: 0, height: 1)
         layer.shadowRadius = 6
+        if isFailed {
+            layer.borderColor = DSColor.Warning._300.cgColor
+            layer.borderWidth = 1.5
+        }
 
-        let stack = UIStackView(arrangedSubviews: [makeHeader(), makeAttrs()]).then {
+        let body: UIView = isFailed ? makeFailureNotice() : makeAttrs()
+        let stack = UIStackView(arrangedSubviews: [makeHeader(), body]).then {
             $0.axis = .vertical
             $0.spacing = 10
         }
@@ -77,14 +84,15 @@ final class PillResultRowView: UIView {
         }
         thumb.snp.makeConstraints { $0.width.height.equalTo(40) }
 
-        let pencil = UIImageView().then {
-            $0.image = DSIcon.pencil.uiImage
-            $0.tintColor = DSColor.Primary._500
-            $0.contentMode = .scaleAspectFit
+        let menuButton = UIButton(type: .system).then {
+            $0.setImage(DSIcon.moreVertical.uiImage, for: .normal)
+            $0.tintColor = DSColor.textTertiary
         }
-        pencil.snp.makeConstraints { $0.width.height.equalTo(14) }
+        menuButton.snp.makeConstraints { $0.width.height.equalTo(18) }
+        menuButton.setContentHuggingPriority(.required, for: .horizontal)
+        menuButton.addAction(UIAction { [weak self] _ in self?.onMenu?() }, for: .touchUpInside)
 
-        let titleRow = UIStackView(arrangedSubviews: [titleLabel, pencil]).then {
+        let titleRow = UIStackView(arrangedSubviews: [titleLabel, menuButton]).then {
             $0.axis = .horizontal
             $0.spacing = 8
             $0.alignment = .center
@@ -109,6 +117,40 @@ final class PillResultRowView: UIView {
         backgroundColor = DSColor.Secondary._50
         layer.borderColor = DSColor.Secondary._300.cgColor
         layer.borderWidth = 1.5
+    }
+
+    // MARK: - Failure Notice (인식 실패)
+
+    private func makeFailureNotice() -> UIView {
+        let icon = UIImageView().then {
+            $0.image = DSIcon.alertTriangle.uiImage
+            $0.tintColor = DSColor.Warning._600
+            $0.contentMode = .scaleAspectFit
+        }
+        icon.snp.makeConstraints { $0.width.height.equalTo(20) }
+        let title = UILabel().then {
+            $0.text = "정보를 인식하지 못했어요"
+            $0.font = DSKitFontFamily.Pretendard.semiBold.font(size: 13)
+            $0.textColor = DSColor.Warning._700
+        }
+        let line1 = UIStackView(arrangedSubviews: [icon, title]).then {
+            $0.axis = .horizontal; $0.spacing = 6; $0.alignment = .center
+        }
+        let desc = UILabel().then {
+            $0.text = "색·모양·제형·각인을 직접 입력하세요"
+            $0.font = DSKitFontFamily.Pretendard.regular.font(size: 12)
+            $0.textColor = DSColor.textSecondary
+            $0.textAlignment = .center
+        }
+        let stack = UIStackView(arrangedSubviews: [line1, desc]).then {
+            $0.axis = .vertical; $0.spacing = 4; $0.alignment = .center
+            $0.isLayoutMarginsRelativeArrangement = true
+            $0.layoutMargins = UIEdgeInsets(top: 4, left: 0, bottom: 4, right: 0)
+        }
+        let container = UIView()
+        container.addSubview(stack)
+        stack.snp.makeConstraints { $0.top.bottom.equalToSuperview(); $0.centerX.equalToSuperview(); $0.leading.greaterThanOrEqualToSuperview(); $0.trailing.lessThanOrEqualToSuperview() }
+        return container
     }
 
     // MARK: - Attributes

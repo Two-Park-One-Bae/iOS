@@ -16,8 +16,21 @@ final class MockPillRepository: PillRepositoryProtocol {
         originalImage: String,
         items: [(pillId: String, segmentation: [[Double]], croppedImage: String)]
     ) -> AnyPublisher<[PillAttributeModel], Error> {
-        let stub = items.map { item in
-            PillAttributeModel(
+        let stub = items.enumerated().map { index, item -> PillAttributeModel in
+            // 두 번째 알약은 색·모양·제형·각인 인식 실패 카드로 반환
+            if index == 1 {
+                return PillAttributeModel(
+                    pillId:        item.pillId,
+                    colors:        [],
+                    isTransparent: false,
+                    shape:         nil,
+                    formulation:   nil,
+                    front:         nil,
+                    back:          nil,
+                    error:         "RECOGNITION_FAILED"
+                )
+            }
+            return PillAttributeModel(
                 pillId:        item.pillId,
                 colors:        [.white, .yellow],
                 isTransparent: false,
@@ -43,6 +56,21 @@ final class MockPillRepository: PillRepositoryProtocol {
         page: Int,
         size: Int
     ) -> AnyPublisher<PillCandidatePageModel, Error> {
+        // 데모: 투명 알약으로 검색하면 "조건에 맞는 후보가 없어요" 빈 상태를 보여준다.
+        // 토글을 끄면 다시 후보가 나타난다.
+        if isTransparent == true {
+            let empty = PillCandidatePageModel(
+                candidates:    [],
+                page:          page,
+                size:          size,
+                totalElements: 0,
+                totalPages:    0
+            )
+            return Just(empty)
+                .setFailureType(to: Error.self)
+                .eraseToAnyPublisher()
+        }
+
         let stub = PillCandidatePageModel(
             candidates: [
                 PillCandidateModel(
