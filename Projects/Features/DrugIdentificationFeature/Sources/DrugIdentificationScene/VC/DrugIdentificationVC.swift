@@ -20,6 +20,7 @@ public final class DrugIdentificationVC: UIViewController {
 
     private var rowViews: [Int: PillResultRowView] = [:]
     private var identifiedIndices = Set<Int>()
+    private var deletedIndices = Set<Int>()
 
     // MARK: - UI
 
@@ -160,12 +161,72 @@ public final class DrugIdentificationVC: UIViewController {
         for pill in pills {
             let row = PillResultRowView(pill: pill)
             row.onTap = { [weak self] in self?.onSelectPill?(pill) }
+            row.onMenu = { [weak self] in self?.showRowMenu(for: pill, anchor: row) }
             rowViews[pill.index] = row
             listStack.addArrangedSubview(row)
         }
 
         contentStack.addArrangedSubview(listStack)
 
+        updateProgress()
+    }
+
+    // MARK: - Row Menu (⋮ 수정/삭제)
+
+    private func showRowMenu(for pill: IdentifiedPill, anchor: UIView) {
+        let scrim = UIView(frame: view.bounds).then { $0.backgroundColor = .clear }
+        addDismissTap(to: scrim)
+
+        let menu = PillActionMenuView()
+        menu.onEdit = { [weak self] in
+            scrim.removeFromSuperview()
+            self?.onSelectPill?(pill)
+        }
+        menu.onDelete = { [weak self] in
+            scrim.removeFromSuperview()
+            self?.showDeleteConfirm(pill: pill)
+        }
+        scrim.addSubview(menu)
+        view.addSubview(scrim)
+
+        let anchorFrame = anchor.convert(anchor.bounds, to: scrim)
+        menu.snp.makeConstraints {
+            $0.trailing.equalTo(scrim.snp.leading).offset(anchorFrame.maxX - 6)
+            $0.top.equalTo(scrim.snp.top).offset(anchorFrame.minY + 40)
+        }
+    }
+
+    private func showDeleteConfirm(pill: IdentifiedPill) {
+        let dim = UIView(frame: view.bounds).then { $0.backgroundColor = DSColor.Neutral._900.withAlphaComponent(0.6) }
+        addDismissTap(to: dim)
+
+        let card = DeleteConfirmCardView()
+        card.onCancel = { dim.removeFromSuperview() }
+        card.onDelete = { [weak self] in
+            dim.removeFromSuperview()
+            self?.deletePill(pill)
+        }
+        dim.addSubview(card)
+        view.addSubview(dim)
+        card.snp.makeConstraints { $0.center.equalToSuperview() }
+    }
+
+    // 오버레이 빈 영역 탭으로 닫기 (내부 컨텐츠 터치는 무시)
+    private func addDismissTap(to overlay: UIView) {
+        let tap = UITapGestureRecognizer(target: self, action: #selector(dismissOverlay(_:)))
+        tap.delegate = self
+        overlay.addGestureRecognizer(tap)
+    }
+
+    @objc private func dismissOverlay(_ sender: UITapGestureRecognizer) {
+        sender.view?.removeFromSuperview()
+    }
+
+    private func deletePill(_ pill: IdentifiedPill) {
+        rowViews[pill.index]?.removeFromSuperview()
+        rowViews[pill.index] = nil
+        deletedIndices.insert(pill.index)
+        identifiedIndices.remove(pill.index)
         updateProgress()
     }
 
@@ -178,7 +239,7 @@ public final class DrugIdentificationVC: UIViewController {
     }
 
     private func updateProgress() {
-        let total = pills.count
+        let total = pills.count - deletedIndices.count
         let done = identifiedIndices.count
 
         if done == total {
@@ -247,5 +308,14 @@ public final class DrugIdentificationVC: UIViewController {
 
     @objc private func confirmTapped() {
         onConfirm?()
+    }
+}
+
+// MARK: - Overlay 빈 영역 탭 감지
+
+extension DrugIdentificationVC: UIGestureRecognizerDelegate {
+    public func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+        // 오버레이(scrim/dim) 자체를 탭했을 때만 닫기 — 메뉴/카드 내부 터치는 통과
+        touch.view === gestureRecognizer.view
     }
 }
