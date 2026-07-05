@@ -89,18 +89,46 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
 
     // MARK: - ⑤ 인식 결과
 
+    private weak var resultVC: DrugIdentificationVC?
+
     private func showResult(pills: [IdentifiedPill], image: UIImage, replacing loadingVC: UIViewController) {
         let vc = DrugIdentificationVC(pills: pills, image: image)
+        resultVC = vc
         vc.onBackTapped = { [weak self] in
             self?.navigationController.popViewController(animated: true)
         }
-        vc.onSelectPill = { _ in
-            // TODO: 후보 선택 화면 진입
+        vc.onSelectPill = { [weak self] pill in
+            self?.showEdit(pill: pill)
         }
         vc.onConfirm = {
             // TODO: 최종 결과 확인
         }
         replace(loadingVC, with: vc)
+    }
+
+    // MARK: - ⑧ 알약 수정
+
+    private func showEdit(pill: IdentifiedPill) {
+        let viewModel = PillEditViewModel(
+            pillIndex: pill.index,
+            attribute: pill.attribute,
+            thumbnail: pill.thumbnail
+        )
+        let vc = PillEditVC(viewModel: viewModel)
+        vc.onBackTapped = { [weak self] in
+            self?.navigationController.popViewController(animated: true)
+        }
+        vc.onCancel = { [weak self] in
+            self?.navigationController.popViewController(animated: true)
+        }
+        vc.onConfirm = { [weak self] candidate in
+            self?.resultVC?.applySelection(
+                pillIndex: pill.index,
+                name: candidate.pillName ?? "이름 미상"
+            )
+            self?.navigationController.popViewController(animated: true)
+        }
+        navigationController.pushViewController(vc, animated: true)
     }
 
     // MARK: - ⑥ 결과 없음
