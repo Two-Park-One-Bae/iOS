@@ -133,20 +133,16 @@ final class CameraOverlayView: UIView {
         let btnCenterY = controlsH / 2
 
         // Gallery (DSIcon.image, 48×48, bg Neutral._700, corner 12)
-        let galleryBtn = UIButton(type: .system)
+        var galleryConfig = UIButton.Configuration.plain()
+        galleryConfig.image = DSIcon.image.uiImage
+        galleryConfig.baseForegroundColor = DSColor.Neutral._0
+        galleryConfig.contentInsets = NSDirectionalEdgeInsets(top: 13, leading: 13, bottom: 13, trailing: 13)
+        galleryConfig.background.backgroundColor = DSColor.Neutral._700
+        galleryConfig.background.cornerRadius = DSRadius.md
+        galleryConfig.background.strokeColor = UIColor.white.withAlphaComponent(0.2)
+        galleryConfig.background.strokeWidth = 1
+        let galleryBtn = UIButton(configuration: galleryConfig)
         galleryBtn.frame = CGRect(x: 36, y: btnCenterY - 24, width: 48, height: 48)
-        galleryBtn.backgroundColor = DSColor.Neutral._700
-        galleryBtn.layer.cornerRadius = DSRadius.md
-        galleryBtn.layer.borderColor = UIColor.white.withAlphaComponent(0.2).cgColor
-        galleryBtn.layer.borderWidth = 1
-        galleryBtn.setImage(DSIcon.image.uiImage, for: .normal)
-        galleryBtn.tintColor = DSColor.Neutral._0
-        galleryBtn.imageView?.contentMode = .scaleAspectFit
-        let galleryInset: CGFloat = 13
-        galleryBtn.imageEdgeInsets = UIEdgeInsets(
-            top: galleryInset, left: galleryInset,
-            bottom: galleryInset, right: galleryInset
-        )
         galleryBtn.addTarget(self, action: #selector(galleryTapped), for: .touchUpInside)
         controlsDim.addSubview(galleryBtn)
 

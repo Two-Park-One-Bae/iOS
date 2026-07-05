@@ -1,34 +1,60 @@
 import UIKit
-import Combine
 import SnapKit
 import Then
 import DSKit
 
+// ⑤ 인식 결과 — 촬영 사진(bbox 오버레이) + 알약 목록 + 결과 확인 푸터
 public final class DrugIdentificationVC: UIViewController {
+
+    // MARK: - Callbacks
+
+    var onSelectPill: ((IdentifiedPill) -> Void)?
+    var onConfirm: (() -> Void)?
+    var onBackTapped: (() -> Void)?
 
     // MARK: - Properties
 
-    private let viewModel: DrugIdentificationViewModel
-    private var cancelBag = Set<AnyCancellable>()
-    public var capturedImage: UIImage?
+    private let pills: [IdentifiedPill]
+    private let capturedImage: UIImage
+    private let photoSize: CGFloat = 300
 
     // MARK: - UI
 
-    private let navBar = DSNavBar(title: "약물 식별").then {
+    private let navBar = DSNavBar(title: "인식 결과").then {
         $0.translatesAutoresizingMaskIntoConstraints = false
     }
 
-    private let imageView = UIImageView().then {
-        $0.contentMode = .scaleAspectFit
-        $0.clipsToBounds = true
-        $0.layer.cornerRadius = DSRadius.md
-        $0.backgroundColor = DSColor.Neutral._100
+    private let scrollView = UIScrollView().then {
+        $0.showsVerticalScrollIndicator = false
+        $0.alwaysBounceVertical = true
+    }
+
+    private let contentStack = UIStackView().then {
+        $0.axis = .vertical
+    }
+
+    private let photoCard = PhotoCardView()
+
+    private let footer = UIView().then {
+        $0.backgroundColor = DSColor.bgApp
+    }
+
+    private let progressLabel = UILabel().then {
+        $0.font = DSKitFontFamily.Pretendard.medium.font(size: 12)
+        $0.textColor = DSColor.textTertiary
+        $0.textAlignment = .center
+    }
+
+    private let confirmButton = PrimaryButton(title: "결과 확인").then {
+        $0.changeCornerRadius(radius: 14)
+        $0.setEnabled(false)
     }
 
     // MARK: - Init
 
-    public init(viewModel: DrugIdentificationViewModel) {
-        self.viewModel = viewModel
+    init(pills: [IdentifiedPill], image: UIImage) {
+        self.pills = pills
+        self.capturedImage = image
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -41,39 +67,156 @@ public final class DrugIdentificationVC: UIViewController {
         navigationController?.setNavigationBarHidden(true, animated: false)
         setUI()
         setLayout()
-        bind()
+        setContent()
+    }
+
+    public override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        scrollView.contentInset.bottom = footer.frame.height
     }
 
     // MARK: - Setup
 
     private func setUI() {
         view.backgroundColor = DSColor.bgApp
-        imageView.image = capturedImage
-        navBar.onBackTapped = { [weak self] in
-            self?.navigationController?.popViewController(animated: true)
-        }
+        photoCard.setImage(capturedImage)
+        progressLabel.text = "알약을 모두 식별해주세요 · 0/\(pills.count)"
+        navBar.onBackTapped = { [weak self] in self?.onBackTapped?() }
+        confirmButton.addTarget(self, action: #selector(confirmTapped), for: .touchUpInside)
     }
 
     private func setLayout() {
         view.addSubview(navBar)
-        view.addSubview(imageView)
+        view.addSubview(scrollView)
+        view.addSubview(footer)
+        scrollView.addSubview(contentStack)
 
         navBar.snp.makeConstraints {
             $0.top.equalTo(view.safeAreaLayoutGuide)
             $0.leading.trailing.equalToSuperview()
         }
+        scrollView.snp.makeConstraints {
+            $0.top.equalTo(navBar.snp.bottom)
+            $0.leading.trailing.bottom.equalToSuperview()
+        }
+        contentStack.snp.makeConstraints {
+            $0.edges.equalTo(scrollView.contentLayoutGuide)
+            $0.width.equalTo(scrollView.frameLayoutGuide)
+        }
 
-        imageView.snp.makeConstraints {
-            $0.top.equalTo(navBar.snp.bottom).offset(20)
+        setupFooter()
+    }
+
+    private func setupFooter() {
+        let footerStack = UIStackView(arrangedSubviews: [progressLabel, confirmButton]).then {
+            $0.axis = .vertical
+            $0.spacing = 8
+            $0.alignment = .fill
+        }
+        footer.addSubview(footerStack)
+        confirmButton.snp.makeConstraints { $0.height.equalTo(52) }
+
+        footer.snp.makeConstraints {
+            $0.leading.trailing.bottom.equalToSuperview()
+        }
+        footerStack.snp.makeConstraints {
+            $0.top.equalToSuperview().offset(12)
             $0.leading.trailing.equalToSuperview().inset(20)
-            $0.height.equalTo(imageView.snp.width)
+            $0.bottom.equalTo(view.safeAreaLayoutGuide).offset(-28)
         }
     }
 
-    private func bind() {
-        let input = DrugIdentificationViewModel.Input(
-            viewDidLoad: Just(()).eraseToAnyPublisher()
-        )
-        _ = viewModel.transform(input: input)
+    // MARK: - Content
+
+    private func setContent() {
+        // Photo Header
+        let photoHeader = UIView()
+        photoHeader.addSubview(photoCard)
+        photoCard.snp.makeConstraints {
+            $0.top.equalToSuperview().offset(12)
+            $0.bottom.equalToSuperview().offset(-8)
+            $0.centerX.equalToSuperview()
+        }
+        contentStack.addArrangedSubview(photoHeader)
+        addBoundingBoxes()
+
+        // Result List
+        let listTitle = UILabel().then {
+            $0.text = "알약 \(pills.count)개를 찾았어요"
+            $0.font = DSKitFontFamily.Pretendard.bold.font(size: 15)
+            $0.textColor = DSColor.textPrimary
+        }
+
+        let listStack = UIStackView(arrangedSubviews: [listTitle]).then {
+            $0.axis = .vertical
+            $0.spacing = 10
+            $0.isLayoutMarginsRelativeArrangement = true
+            $0.layoutMargins = UIEdgeInsets(top: 20, left: 20, bottom: 20, right: 20)
+        }
+
+        for pill in pills {
+            let row = PillResultRowView(pill: pill)
+            row.onTap = { [weak self] in self?.onSelectPill?(pill) }
+            listStack.addArrangedSubview(row)
+        }
+
+        contentStack.addArrangedSubview(listStack)
+    }
+
+    // 사진 위 bbox + 번호 태그
+    private func addBoundingBoxes() {
+        photoCard.layoutIfNeeded()
+        let container = photoCard.photoContainer
+
+        for pill in pills {
+            let box = pill.boundingBox
+            let rect = CGRect(
+                x: box.minX * photoSize,
+                y: box.minY * photoSize,
+                width: box.width * photoSize,
+                height: box.height * photoSize
+            )
+
+            let boxView = UIView(frame: rect).then {
+                $0.backgroundColor = .clear
+                $0.layer.borderColor = DSColor.Primary._500.cgColor
+                $0.layer.borderWidth = 2
+                $0.layer.cornerRadius = 4
+            }
+            container.addSubview(boxView)
+
+            let tag = UIView().then {
+                $0.backgroundColor = DSColor.Primary._500
+                $0.layer.cornerRadius = 4
+                $0.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMinXMaxYCorner]
+            }
+            let tagLabel = UILabel().then {
+                $0.text = "\(pill.index)"
+                $0.font = DSKitFontFamily.Pretendard.bold.font(size: 11)
+                $0.textColor = DSColor.Neutral._0
+                $0.textAlignment = .center
+            }
+            tag.addSubview(tagLabel)
+            container.addSubview(tag)
+
+            tagLabel.translatesAutoresizingMaskIntoConstraints = false
+            tag.translatesAutoresizingMaskIntoConstraints = false
+            let tagX = max(0, rect.minX)
+            let tagY = max(0, rect.minY - 18)
+            NSLayoutConstraint.activate([
+                tagLabel.topAnchor.constraint(equalTo: tag.topAnchor, constant: 1),
+                tagLabel.bottomAnchor.constraint(equalTo: tag.bottomAnchor, constant: -1),
+                tagLabel.leadingAnchor.constraint(equalTo: tag.leadingAnchor, constant: 6),
+                tagLabel.trailingAnchor.constraint(equalTo: tag.trailingAnchor, constant: -6),
+                tag.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: tagX),
+                tag.topAnchor.constraint(equalTo: container.topAnchor, constant: tagY)
+            ])
+        }
+    }
+
+    // MARK: - Actions
+
+    @objc private func confirmTapped() {
+        onConfirm?()
     }
 }
