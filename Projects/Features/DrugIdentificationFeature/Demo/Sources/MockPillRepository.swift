@@ -49,13 +49,15 @@ final class MockPillRepository: PillRepositoryProtocol {
                     pillCode:     "A11A1234",
                     pillName:     "타이레놀정500밀리그람",
                     companyName:  "한국얀센",
-                    pillImageUrl: nil
+                    pillImageUrl: nil,
+                    matchScore:   0.95
                 ),
                 PillCandidateModel(
                     pillCode:     "A11A5678",
                     pillName:     "게보린정",
                     companyName:  "삼진제약",
-                    pillImageUrl: nil
+                    pillImageUrl: nil,
+                    matchScore:   0.82
                 ),
             ],
             page:          page,
