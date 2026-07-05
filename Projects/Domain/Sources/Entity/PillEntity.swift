@@ -58,20 +58,17 @@ public struct PillCandidateModel: Equatable {
     public let pillName: String?
     public let companyName: String?
     public let pillImageUrl: String?
-    public let matchScore: Double?
 
     public init(
         pillCode: String,
         pillName: String?,
         companyName: String?,
-        pillImageUrl: String?,
-        matchScore: Double?
+        pillImageUrl: String?
     ) {
         self.pillCode = pillCode
         self.pillName = pillName
         self.companyName = companyName
         self.pillImageUrl = pillImageUrl
-        self.matchScore = matchScore
     }
 }
 
