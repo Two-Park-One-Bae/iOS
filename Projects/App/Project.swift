@@ -21,6 +21,9 @@ let project = Project(
                 "CLARITY_PROJECT_ID": "$(CLARITY_PROJECT_ID)",
                 "NSCameraUsageDescription": "알약 사진 촬영을 위해 카메라 접근이 필요합니다.",
                 "NSPhotoLibraryUsageDescription": "앨범에서 알약 사진을 선택하기 위해 접근이 필요합니다.",
+                "NSSupportsLiveActivities": true,
+                "UIBackgroundModes": ["audio"],
+                "NSAlarmKitUsageDescription": "치료 타이머 종료 알람을 예약·알림하기 위해 필요합니다.",
                 "UIUserInterfaceStyle": "Light",
                 "UILaunchScreen": ["UIColorName": "", "UIImageName": ""],
                 "UIApplicationSceneManifest": [
@@ -35,11 +38,41 @@ let project = Project(
             ]),
             sources: ["Sources/**"],
             resources: ["Resources/**"],
+            entitlements: .dictionary([
+                "com.apple.developer.usernotifications.time-sensitive": .boolean(true),
+                "com.apple.security.application-groups": .array([.string("group.app.nursemate.timer")])
+            ]),
             dependencies: [
                 Dep.Features.Home.Feature,
                 Dep.Features.TabBar.Feature,
                 Dep.Features.DrugIdentification.Feature,
+                Dep.Features.Timer.Feature,
                 Dep.Core.Core,
+                .target(name: "TimerWidget"),
+            ],
+            settings: .settings(base: XCConfig.base)
+        ),
+        // 잠금화면 Live Activity · Dynamic Island (spec: 잠금화면 실시간 표시)
+        .target(
+            name: "TimerWidget",
+            destinations: .iOS,
+            product: .appExtension,
+            bundleId: "\(Environment.bundlePrefix).app.timerwidget",
+            deploymentTargets: Environment.deploymentTarget,
+            infoPlist: .extendingDefault(with: [
+                "CFBundleDisplayName": "널스메이트 타이머",
+                "NSSupportsLiveActivities": true,
+                "NSExtension": [
+                    "NSExtensionPointIdentifier": "com.apple.widgetkit-extension"
+                ],
+            ]),
+            sources: ["Widget/Sources/**"],
+            entitlements: .dictionary([
+                "com.apple.security.application-groups": .array([.string("group.app.nursemate.timer")])
+            ]),
+            // 공유 계약 모듈만 링크 — Live Activity/AlarmKit 타입을 TimerFeature와 동일하게 맞춘다.
+            dependencies: [
+                Dep.Modules.TimerShared.TimerShared,
             ],
             settings: .settings(base: XCConfig.base)
         ),

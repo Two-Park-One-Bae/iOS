@@ -3,11 +3,13 @@ import BaseFeatureDependency
 import Core
 import Domain
 import DrugIdentificationFeatureInterface
+import TimerFeatureInterface
 
 public final class HomeCoordinator: BaseCoordinator {
 
     @Injected var homeUseCase: HomeUseCaseProtocol
     @Injected var drugIdentificationBuilder: DrugIdentificationFeatureBuildable
+    @Injected var timerBuilder: TimerFeatureBuildable
 
     public override func start() {
         let viewModel = HomeViewModel(useCase: homeUseCase)
@@ -16,7 +18,7 @@ public final class HomeCoordinator: BaseCoordinator {
             self?.showDrugIdentification()
         }
         viewModel.onTreatmentTimerTapped = { [weak self] in
-            // TODO: 처치 타이머 화면 진입
+            self?.showTimer()
         }
 
         let homeVC = HomeVC(viewModel: viewModel)
@@ -27,6 +29,13 @@ public final class HomeCoordinator: BaseCoordinator {
         let coordinator = drugIdentificationBuilder.makeDrugIdentificationCoordinator(
             navigationController: navigationController
         )
+        addChild(coordinator)
+        coordinator.start()
+    }
+
+    // spec: 홈 상태칩 → C1 타이머 리스트
+    private func showTimer() {
+        let coordinator = timerBuilder.makeTimerCoordinator(navigationController: navigationController)
         addChild(coordinator)
         coordinator.start()
     }
