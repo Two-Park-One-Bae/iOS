@@ -45,7 +45,8 @@ enum RegisterDependencies {
         container.register(TimerUseCase.self) {
             DefaultTimerUseCase(
                 repository: container.resolve(TimerRepositoryProtocol.self),
-                alarmScheduler: container.resolve(TimerAlarmScheduling.self)
+                alarmScheduler: container.resolve(TimerAlarmScheduling.self),
+                watchSync: TimerWatchSyncService.shared
             )
         }
 

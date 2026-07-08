@@ -17,6 +17,12 @@ public protocol TimerRepositoryProtocol {
     func savePresets(_ presets: [TimerPresetModel])
 }
 
+// 폰→워치 동기화 추상화. 구현체(WCSession)는 App 타깃에 둔다 — Domain은 전송 수단을 모른다.
+// 계약(NM-269): 변경마다 전체 목록 스냅샷 전송, 최신 snapshotAt 이 이김.
+public protocol TimerWatchSyncing {
+    func sync(timers: [TreatmentTimerModel], presets: [TimerPresetModel])
+}
+
 // 로컬 알람(UNUserNotificationCenter) 스케줄링 추상화
 public protocol TimerAlarmScheduling {
     func requestAuthorization() -> AnyPublisher<Bool, Never>

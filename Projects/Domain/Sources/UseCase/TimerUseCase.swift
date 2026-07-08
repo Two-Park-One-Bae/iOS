@@ -46,17 +46,33 @@ public final class DefaultTimerUseCase: TimerUseCase {
 
     private let repository: TimerRepositoryProtocol
     private let alarmScheduler: TimerAlarmScheduling
+    private let watchSync: TimerWatchSyncing?
     private var cancellables = Set<AnyCancellable>()
 
     public let timers = CurrentValueSubject<[TreatmentTimerModel], Never>([])
     public let presets = CurrentValueSubject<[TimerPresetModel], Never>([])
     public let alarmPermission = PassthroughSubject<TimerAlarmAuthorizationStatus, Never>()
 
-    public init(repository: TimerRepositoryProtocol, alarmScheduler: TimerAlarmScheduling) {
+    public init(
+        repository: TimerRepositoryProtocol,
+        alarmScheduler: TimerAlarmScheduling,
+        watchSync: TimerWatchSyncing? = nil
+    ) {
         self.repository = repository
         self.alarmScheduler = alarmScheduler
+        self.watchSync = watchSync
         timers.send(repository.loadTimers())
         presets.send(repository.loadPresets())
+
+        // 타이머·프리셋이 바뀔 때마다 워치로 전체 스냅샷 push. 구독 시 현재값이 즉시 흘러
+        // 앱 시작 직후에도 최신 상태를 한 번 보낸다(updateApplicationContext는 병합됨).
+        if let watchSync {
+            Publishers.CombineLatest(timers, presets)
+                .sink { timers, presets in
+                    watchSync.sync(timers: timers, presets: presets)
+                }
+                .store(in: &cancellables)
+        }
     }
 
     // MARK: - Timers
