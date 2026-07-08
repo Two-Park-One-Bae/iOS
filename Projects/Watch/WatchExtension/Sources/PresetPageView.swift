@@ -29,7 +29,13 @@ struct PresetPageView: View {
                 List {
                     Section {
                         ForEach(presets) { preset in
-                            PresetRow(preset: preset)
+                            Button {
+                                // 폰에 시작 명령 전송 — 폰이 타이머 생성·알람 예약 후 스냅샷 재전송.
+                                connectivity.send(command: .start(presetId: preset.id))
+                            } label: {
+                                PresetRow(preset: preset)
+                            }
+                            .buttonStyle(.plain)
                         }
                     } header: {
                         Text("누르면 바로 시작됩니다")
