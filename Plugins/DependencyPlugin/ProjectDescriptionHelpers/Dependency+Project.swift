@@ -43,6 +43,12 @@ public struct Dep {
                 path: .relativeToRoot("Projects/Modules/SegmentationKit")
             )
         }
+        public struct TimerShared {
+            public static let TimerShared = TargetDependency.project(
+                target: "TimerShared",
+                path: .relativeToRoot("Projects/Modules/TimerShared")
+            )
+        }
     }
 
     public struct Features {
@@ -80,6 +86,16 @@ public struct Dep {
             public static let Interface = TargetDependency.project(
                 target: "DrugIdentificationFeatureInterface",
                 path: .relativeToRoot("Projects/Features/DrugIdentificationFeature")
+            )
+        }
+        public struct Timer {
+            public static let Feature = TargetDependency.project(
+                target: "TimerFeature",
+                path: .relativeToRoot("Projects/Features/TimerFeature")
+            )
+            public static let Interface = TargetDependency.project(
+                target: "TimerFeatureInterface",
+                path: .relativeToRoot("Projects/Features/TimerFeature")
             )
         }
     }
