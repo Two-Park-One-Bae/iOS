@@ -8,6 +8,7 @@ let project = Project.makeModule(
     internalDependencies: [
         Dep.Features.Home.Interface,
         Dep.Features.DrugIdentification.Interface,
+        Dep.Features.Timer.Interface,
         Dep.Core.Core,
         Dep.Domain.Domain,
         Dep.Data.Data,

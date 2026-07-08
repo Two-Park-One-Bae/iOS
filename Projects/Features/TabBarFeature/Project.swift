@@ -10,6 +10,7 @@ let project = Project.makeModule(
         Dep.Modules.DSKit.DSKit,
         Dep.Features.Base.Base,
         Dep.Features.Home.Interface,
+        Dep.Features.Timer.Interface,
     ],
     interfaceDependencies: [
         Dep.Features.Base.Base,

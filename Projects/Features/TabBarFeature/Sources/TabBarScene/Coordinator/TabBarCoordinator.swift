@@ -1,6 +1,7 @@
 import UIKit
 import BaseFeatureDependency
 import HomeFeatureInterface
+import TimerFeatureInterface
 import DSKit
 
 public final class TabBarCoordinator: CoordinatorProtocol {
@@ -11,16 +12,19 @@ public final class TabBarCoordinator: CoordinatorProtocol {
     public var childCoordinators: [CoordinatorProtocol] = []
 
     private let homeBuilder: HomeFeatureBuildable
+    private let timerBuilder: TimerFeatureBuildable
     private var tabBarVC: TabBarVC?
 
     // MARK: - Init
 
     public init(
         navigationController: UINavigationController,
-        homeBuilder: HomeFeatureBuildable
+        homeBuilder: HomeFeatureBuildable,
+        timerBuilder: TimerFeatureBuildable
     ) {
         self.navigationController = navigationController
         self.homeBuilder = homeBuilder
+        self.timerBuilder = timerBuilder
     }
 
     // MARK: - Start
@@ -37,8 +41,16 @@ public final class TabBarCoordinator: CoordinatorProtocol {
         navigationController.setNavigationBarHidden(true, animated: false)
     }
 
+    // MARK: - Public
+
+    /// 알람 탭 랜딩 = C1 (spec) — 타이머 탭으로 전환
+    public func switchToTimerTab() {
+        tabBarVC?.selectedIndex = 2
+    }
+
     // MARK: - Private
 
+    // 탭 구성 (디자인): 홈 / 알약 / 타이머 / 설정
     private func makeTabViewControllers() -> [UIViewController] {
         let homeNav = UINavigationController()
         let homeCoordinator = homeBuilder.makeHomeCoordinator(navigationController: homeNav)
@@ -46,16 +58,19 @@ public final class TabBarCoordinator: CoordinatorProtocol {
         addChild(homeCoordinator)
         homeNav.tabBarItem = UITabBarItem(title: "홈", image: DSIcon.house.uiImage, tag: 0)
 
-        let taskNav = UINavigationController()
-        taskNav.tabBarItem = UITabBarItem(title: "업무", image: DSIcon.clipboard.uiImage, tag: 1)
+        let pillNav = UINavigationController()
+        pillNav.tabBarItem = UITabBarItem(title: "알약", image: UIImage(systemName: "pills"), tag: 1)
 
-        let historyNav = UINavigationController()
-        historyNav.tabBarItem = UITabBarItem(title: "기록", image: DSIcon.clock.uiImage, tag: 2)
+        let timerNav = UINavigationController()
+        let timerCoordinator = timerBuilder.makeTimerCoordinator(navigationController: timerNav)
+        timerCoordinator.start()
+        addChild(timerCoordinator)
+        timerNav.tabBarItem = UITabBarItem(title: "타이머", image: UIImage(systemName: "timer"), tag: 2)
 
         let settingsNav = UINavigationController()
         settingsNav.tabBarItem = UITabBarItem(title: "설정", image: DSIcon.settings.uiImage, tag: 3)
 
-        return [homeNav, taskNav, historyNav, settingsNav]
+        return [homeNav, pillNav, timerNav, settingsNav]
     }
 
     private func configureAppearance(_ tabBar: UITabBarController) {
