@@ -49,6 +49,32 @@ let project = Project(
                 Dep.Features.Timer.Feature,
                 Dep.Core.Core,
                 .target(name: "TimerWidget"),
+                // 워치 앱 embed — 폰 설치 시 워치에 자동 설치(별도 다운 X),
+                // 폰↔워치 companion 쌍으로 인식돼 WCSession 동기화가 성립한다.
+                .target(name: "WatchApp"),
+            ],
+            settings: .settings(base: XCConfig.base)
+        ),
+        // watchOS 10 단일 타깃 SwiftUI 앱(WKApplication). 소스는 Projects/Watch/ 에 그대로 유지.
+        // App 과 같은 프로젝트에 둬야 Tuist 가 "Embed Watch Content" 로 올바르게 embed 한다.
+        .target(
+            name: "WatchApp",
+            destinations: [.appleWatch],
+            product: .app,
+            bundleId: "\(Environment.bundlePrefix).app.watchapp",
+            deploymentTargets: .watchOS("10.0"),
+            infoPlist: .extendingDefault(with: [
+                "WKApplication": true,
+                "WKCompanionAppBundleIdentifier": "\(Environment.bundlePrefix).app",
+            ]),
+            sources: ["../Watch/WatchExtension/Sources/**"],
+            resources: [
+                "../Watch/WatchApp/Resources/**",
+                "../Watch/WatchExtension/Resources/**",
+            ],
+            dependencies: [
+                // 폰·워치 공용 타이머 도메인 — 동기화 스냅샷을 같은 타입으로 디코드
+                Dep.Modules.TimerDomain.TimerDomain,
             ],
             settings: .settings(base: XCConfig.base)
         ),
