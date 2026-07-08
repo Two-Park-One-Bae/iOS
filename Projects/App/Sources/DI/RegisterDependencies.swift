@@ -43,11 +43,18 @@ enum RegisterDependencies {
         }
 
         container.register(TimerUseCase.self) {
-            DefaultTimerUseCase(
+            let sync = TimerWatchSyncService.shared
+            let useCase = DefaultTimerUseCase(
                 repository: container.resolve(TimerRepositoryProtocol.self),
                 alarmScheduler: container.resolve(TimerAlarmScheduling.self),
-                watchSync: TimerWatchSyncService.shared
+                watchSync: sync
             )
+            // 워치 명령 → 폰 UseCase 실행(알람 예약 포함) → 스냅샷 재브로드캐스트.
+            // resolve 캐싱(싱글톤)이라 UI와 같은 인스턴스가 명령을 처리한다.
+            sync.commandHandler = { [weak useCase] command in
+                useCase?.handleWatchCommand(command)
+            }
+            return useCase
         }
 
         // Feature Builders
