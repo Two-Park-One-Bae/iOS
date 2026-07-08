@@ -10,6 +10,9 @@ import TimerDomain
 struct TimerListView: View {
     @EnvironmentObject var connectivity: WatchConnectivityManager
 
+    /// 빈 상태 CTA 탭 — 프리셋 페이지로 전환(ContentView가 소유).
+    let onStartFromPreset: () -> Void
+
     private var timers: [TreatmentTimerModel] {
         (connectivity.snapshot?.timers ?? []).sorted(by: Self.order)
     }
@@ -17,7 +20,7 @@ struct TimerListView: View {
     var body: some View {
         Group {
             if timers.isEmpty {
-                EmptyTimersView()
+                EmptyTimersView(onStartFromPreset: onStartFromPreset)
             } else {
                 // 1초마다 남은 시간 갱신 — 타이머 수동 관리 없이 TimelineView로.
                 TimelineView(.periodic(from: .now, by: 1)) { context in
@@ -41,18 +44,26 @@ struct TimerListView: View {
     }
 }
 
-// 빈 상태 — 프리셋 페이지로 유도(스와이프). 프리셋 페이지는 별도 티켓.
+// 빈 상태 — 프리셋 페이지로 유도. CTA를 누르면 프리셋 페이지로 전환.
 struct EmptyTimersView: View {
+    let onStartFromPreset: () -> Void
+
     var body: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 10) {
             Image(systemName: "timer")
                 .font(.title2)
                 .foregroundStyle(.secondary)
             Text("진행 중인 타이머 없음")
                 .font(.headline)
-            Text("프리셋에서 시작하세요")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+            Button(action: onStartFromPreset) {
+                HStack(spacing: 4) {
+                    Text("프리셋에서 시작하세요")
+                    Image(systemName: "chevron.right")
+                }
+                .font(.caption)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.blue)
         }
         .multilineTextAlignment(.center)
         .padding()
