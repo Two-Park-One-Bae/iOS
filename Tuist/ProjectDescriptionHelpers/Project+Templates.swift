@@ -10,7 +10,10 @@ public extension Project {
         internalDependencies: [TargetDependency] = [],
         externalDependencies: [TargetDependency] = [],
         interfaceDependencies: [TargetDependency] = [],
-        hasResources: Bool = false
+        hasResources: Bool = false,
+        // 모듈별로 추가할 커스텀 타깃·스킴 (예: 버전별 데모 앱 + 위젯 익스텐션).
+        extraTargets: [Target] = [],
+        extraSchemes: [Scheme] = []
     ) -> Project {
         var projectTargets: [Target] = []
         let bundleId = "\(Environment.bundlePrefix).\(name.lowercased())"
@@ -114,8 +117,8 @@ public extension Project {
         return Project(
             name: name,
             settings: .settings(base: XCConfig.base, configurations: XCConfig.framework),
-            targets: projectTargets,
-            schemes: schemes
+            targets: projectTargets + extraTargets,
+            schemes: schemes + extraSchemes
         )
     }
 }
