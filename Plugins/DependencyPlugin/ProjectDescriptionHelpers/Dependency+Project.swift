@@ -49,6 +49,12 @@ public struct Dep {
                 path: .relativeToRoot("Projects/Modules/TimerShared")
             )
         }
+        public struct TimerDomain {
+            public static let TimerDomain = TargetDependency.project(
+                target: "TimerDomain",
+                path: .relativeToRoot("Projects/Modules/TimerDomain")
+            )
+        }
     }
 
     public struct Features {
