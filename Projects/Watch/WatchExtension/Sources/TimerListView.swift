@@ -25,8 +25,12 @@ struct TimerListView: View {
                 // 1초마다 남은 시간 갱신 — 타이머 수동 관리 없이 TimelineView로.
                 TimelineView(.periodic(from: .now, by: 1)) { context in
                     List(timers) { timer in
-                        TimerCardRow(timer: timer, now: context.date)
-                            .listRowInsets(EdgeInsets(top: 4, leading: 4, bottom: 4, trailing: 4))
+                        NavigationLink {
+                            TimerActionView(timer: timer)
+                        } label: {
+                            TimerCardRow(timer: timer, now: context.date)
+                        }
+                        .listRowInsets(EdgeInsets(top: 4, leading: 4, bottom: 4, trailing: 4))
                     }
                     .listStyle(.carousel)
                 }

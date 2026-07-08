@@ -9,6 +9,9 @@ import Domain
 final class TimerWatchSyncService: NSObject, TimerWatchSyncing {
     static let shared = TimerWatchSyncService()
 
+    /// 워치에서 온 명령 처리 — DI에서 UseCase.handleWatchCommand 로 연결(main에서 호출됨).
+    var commandHandler: ((TimerWatchCommand) -> Void)?
+
     // 활성화 전/미도달 시 못 보낸 최신 페이로드 — 활성화·연결 시 flush.
     private var lastPayload: [String: Any]?
 
@@ -47,6 +50,22 @@ extension TimerWatchSyncService: WCSessionDelegate {
     func sessionReachabilityDidChange(_ session: WCSession) {
         if session.isReachable, let lastPayload {
             push(lastPayload)
+        }
+    }
+
+    // 워치 명령 수신 — reachable 이면 message, 아니면 큐잉된 userInfo 로 도착.
+    func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
+        handleIncoming(message)
+    }
+
+    func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any] = [:]) {
+        handleIncoming(userInfo)
+    }
+
+    private func handleIncoming(_ dict: [String: Any]) {
+        guard let command = TimerWatchCommand.decode(fromWCPayload: dict) else { return }
+        DispatchQueue.main.async { [weak self] in
+            self?.commandHandler?(command)
         }
     }
 
