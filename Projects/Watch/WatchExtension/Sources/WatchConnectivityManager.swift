@@ -18,9 +18,18 @@ final class WatchConnectivityManager: NSObject, ObservableObject {
         WCSession.default.activate()
     }
 
-    func send(_ message: [String: Any]) {
-        guard WCSession.default.isReachable else { return }
-        WCSession.default.sendMessage(message, replyHandler: nil)
+    /// 워치→폰 명령 전송(NM-269). 알람 예약은 폰 단독이라 워치는 명령만 보낸다.
+    /// reachable 이면 즉시 message, 아니면(또는 실패 시) 큐잉되는 transferUserInfo 로 폴백.
+    func send(command: TimerWatchCommand) {
+        guard WCSession.isSupported(), let payload = try? command.wcPayload() else { return }
+        let session = WCSession.default
+        if session.isReachable {
+            session.sendMessage(payload, replyHandler: nil) { _ in
+                session.transferUserInfo(payload)
+            }
+        } else {
+            session.transferUserInfo(payload)
+        }
     }
 
     /// 수신 딕셔너리에서 스냅샷을 복원해 최신이면 반영. applicationContext·message 공용.

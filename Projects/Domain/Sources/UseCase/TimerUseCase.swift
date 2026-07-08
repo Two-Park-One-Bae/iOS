@@ -27,6 +27,8 @@ public protocol TimerUseCase {
     func refresh()
     /// 외부 프로세스(App Intent 등)가 App Group 저장소를 직접 바꾼 뒤 재동기화
     func reload()
+    /// 워치에서 온 명령 실행 — 알람 예약은 폰 단독이라 워치는 명령만 보낸다(NM-269)
+    func handleWatchCommand(_ command: TimerWatchCommand)
 
     // 프리셋 CRUD (폰 C3에서만)
     func addPreset(label: String, category: TimerCategory, duration: Int)
@@ -175,6 +177,18 @@ public final class DefaultTimerUseCase: TimerUseCase {
 
     public func reload() {
         timers.send(repository.loadTimers())
+    }
+
+    public func handleWatchCommand(_ command: TimerWatchCommand) {
+        switch command {
+        case .start(let presetId):
+            guard let preset = presets.value.first(where: { $0.id == presetId }) else { return }
+            start(preset: preset)
+        case .pause(let id):  pause(id: id)
+        case .resume(let id): resume(id: id)
+        case .snooze(let id): snooze(id: id)
+        case .remove(let id): remove(id: id)
+        }
     }
 
     // MARK: - Presets
