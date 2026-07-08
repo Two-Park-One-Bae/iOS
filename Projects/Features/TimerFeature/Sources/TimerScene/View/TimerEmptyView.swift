@@ -72,10 +72,10 @@ final class TimerEmptyView: UIView {
             $0.axis = .vertical; $0.spacing = 20; $0.alignment = .center
         }
         addSubview(stack)
+        // edges 로 고정해 뷰가 콘텐츠 크기를 갖게 한다.
+        // (center 로만 잡으면 emptyView 높이가 0 이라 시작 버튼이 보이되 탭이 안 먹는다)
         stack.snp.makeConstraints {
-            $0.center.equalToSuperview()
-            $0.leading.greaterThanOrEqualToSuperview()
-            $0.trailing.lessThanOrEqualToSuperview()
+            $0.edges.equalToSuperview()
         }
     }
 }

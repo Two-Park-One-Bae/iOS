@@ -97,6 +97,7 @@ public final class TimerRingingAlarmViewController: UIViewController {
 
         let root = UIStackView(arrangedSubviews: [topStack, bellStack, actions]).then {
             $0.axis = .vertical
+            $0.alignment = .center       // 가로 중앙 정렬 (ZFXjS) — 없으면 .fill 로 액션 행이 쏠린다
             $0.distribution = .equalSpacing
         }
         view.addSubview(root)
