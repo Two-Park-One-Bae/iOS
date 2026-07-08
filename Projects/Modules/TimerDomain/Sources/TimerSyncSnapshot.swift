@@ -21,3 +21,23 @@ public struct TimerSyncSnapshot: Codable, Equatable, Sendable {
         self.presets = presets
     }
 }
+
+// MARK: - WCSession 전송 (폰·워치 공용)
+
+public extension TimerSyncSnapshot {
+    /// applicationContext·message 딕셔너리의 페이로드 키.
+    /// 폰·워치가 같은 키·같은 코딩을 써야 스냅샷이 무손실로 왕복한다.
+    static let wcPayloadKey = "timerSyncSnapshot"
+
+    /// WCSession(`updateApplicationContext`·`sendMessage`)으로 보낼 딕셔너리.
+    /// 값은 인코딩된 Data 하나 — 딕셔너리 자체는 property-list 호환.
+    func wcPayload() throws -> [String: Any] {
+        [Self.wcPayloadKey: try JSONEncoder().encode(self)]
+    }
+
+    /// 수신 딕셔너리에서 스냅샷 복원. 키가 없거나 형식이 어긋나면 nil.
+    static func decode(fromWCPayload dict: [String: Any]) -> TimerSyncSnapshot? {
+        guard let data = dict[wcPayloadKey] as? Data else { return nil }
+        return try? JSONDecoder().decode(TimerSyncSnapshot.self, from: data)
+    }
+}
