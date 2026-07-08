@@ -1,13 +1,10 @@
 //
 //  TimerEntity.swift
-//  Domain
-//
-//  Created by 바견규 on 7/7/26.
+//  TimerDomain — 폰(iOS)·워치(watchOS) 공용
 //
 //  spec/feature/care-timer/domain-model.md (NM-258) —
-//  폰(iOS)·워치(watchOS)가 동일하게 구현하는 데이터 계약.
-//  상태는 RUNNING/PAUSED/RINGING 3개뿐, 완료·취소는 상태가 아니라 즉시 삭제.
-//  시간은 endAt 하나로 관리: 남은 시간 = endAt − 현재 시각.
+//  두 플랫폼이 동일하게 구현하는 데이터 계약. 상태는 RUNNING/PAUSED/RINGING 3개뿐,
+//  완료·취소는 상태가 아니라 즉시 삭제. 시간은 endAt 하나로 관리(남은 시간 = endAt − now).
 
 import Foundation
 
@@ -18,7 +15,7 @@ public enum TimerCategory: String, Codable, Equatable, Sendable, CaseIterable {
     case treatment    // 처치
     case examination  // 검사
 
-    /// 표시명 (위젯·Live Activity·알람 공용) — 프라이버시 규칙상 노출 가능한 분류 태그.
+    /// 표시명 (위젯·Live Activity·알람·워치 공용) — 프라이버시상 노출 가능한 분류 태그.
     public var displayName: String {
         switch self {
         case .medication:  return "투약"
