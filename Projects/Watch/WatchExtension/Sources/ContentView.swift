@@ -1,23 +1,23 @@
 import SwiftUI
 
+// W1 — 좌우 스와이프 2페이지: 활성 타이머 ↔ 프리셋 (spec/feature/care-timer/README.md).
 struct ContentView: View {
-    @EnvironmentObject var connectivity: WatchConnectivityManager
+    private enum Page: Int { case active, preset }
+
+    @State private var page: Page = .active
 
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 12) {
-                Circle()
-                    .fill(.blue.opacity(0.2))
-                    .frame(width: 64, height: 64)
-
-                Text("Watch App")
-                    .font(.headline)
-
-                Text(connectivity.isReachable ? "Connected" : "Disconnected")
-                    .font(.caption2)
-                    .foregroundStyle(connectivity.isReachable ? .green : .secondary)
+        TabView(selection: $page) {
+            NavigationStack {
+                TimerListView(onStartFromPreset: { page = .preset })
             }
-            .navigationTitle("Home")
+            .tag(Page.active)
+
+            NavigationStack {
+                PresetPageView()
+            }
+            .tag(Page.preset)
         }
+        .tabViewStyle(.page)
     }
 }
