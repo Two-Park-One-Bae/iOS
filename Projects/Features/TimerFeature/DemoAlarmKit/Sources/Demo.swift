@@ -1,8 +1,9 @@
 //
 //  Demo.swift
-//  TimerFeatureDemo
+//  TimerFeatureDemoAlarmKit — iOS 26+ (AlarmKit)
 //
-//  Created by 바견규 on 7/7/26.
+//  AlarmKit 경로 강제: 시스템 알람 + AlarmKit 카운트다운 Live Activity.
+//  26.1+ 시뮬레이터에서 실행하세요. (미만에서 실행하면 자동으로 커스텀 폴백)
 //
 
 import UIKit
@@ -27,7 +28,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             TimerRepository()
         }
         container.register(TimerAlarmScheduling.self) {
-            TimerAlarmScheduler()
+            if #available(iOS 26.1, *) {
+                return AlarmKitAlarmScheduler()
+            }
+            return CustomAlarmScheduler()
         }
         container.register(TimerUseCase.self) {
             DefaultTimerUseCase(
@@ -38,6 +42,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         container.register(TimerFeatureBuildable.self) {
             TimerBuilder()
         }
+
+        // AlarmKit(26.1+)은 시스템이 알람·카운트다운 LA를 단독 관리 — 커스텀 스택 activate 안 함.
 
         return true
     }
@@ -54,13 +60,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     var window: UIWindow?
-
-    private var rootController: UINavigationController {
-        window!.rootViewController as? UINavigationController
-            ?? UINavigationController(rootViewController: UIViewController())
-    }
-
-    private lazy var coordinator = TimerCoordinator(navigationController: rootController)
+    private lazy var navigationController = UINavigationController()
+    private lazy var coordinator = TimerCoordinator(navigationController: navigationController)
 
     func scene(
         _ scene: UIScene,
@@ -69,7 +70,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     ) {
         guard let windowScene = scene as? UIWindowScene else { return }
         window = UIWindow(windowScene: windowScene)
-        window?.rootViewController = rootController
+        window?.rootViewController = navigationController
         window?.makeKeyAndVisible()
         coordinator.start()
     }
