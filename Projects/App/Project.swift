@@ -66,6 +66,7 @@ let project = Project(
             infoPlist: .extendingDefault(with: [
                 "WKApplication": true,
                 "WKCompanionAppBundleIdentifier": "\(Environment.bundlePrefix).app",
+                "CFBundleDisplayName": "널스메이트",
             ]),
             sources: ["../Watch/WatchExtension/Sources/**"],
             resources: [
@@ -76,7 +77,9 @@ let project = Project(
                 // 폰·워치 공용 타이머 도메인 — 동기화 스냅샷을 같은 타입으로 디코드
                 Dep.Modules.TimerDomain.TimerDomain,
             ],
-            settings: .settings(base: XCConfig.base)
+            // configurations 를 붙여야 xcconfig 의 DEVELOPMENT_TEAM·자동서명이 적용된다.
+            // (없으면 워치 앱에 프로비저닝 프로파일이 안 잡혀 "could not be installed")
+            settings: .settings(base: XCConfig.base, configurations: XCConfig.app)
         ),
         // 잠금화면 Live Activity · Dynamic Island (spec: 잠금화면 실시간 표시)
         .target(
