@@ -6,6 +6,9 @@ import TimerDomain
 struct PresetPageView: View {
     @EnvironmentObject var connectivity: WatchConnectivityManager
 
+    /// 프리셋 시작 직후 호출 — 활성 페이지로 전환(ContentView가 소유).
+    let onStarted: () -> Void
+
     private var presets: [TimerPresetModel] {
         connectivity.snapshot?.presets ?? []
     }
@@ -32,6 +35,8 @@ struct PresetPageView: View {
                             Button {
                                 // 폰에 시작 명령 전송 — 폰이 타이머 생성·알람 예약 후 스냅샷 재전송.
                                 connectivity.send(command: .start(presetId: preset.id))
+                                // 활성 페이지로 전환 — 시작한 타이머를 바로 보여준다.
+                                onStarted()
                             } label: {
                                 PresetRow(preset: preset)
                             }
