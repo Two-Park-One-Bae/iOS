@@ -11,6 +11,11 @@ final class WatchConnectivityManager: NSObject, ObservableObject {
     /// 계약(NM-269): snapshotAt 최신이 이긴다. 오래된 스냅샷은 버린다.
     @Published private(set) var snapshot: TimerSyncSnapshot?
 
+    /// 프리셋 시작 명령을 보내고 폰의 스냅샷을 기다리는 중 — 활성 페이지에서 "시작하는 중" 표시.
+    /// 왕복(워치→폰→생성→스냅샷→워치) 지연 동안 빈 상태 대신 로딩을 보여주기 위함.
+    @Published private(set) var isStarting: Bool = false
+    private var startTimeout: DispatchWorkItem?
+
     private override init() {
         super.init()
         guard WCSession.isSupported() else { return }
@@ -30,6 +35,14 @@ final class WatchConnectivityManager: NSObject, ObservableObject {
         } else {
             session.transferUserInfo(payload)
         }
+        // 시작 명령은 스냅샷 도착 전까지 "시작하는 중" 표시. 스냅샷이 안 오면 5초 후 자동 해제.
+        if case .start = command {
+            isStarting = true
+            startTimeout?.cancel()
+            let item = DispatchWorkItem { [weak self] in self?.isStarting = false }
+            startTimeout = item
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5, execute: item)
+        }
     }
 
     /// 수신 딕셔너리에서 스냅샷을 복원해 최신이면 반영. applicationContext·message 공용.
@@ -38,6 +51,11 @@ final class WatchConnectivityManager: NSObject, ObservableObject {
         // 최신 snapshotAt 만 채택 — 늦게 도착한 오래된 스냅샷이 최신 상태를 덮지 않게.
         if let current = snapshot, incoming.snapshotAt <= current.snapshotAt { return }
         snapshot = incoming
+        // 시작한 타이머가 스냅샷에 반영됐으면 "시작하는 중" 해제.
+        if isStarting, !incoming.timers.isEmpty {
+            isStarting = false
+            startTimeout?.cancel()
+        }
     }
 }
 
