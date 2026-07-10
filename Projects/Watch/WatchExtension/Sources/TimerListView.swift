@@ -1,12 +1,11 @@
 import SwiftUI
 import TimerDomain
 
-// W1 활성 페이지 — 진행중 타이머 리스트 (spec/feature/care-timer/README.md, NM-267)
+// W1 활성 페이지 — 진행중 타이머 리스트 (spec/design OduYy / Ab5HV, NM-267)
 //
 // - 폰에서 받은 동기화 스냅샷(WatchConnectivityManager.snapshot)이 유일한 소스.
-// - 만료(ringing)는 맨 위 경고색 카드 — 폰 C1과 동일.
-// - 프라이버시 규칙: 처치 키워드 + 분류 태그 + 남은 시간만 노출(메모 없음).
-// - 카드 탭 조작(일시정지/재개·정지)·프리셋 페이지는 별도(W2 / W1P).
+// - 만료(ringing)는 맨 위 경고색 카드 + [완료]. RUNNING/PAUSED 카드 탭 → W2 조작.
+// - List 네이티브 사이징으로 워치 크기에 자동 적응.
 struct TimerListView: View {
     @EnvironmentObject var connectivity: WatchConnectivityManager
 
@@ -21,27 +20,41 @@ struct TimerListView: View {
         Group {
             if timers.isEmpty {
                 if connectivity.isStarting {
-                    // 프리셋 시작 후 폰 스냅샷 도착 전 — 빈 상태 대신 로딩.
                     StartingView()
                 } else {
                     EmptyTimersView(onStartFromPreset: onStartFromPreset)
                 }
             } else {
-                // 1초마다 남은 시간 갱신 — 타이머 수동 관리 없이 TimelineView로.
-                TimelineView(.periodic(from: .now, by: 1)) { context in
-                    List(timers) { timer in
-                        NavigationLink {
-                            TimerActionView(timer: timer)
-                        } label: {
-                            TimerCardRow(timer: timer, now: context.date)
-                        }
-                        .listRowInsets(EdgeInsets(top: 4, leading: 4, bottom: 4, trailing: 4))
+                List {
+                    // 기존 타이머가 있는데 새로 시작 중이면 맨 위에 로딩 카드.
+                    if connectivity.isStarting {
+                        StartingCardRow()
+                            .listRowBackground(Color.clear)
+                            .listRowInsets(EdgeInsets(top: 4, leading: 2, bottom: 4, trailing: 2))
                     }
-                    .listStyle(.carousel)
+                    ForEach(timers) { timer in
+                        Group {
+                            if timer.state == .ringing {
+                                RingingCardRow(timer: timer) {
+                                    connectivity.send(command: .remove(id: timer.id))
+                                }
+                            } else {
+                                NavigationLink {
+                                    TimerActionView(timer: timer)
+                                } label: {
+                                    TimerCardRow(timer: timer)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .listRowBackground(Color.clear)
+                        .listRowInsets(EdgeInsets(top: 4, leading: 2, bottom: 4, trailing: 2))
+                    }
                 }
+                .listStyle(.plain)
             }
         }
-        .navigationTitle("타이머")
+        .toolbar(.hidden, for: .navigationBar)
     }
 
     // 만료(ringing) 카드가 맨 위, 그다음 만료 임박 순(endAt 오름차순).
@@ -53,41 +66,66 @@ struct TimerListView: View {
     }
 }
 
-// 프리셋 시작 직후 — 폰이 타이머를 만들어 스냅샷을 보내는 짧은 동안 표시.
+// 프리셋 시작 직후(타이머 없음) — 폰이 타이머를 만들어 스냅샷을 보내는 짧은 동안 중앙 표시.
 struct StartingView: View {
     var body: some View {
         VStack(spacing: 8) {
             ProgressView()
             Text("시작하는 중…")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(WT.muted)
         }
         .padding()
     }
 }
 
-// 빈 상태 — 프리셋 페이지로 유도. CTA를 누르면 프리셋 페이지로 전환.
+// 기존 타이머가 있을 때 — 목록 맨 위에 얹는 로딩 카드.
+struct StartingCardRow: View {
+    var body: some View {
+        HStack(spacing: 10) {
+            ProgressView()
+            Text("시작하는 중…")
+                .font(.headline)
+                .foregroundStyle(WT.muted)
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 12)
+        .padding(.horizontal, 14)
+        .frame(maxWidth: .infinity)
+        .background(WT.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+}
+
+// 빈 상태 (spec/design Ab5HV) — 아이콘 원형 + 안내 + 프리셋 페이지 유도 CTA.
 struct EmptyTimersView: View {
     let onStartFromPreset: () -> Void
+    @ScaledMetric private var circle: CGFloat = 64
 
     var body: some View {
-        VStack(spacing: 10) {
-            Image(systemName: "timer")
-                .font(.title2)
-                .foregroundStyle(.secondary)
-            Text("진행 중인 타이머 없음")
+        VStack(spacing: 12) {
+            ZStack {
+                Circle().fill(WT.card).frame(width: circle, height: circle)
+                Image(systemName: "timer")
+                    .font(.system(size: circle * 0.44))
+                    .foregroundStyle(WT.muted)
+            }
+            Text("진행 중인 타이머가 없어요")
                 .font(.headline)
+                .foregroundStyle(WT.textPrimary)
+                .multilineTextAlignment(.center)
+                .minimumScaleFactor(0.7)
             Button(action: onStartFromPreset) {
                 HStack(spacing: 4) {
                     Text("프리셋에서 시작하세요")
-                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .minimumScaleFactor(0.7)
+                        .lineLimit(1)
+                    WIcon(name: "ic_chevron_right", size: 12, color: WT.remaining)
                 }
-                .font(.caption)
+                .foregroundStyle(WT.remaining)
             }
             .buttonStyle(.plain)
-            .foregroundStyle(.blue)
         }
-        .multilineTextAlignment(.center)
-        .padding()
+        .padding(.horizontal, 8)
     }
 }
