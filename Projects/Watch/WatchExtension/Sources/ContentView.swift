@@ -14,7 +14,7 @@ struct ContentView: View {
             .tag(Page.active)
 
             NavigationStack {
-                PresetPageView()
+                PresetPageView(onStarted: { page = .active })
             }
             .tag(Page.preset)
         }
