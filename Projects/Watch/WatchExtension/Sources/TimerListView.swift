@@ -20,7 +20,12 @@ struct TimerListView: View {
     var body: some View {
         Group {
             if timers.isEmpty {
-                EmptyTimersView(onStartFromPreset: onStartFromPreset)
+                if connectivity.isStarting {
+                    // 프리셋 시작 후 폰 스냅샷 도착 전 — 빈 상태 대신 로딩.
+                    StartingView()
+                } else {
+                    EmptyTimersView(onStartFromPreset: onStartFromPreset)
+                }
             } else {
                 // 1초마다 남은 시간 갱신 — 타이머 수동 관리 없이 TimelineView로.
                 TimelineView(.periodic(from: .now, by: 1)) { context in
@@ -45,6 +50,19 @@ struct TimerListView: View {
             return a.state == .ringing
         }
         return a.endAt < b.endAt
+    }
+}
+
+// 프리셋 시작 직후 — 폰이 타이머를 만들어 스냅샷을 보내는 짧은 동안 표시.
+struct StartingView: View {
+    var body: some View {
+        VStack(spacing: 8) {
+            ProgressView()
+            Text("시작하는 중…")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding()
     }
 }
 
