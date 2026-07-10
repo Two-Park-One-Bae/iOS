@@ -1,8 +1,8 @@
 import SwiftUI
 import TimerDomain
 
-// W1 프리셋 페이지 — 프리셋 원탭 시작(spec/feature/care-timer/README.md).
-// 목록·순서는 폰에서 받은 스냅샷을 따른다. 원탭 시작(write-back)은 후속.
+// W1 프리셋 페이지 (spec/design mngll) — 프리셋 원탭 시작.
+// List 네이티브 사이징으로 워치 크기에 자동 적응. 탭 → start 명령 → 활성 페이지 전환.
 struct PresetPageView: View {
     @EnvironmentObject var connectivity: WatchConnectivityManager
 
@@ -19,66 +19,73 @@ struct PresetPageView: View {
                 VStack(spacing: 6) {
                     Image(systemName: "square.stack.3d.up")
                         .font(.title2)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(WT.muted)
                     Text("프리셋 없음")
                         .font(.headline)
+                        .foregroundStyle(WT.textPrimary)
                     Text("폰에서 프리셋을 추가하세요")
                         .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(WT.muted)
+                        .multilineTextAlignment(.center)
                 }
-                .multilineTextAlignment(.center)
                 .padding()
             } else {
-                List {
-                    Section {
+                // List 대신 ScrollView+VStack — 카드 간격을 직접(정확히) 제어.
+                ScrollView {
+                    VStack(spacing: 6) {
+                        Text("누르면 바로 시작됩니다")
+                            .font(.caption2)
+                            .foregroundStyle(WT.muted)
+                            .frame(maxWidth: .infinity)
+
                         ForEach(presets) { preset in
                             Button {
-                                // 폰에 시작 명령 전송 — 폰이 타이머 생성·알람 예약 후 스냅샷 재전송.
                                 connectivity.send(command: .start(presetId: preset.id))
-                                // 활성 페이지로 전환 — 시작한 타이머를 바로 보여준다.
                                 onStarted()
                             } label: {
                                 PresetRow(preset: preset)
                             }
                             .buttonStyle(.plain)
                         }
-                    } header: {
-                        Text("누르면 바로 시작됩니다")
                     }
+                    .padding(.horizontal, 2)
+                    .padding(.top, -12)
                 }
             }
         }
-        .navigationTitle("프리셋")
+        .toolbar(.hidden, for: .navigationBar)
     }
 }
 
-// 프리셋 행 — 재생 아이콘 + 라벨 + 지속시간.
+// 프리셋 카드 (spec/design "프리셋 — AST") — 재생 아이콘 + 라벨 + 지속시간.
 struct PresetRow: View {
     let preset: TimerPresetModel
 
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "play.circle.fill")
-                .foregroundStyle(.blue)
+        HStack(spacing: 9) {
+            // circle-play = 원(외곽선) + lucide ic_play 에셋. 아이콘은 작게.
+            ZStack {
+                Circle().stroke(WT.accent, lineWidth: 1.3).frame(width: 16, height: 16)
+                WIcon(name: "ic_play", size: 8, color: WT.accent)
+                    .offset(x: 1)
+            }
+            // 라벨: 길어도 잘리지 않고 축소해서 전부 보이게.
             Text(preset.label)
-                .font(.headline)
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(WT.textPrimary)
                 .lineLimit(1)
+                .minimumScaleFactor(0.4)
+                .layoutPriority(1)
             Spacer(minLength: 4)
-            Text(Self.durationText(preset.duration))
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            Text(WatchFormat.duration(preset.duration))
+                .font(.system(size: 13))
+                .foregroundStyle(WT.muted)
+                .lineLimit(1)
+                .fixedSize()
         }
-    }
-
-    // 폰 TimerFormat.duration 과 동일 표기: 900→"15분", 7200→"2시간", 5400→"1시간 30분".
-    static func durationText(_ seconds: Int) -> String {
-        let h = seconds / 3600
-        let m = (seconds % 3600) / 60
-        let s = seconds % 60
-        var parts: [String] = []
-        if h > 0 { parts.append("\(h)시간") }
-        if m > 0 { parts.append("\(m)분") }
-        if s > 0 { parts.append("\(s)초") }
-        return parts.isEmpty ? "0초" : parts.joined(separator: " ")
+        .padding(.vertical, 11)
+        .padding(.horizontal, 14)
+        .frame(maxWidth: .infinity)
+        .background(WT.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 }
