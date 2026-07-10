@@ -7,17 +7,17 @@ struct ContentView: View {
     @State private var page: Page = .active
 
     var body: some View {
-        TabView(selection: $page) {
-            NavigationStack {
+        // NavigationStack을 TabView 바깥에 — W2(상세) 푸시 시 전체를 덮어
+        // 좌우 스와이프 페이지 전환이 상세 화면에서 동작하지 않게 한다.
+        NavigationStack {
+            TabView(selection: $page) {
                 TimerListView(onStartFromPreset: { page = .preset })
-            }
-            .tag(Page.active)
+                    .tag(Page.active)
 
-            NavigationStack {
                 PresetPageView(onStarted: { page = .active })
+                    .tag(Page.preset)
             }
-            .tag(Page.preset)
+            .tabViewStyle(.page)
         }
-        .tabViewStyle(.page)
     }
 }

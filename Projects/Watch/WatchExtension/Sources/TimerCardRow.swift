@@ -1,69 +1,94 @@
 import SwiftUI
 import TimerDomain
 
-// 진행중 리스트의 카드 한 장. 처치 키워드 + 분류 태그 + 남은 시간만 노출.
+// 진행중 카드 (RUNNING/PAUSED) — 진행률 링 + 라벨/분류 + 남은 시간 + chevron.
+// spec/design OduYy. 크기는 고정 대신 시스템 폰트·비율·minimumScaleFactor 로 적응.
 struct TimerCardRow: View {
     let timer: TreatmentTimerModel
-    let now: Date
-
-    private var isRinging: Bool { timer.state == .ringing }
-    private var isPaused: Bool { timer.state == .paused }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 6) {
-                categoryTag
-                Spacer(minLength: 0)
-                if isPaused {
-                    Image(systemName: "pause.fill")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            let remaining = timer.remainingSeconds(at: context.date)
+            let progress = timer.duration > 0 ? Double(remaining) / Double(timer.duration) : 0
+            let paused = timer.state == .paused
+
+            HStack(spacing: 9) {
+                // 링: 화면 폭 비율(디자인 60/396 ≈ 15%)로 적응.
+                ProgressRing(progress: progress,
+                             tint: paused ? WT.muted : WT.accent,
+                             lineWidth: 4, paused: paused)
+                    .containerRelativeFrame(.horizontal) { w, _ in w * 0.17 }
+                    .aspectRatio(1, contentMode: .fit)
+
+                VStack(alignment: .leading, spacing: 1) {
+                    HStack(spacing: 5) {
+                        Text(timer.label)
+                            .font(.headline)
+                            .foregroundStyle(WT.textPrimary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.55)
+                            .layoutPriority(1)
+                        Text(timer.category.displayName)
+                            .font(.caption2)
+                            .foregroundStyle(WT.category(timer.category))
+                            .lineLimit(1)
+                            .fixedSize()
+                    }
+                    Text(paused ? "\(WatchFormat.countdown(remaining)) · 일시정지"
+                                : WatchFormat.countdown(remaining))
+                        .font(.system(.title3, design: .rounded).weight(.semibold))
+                        .foregroundStyle(paused ? WT.muted : WT.remaining)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.5)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                WIcon(name: "ic_chevron_right", size: 13, color: WT.muted)
             }
-
-            Text(timer.label)
-                .font(.headline)
-                .lineLimit(1)
-
-            Text(timeText)
-                .font(.system(.title3, design: .rounded).monospacedDigit())
-                .foregroundStyle(isRinging ? Color.white : .primary)
+            .padding(.vertical, 10)
+            .padding(.horizontal, 12)
+            .frame(maxWidth: .infinity)
+            .background(WT.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .listRowBackground(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(isRinging ? Color.orange : Color.gray.opacity(0.18))
+    }
+}
+
+// 만료 카드 (RINGING) — 경고색 배경 + 종 + 라벨/분류 + [완료]. spec/design OduYy "만료 카드".
+struct RingingCardRow: View {
+    let timer: TreatmentTimerModel
+    let onComplete: () -> Void
+
+    var body: some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 6) {
+                WIcon(name: "ic_bell", size: 15, color: WT.bell)
+                Text(timer.label)
+                    .font(.headline)
+                    .foregroundStyle(WT.textPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                Text(timer.category.displayName)
+                    .font(.caption2)
+                    .foregroundStyle(WT.category(timer.category))
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+            }
+            Button(action: onComplete) {
+                Text("완료")
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 7)
+                    .background(WT.ringingAccent, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .foregroundStyle(WT.textPrimary)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity)
+        .background(WT.ringingBg, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(WT.ringingAccent, lineWidth: 1.5)
         )
-    }
-
-    private var categoryTag: some View {
-        Text(timer.category.displayName)
-            .font(.caption2.weight(.medium))
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(
-                Capsule().fill((isRinging ? Color.white : categoryColor).opacity(0.22))
-            )
-            .foregroundStyle(isRinging ? Color.white : categoryColor)
-    }
-
-    // 폰 C1 태그 색 컨벤션 근사: 투약=파랑 / 처치=청록 / 검사=남색.
-    private var categoryColor: Color {
-        switch timer.category {
-        case .medication:  return .blue
-        case .treatment:   return .teal
-        case .examination: return .indigo
-        }
-    }
-
-    // 카운트다운 포맷 — 폰 TimerFormat.countdown 과 동일(mm:ss / h:mm:ss).
-    private var timeText: String {
-        guard !isRinging else { return "종료" }
-        let secs = timer.remainingSeconds(at: now)
-        let h = secs / 3600
-        let m = (secs % 3600) / 60
-        let s = secs % 60
-        if h > 0 { return String(format: "%d:%02d:%02d", h, m, s) }
-        return String(format: "%02d:%02d", m, s)
     }
 }
