@@ -15,6 +15,7 @@ final class WatchConnectivityManager: NSObject, ObservableObject {
     /// 왕복(워치→폰→생성→스냅샷→워치) 지연 동안 빈 상태 대신 로딩을 보여주기 위함.
     @Published private(set) var isStarting: Bool = false
     private var startTimeout: DispatchWorkItem?
+    private var startingBaseline: Int = 0   // 시작 시점의 타이머 개수 — 이보다 늘면 새 타이머 도착
 
     private override init() {
         super.init()
@@ -38,6 +39,7 @@ final class WatchConnectivityManager: NSObject, ObservableObject {
         // 시작 명령은 스냅샷 도착 전까지 "시작하는 중" 표시. 스냅샷이 안 오면 5초 후 자동 해제.
         if case .start = command {
             isStarting = true
+            startingBaseline = snapshot?.timers.count ?? 0   // 지금 개수 기록
             startTimeout?.cancel()
             let item = DispatchWorkItem { [weak self] in self?.isStarting = false }
             startTimeout = item
@@ -51,8 +53,8 @@ final class WatchConnectivityManager: NSObject, ObservableObject {
         // 최신 snapshotAt 만 채택 — 늦게 도착한 오래된 스냅샷이 최신 상태를 덮지 않게.
         if let current = snapshot, incoming.snapshotAt <= current.snapshotAt { return }
         snapshot = incoming
-        // 시작한 타이머가 스냅샷에 반영됐으면 "시작하는 중" 해제.
-        if isStarting, !incoming.timers.isEmpty {
+        // 새 타이머가 스냅샷에 반영됐으면(개수 증가) "시작하는 중" 해제 — 기존 타이머가 있어도 정확.
+        if isStarting, incoming.timers.count > startingBaseline {
             isStarting = false
             startTimeout?.cancel()
         }
