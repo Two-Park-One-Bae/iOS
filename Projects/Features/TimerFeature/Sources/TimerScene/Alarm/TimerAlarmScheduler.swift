@@ -6,7 +6,7 @@
 //
 //  UNUserNotificationCenter 기반 로컬 알람.
 //  잠금화면/사용중 알럿은 시스템이 렌더링 (디자인 '시스템 알람' 화면 = 예상 화면).
-//  표기(NM-259): title = "{라벨} 종료", 버튼 = [완료] / [+5분].
+//  표기(NM-259): title = "{라벨} 종료", 버튼 = [완료].
 
 import Combine
 import Foundation
@@ -18,7 +18,6 @@ public final class TimerAlarmScheduler: TimerAlarmScheduling {
     public enum Action {
         public static let category = "CARE_TIMER_ALARM"
         public static let complete = "CARE_TIMER_COMPLETE"
-        public static let snooze = "CARE_TIMER_SNOOZE"
     }
 
     private let center = UNUserNotificationCenter.current()
@@ -76,10 +75,9 @@ public final class TimerAlarmScheduler: TimerAlarmScheduling {
 
     private func registerCategory() {
         let complete = UNNotificationAction(identifier: Action.complete, title: "완료", options: [])
-        let snooze = UNNotificationAction(identifier: Action.snooze, title: "+5분", options: [])
         let category = UNNotificationCategory(
             identifier: Action.category,
-            actions: [complete, snooze],
+            actions: [complete],
             intentIdentifiers: []
         )
         center.setNotificationCategories([category])

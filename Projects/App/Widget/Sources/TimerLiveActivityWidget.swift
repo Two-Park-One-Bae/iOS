@@ -31,7 +31,7 @@ struct TimerLiveActivityWidget: Widget {
                 // 확장 (길게 누름)
                 DynamicIslandExpandedRegion(.leading) {
                     if context.state.isRinging || context.isStale {
-                        TimerBellBadge(size: 44, iconSize: 22)
+                        TimerExpiredRing(size: 44)
                             .padding(.leading, 4)
                     } else {
                         TimerRing(
@@ -46,12 +46,12 @@ struct TimerLiveActivityWidget: Widget {
                 DynamicIslandExpandedRegion(.center) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("\(context.state.label) · \(context.state.categoryName)")
-                            .font(.system(size: 12))
-                            .foregroundStyle(Color.timerGrayText)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Color.timerLabelText)
                             .lineLimit(1)
 
                         if context.state.isRinging || context.isStale {
-                            Text("종료 — 확인 필요")
+                            Text("종료")
                                 .font(.system(size: 20, weight: .bold))
                                 .foregroundStyle(Color.timerAmber)
                                 .lineLimit(1)
@@ -60,9 +60,9 @@ struct TimerLiveActivityWidget: Widget {
                                 timerInterval: context.state.startAt...context.state.endAt,
                                 countsDown: true
                             )
-                            .font(.system(size: 20, weight: .bold))
+                            .font(.system(size: 22, weight: .bold))
                             .monospacedDigit()
-                            .foregroundStyle(Color.timerTextPrimary)
+                            .foregroundStyle(Color.timerBlue)
                             .lineLimit(1)
                         }
                     }
@@ -101,7 +101,7 @@ struct TimerLiveActivityWidget: Widget {
                     )
                     .font(.system(size: 13, weight: .semibold))
                     .monospacedDigit()
-                    .foregroundStyle(Color.timerTextPrimary)
+                    .foregroundStyle(Color.timerBlue)
                     .multilineTextAlignment(.trailing)
                     .frame(maxWidth: 44)
                 }
@@ -131,53 +131,55 @@ private struct TimerLockScreenView: View {
     let isRinging: Bool
 
     var body: some View {
-        HStack(spacing: 12) {
-            // Leading — 링 또는 벨
+        HStack(spacing: 14) {
+            // Leading — 진행 링 또는 만료 벨 링
             if isRinging {
-                TimerBellBadge(size: 44, iconSize: 22)
+                TimerExpiredRing(size: 48)
             } else {
-                TimerRing(startAt: state.startAt, endAt: state.endAt, size: 44)
+                TimerRing(startAt: state.startAt, endAt: state.endAt, size: 48)
             }
 
             // Center — 라벨 + 카운트다운/상태
             VStack(alignment: .leading, spacing: 2) {
                 Text("\(state.label) · \(state.categoryName)")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Color.timerGrayText)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Color.timerLabelText)
                     .lineLimit(1)
 
                 if isRinging {
-                    Text("종료 — 확인 필요")
-                        .font(.system(size: 17, weight: .bold))
+                    Text("종료")
+                        .font(.system(size: 18, weight: .bold))
                         .foregroundStyle(Color.timerAmber)
                         .lineLimit(1)
                 } else {
                     Text(timerInterval: state.startAt...state.endAt, countsDown: true)
-                        .font(.system(size: 20, weight: .bold))
+                        .font(.system(size: 26, weight: .bold))
                         .monospacedDigit()
-                        .foregroundStyle(Color.timerTextPrimary)
+                        .foregroundStyle(Color.timerBlue)
                         .lineLimit(1)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            // Trailing — 요약 외 진행 중 개수
-            if state.othersCount > 0 {
-                Text("외 \(state.othersCount)개 진행 중")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Color.timerGrayText)
-                    .lineLimit(1)
-                    .fixedSize()
+            // Trailing — 만료 시 00:00, 그리고 외 N개 진행 중
+            VStack(alignment: .trailing, spacing: 4) {
+                if isRinging {
+                    Text("00:00")
+                        .font(.system(size: 20, weight: .bold))
+                        .monospacedDigit()
+                        .foregroundStyle(Color.timerAmber)
+                        .fixedSize()
+                }
+                if state.othersCount > 0 {
+                    Text("외 \(state.othersCount)개 진행 중")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.timerGrayText)
+                        .lineLimit(1)
+                        .fixedSize()
+                }
             }
         }
-        .padding(14)
-        .overlay {
-            if isRinging {
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .strokeBorder(Color.timerAmber, lineWidth: 1)
-                    .padding(1)
-            }
-        }
+        .padding(16)
     }
 }
 
@@ -214,20 +216,19 @@ private struct TimerRing: View {
     }
 }
 
-// MARK: - 만료 벨 배지
+// MARK: - 만료 벨 링 (앰버 테두리 + 벨)
 
-private struct TimerBellBadge: View {
+private struct TimerExpiredRing: View {
 
     let size: CGFloat
-    let iconSize: CGFloat
 
     var body: some View {
         ZStack {
             Circle()
-                .fill(Color.timerAmberDim)
+                .stroke(Color.timerAmber, lineWidth: max(2, size * 0.09))
 
             Image(systemName: "bell.fill")
-                .font(.system(size: iconSize, weight: .semibold))
+                .font(.system(size: size * 0.42, weight: .semibold))
                 .foregroundStyle(Color.timerAmber)
         }
         .frame(width: size, height: size)
@@ -237,18 +238,16 @@ private struct TimerBellBadge: View {
 // MARK: - 색상 (디자인 시스템 미링크 — 위젯 타깃 자체 정의)
 
 private extension Color {
-    /// 진행 링·키라인 파랑 (#0EA5E9)
+    /// 진행 링·키라인·카운트다운 파랑 (#0EA5E9)
     static let timerBlue = Color(red: 0.055, green: 0.647, blue: 0.914)
     /// 만료 경고 앰버 (#F59E0B)
     static let timerAmber = Color(red: 0.961, green: 0.620, blue: 0.043)
-    /// 벨 배지 배경 (#422006 — 어두운 앰버)
-    static let timerAmberDim = Color(red: 0.259, green: 0.125, blue: 0.024)
+    /// 라벨 텍스트 흰색 80% (#FFFFFFCC)
+    static let timerLabelText = Color.white.opacity(0.80)
     /// 보조 텍스트 회색 (#94A3B8)
     static let timerGrayText = Color(red: 0.580, green: 0.639, blue: 0.722)
-    /// 링 트랙 (#334155)
-    static let timerTrack = Color(red: 0.200, green: 0.255, blue: 0.333)
-    /// 주 텍스트·카운트다운 (#F8FAFC)
-    static let timerTextPrimary = Color(red: 0.973, green: 0.980, blue: 0.988)
-    /// LA 카드 배경 (#0F172A)
-    static let timerCardBackground = Color(red: 0.059, green: 0.090, blue: 0.165)
+    /// 링 트랙 흰색 15% (#FFFFFF26)
+    static let timerTrack = Color.white.opacity(0.15)
+    /// LA 카드 배경 검정 (#000000)
+    static let timerCardBackground = Color.black
 }

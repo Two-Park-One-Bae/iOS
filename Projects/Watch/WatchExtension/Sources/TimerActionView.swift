@@ -95,10 +95,6 @@ struct TimerActionView: View {
                              icon: { WIcon(name: "ic_check", size: 18, color: WT.textPrimary) }) {
                     send(.remove(id: timer.id))
                 }
-                actionButton("+5분", tint: WT.accent,
-                             icon: { WIcon(name: "ic_plus", size: 18, color: WT.accent) }) {
-                    send(.snooze(id: timer.id))
-                }
             }
         }
     }

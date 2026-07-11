@@ -13,7 +13,6 @@ public enum TimerWatchCommand: Codable, Equatable, Sendable {
     case start(presetId: UUID)   // 프리셋 원탭 시작
     case pause(id: UUID)         // 일시정지
     case resume(id: UUID)        // 재개
-    case snooze(id: UUID)        // 울림 [+5분]
     case remove(id: UUID)        // 완료 / 정지(취소) — 즉시 삭제
 }
 

@@ -6,13 +6,24 @@ import Domain
 
 // ZFXjS — 타이머 만료 풀스크린 알람 (포그라운드).
 // 시스템 로컬 알림은 작은 배너로만 뜨기 때문에, 앱이 켜져 있을 때는 이 화면이
-// 전체화면으로 떠서 루핑 사운드와 함께 울린다. [완료]/[+5분]으로만 종료.
+// 전체화면으로 떠서 루핑 사운드와 함께 울린다. [완료]로만 종료.
+//
+// 리프레시 디자인(LA 만료 Km53q 톤): 순수 검정 배경 + 앰버(#F59E0B) 강조 +
+// 벨 뒤 펄스 링 애니메이션으로 "울리는 중" 에너지를 준다.
 public final class TimerRingingAlarmViewController: UIViewController {
 
-    public var onSnooze: (() -> Void)?
     public var onComplete: (() -> Void)?
 
     private let timer: TreatmentTimerModel
+    private let pulse = PulseRingView()
+
+    // 팔레트 (Km53q — DSKit 미보유 값)
+    private enum Palette {
+        static let background = UIColor(hex: 0x000000)
+        static let amber = UIColor(hex: 0xF59E0B)
+        static let textPrimary = UIColor(hex: 0xF8FAFC)
+        static let textSecondary = UIColor(hex: 0x94A3B8)
+    }
 
     public init(timer: TreatmentTimerModel) {
         self.timer = timer
@@ -28,117 +39,231 @@ public final class TimerRingingAlarmViewController: UIViewController {
         setup()
     }
 
-    private func setup() {
-        view.backgroundColor = UIColor(hex: 0x0F172A)
+    public override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        pulse.start()
+    }
 
-        // MARK: Top — 앱 표식 + 제목 + 본문
+    public override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        pulse.stop()
+    }
+
+    private func setup() {
+        view.backgroundColor = Palette.background
+
+        let header = makeHeader()
+        let hero = makeHero()
+        let actions = makeActions()
+
+        let root = UIStackView(arrangedSubviews: [header, hero, actions]).then {
+            $0.axis = .vertical
+            $0.alignment = .fill
+            $0.distribution = .equalSpacing
+        }
+        view.addSubview(root)
+        root.snp.makeConstraints {
+            $0.top.equalTo(view.safeAreaLayoutGuide).offset(56)
+            $0.bottom.equalTo(view.safeAreaLayoutGuide).inset(40)
+            $0.leading.trailing.equalToSuperview().inset(24)
+        }
+    }
+
+    // MARK: - Header — 앱 표식 + 분류 칩
+
+    private func makeHeader() -> UIView {
         let appIcon = UIView().then {
             $0.backgroundColor = DSColor.Primary._500
             $0.layer.cornerRadius = 6
         }
         appIcon.snp.makeConstraints { $0.width.height.equalTo(24) }
+
         let appName = UILabel().then {
             $0.text = "널스메이트"
             $0.font = DSKitFontFamily.Pretendard.medium.font(size: 14)
-            $0.textColor = UIColor(hex: 0x94A3B8)
+            $0.textColor = Palette.textSecondary
         }
         let appRow = UIStackView(arrangedSubviews: [appIcon, appName]).then {
             $0.axis = .horizontal; $0.spacing = 8; $0.alignment = .center
         }
-        let titleLabel = UILabel().then {
-            $0.text = "\(timer.label) 종료"
-            $0.font = DSKitFontFamily.Pretendard.bold.font(size: 24)
-            $0.textColor = UIColor(hex: 0xF8FAFC)
-            $0.textAlignment = .center
-        }
-        let bodyLabel = UILabel().then {
-            $0.text = "\(TimerFormat.duration(timer.duration)) 타이머가 끝났어요"
-            $0.font = DSKitFontFamily.Pretendard.regular.font(size: 15)
-            $0.textColor = UIColor(hex: 0x94A3B8)
-            $0.textAlignment = .center
-        }
-        let topStack = UIStackView(arrangedSubviews: [appRow, titleLabel, bodyLabel]).then {
-            $0.axis = .vertical; $0.spacing = 12; $0.alignment = .center
-        }
 
-        // MARK: Bell — 큰 벨 + "알람이 울리는 중"
-        let bellIcon = UIImageView().then {
+        let chip = makeCategoryChip(timer.category.displayName)
+
+        let row = UIStackView(arrangedSubviews: [appRow, UIView(), chip]).then {
+            $0.axis = .horizontal; $0.alignment = .center
+        }
+        return row
+    }
+
+    private func makeCategoryChip(_ text: String) -> UIView {
+        let label = UILabel().then {
+            $0.text = text
+            $0.font = DSKitFontFamily.Pretendard.semiBold.font(size: 12)
+            $0.textColor = Palette.amber
+        }
+        let wrap = UIView().then {
+            $0.backgroundColor = Palette.amber.withAlphaComponent(0.14)
+            $0.layer.cornerRadius = 12
+        }
+        wrap.addSubview(label)
+        label.snp.makeConstraints {
+            $0.top.bottom.equalToSuperview().inset(5)
+            $0.leading.trailing.equalToSuperview().inset(12)
+        }
+        return wrap
+    }
+
+    // MARK: - Hero — 펄스 링 + 벨 + 제목/상태
+
+    private func makeHero() -> UIView {
+        // 벨 배지
+        let bell = UIImageView().then {
             $0.image = UIImage(
-                systemName: "bell.and.waves.left.and.right",
-                withConfiguration: UIImage.SymbolConfiguration(pointSize: 50, weight: .regular)
+                systemName: "bell.and.waves.left.and.right.fill",
+                withConfiguration: UIImage.SymbolConfiguration(pointSize: 46, weight: .regular)
             )
-            $0.tintColor = DSColor.Warning._500
+            $0.tintColor = Palette.amber
             $0.contentMode = .scaleAspectFit
         }
         let bellWrap = UIView().then {
-            $0.backgroundColor = UIColor(hex: 0x1E293B)
-            $0.layer.cornerRadius = 60
+            $0.backgroundColor = Palette.amber.withAlphaComponent(0.12)
+            $0.layer.cornerRadius = 58
+            $0.layer.borderWidth = 1.5
+            $0.layer.borderColor = Palette.amber.withAlphaComponent(0.4).cgColor
         }
-        bellWrap.addSubview(bellIcon)
-        bellIcon.snp.makeConstraints { $0.center.equalToSuperview(); $0.width.height.equalTo(52) }
-        bellWrap.snp.makeConstraints { $0.width.height.equalTo(120) }
-        let ringingLabel = UILabel().then {
-            $0.text = "알람이 울리는 중"
-            $0.font = DSKitFontFamily.Pretendard.regular.font(size: 13)
-            $0.textColor = UIColor(hex: 0x64748B)
-        }
-        let bellStack = UIStackView(arrangedSubviews: [bellWrap, ringingLabel]).then {
-            $0.axis = .vertical; $0.spacing = 16; $0.alignment = .center
-        }
+        bellWrap.addSubview(bell)
+        bell.snp.makeConstraints { $0.center.equalToSuperview(); $0.width.height.equalTo(48) }
+        bellWrap.snp.makeConstraints { $0.width.height.equalTo(116) }
 
-        // MARK: Actions — [+5분] [완료]
-        let snooze = makeAction(fill: UIColor(hex: 0x334155), icon: "gobackward", caption: "+5분")
-        let complete = makeAction(fill: DSColor.Warning._600, icon: "checkmark", caption: "완료")
-        snooze.button.addAction(UIAction { [weak self] _ in self?.onSnooze?() }, for: .touchUpInside)
-        complete.button.addAction(UIAction { [weak self] _ in self?.onComplete?() }, for: .touchUpInside)
-        let actions = UIStackView(arrangedSubviews: [snooze.stack, complete.stack]).then {
-            $0.axis = .horizontal; $0.spacing = 80; $0.alignment = .top
-        }
+        // 펄스 + 벨 (같은 중심)
+        let ring = UIView()
+        pulse.color = Palette.amber
+        ring.addSubview(pulse)
+        ring.addSubview(bellWrap)
+        pulse.snp.makeConstraints { $0.center.equalToSuperview(); $0.width.height.equalTo(240) }
+        bellWrap.snp.makeConstraints { $0.center.equalToSuperview() }
+        ring.snp.makeConstraints { $0.height.equalTo(240) }
 
-        let root = UIStackView(arrangedSubviews: [topStack, bellStack, actions]).then {
-            $0.axis = .vertical
-            $0.alignment = .center       // 가로 중앙 정렬 (ZFXjS) — 없으면 .fill 로 액션 행이 쏠린다
-            $0.distribution = .equalSpacing
+        // 제목 + 상태
+        let title = UILabel().then {
+            $0.text = timer.label
+            $0.font = DSKitFontFamily.Pretendard.bold.font(size: 26)
+            $0.textColor = Palette.textPrimary
+            $0.textAlignment = .center
+            $0.numberOfLines = 2
         }
-        view.addSubview(root)
-        root.snp.makeConstraints {
-            $0.top.equalTo(view.safeAreaLayoutGuide).offset(64)
-            $0.bottom.equalTo(view.safeAreaLayoutGuide).inset(48)
-            $0.leading.trailing.equalToSuperview().inset(24)
-        }
-    }
-
-    private func makeAction(fill: UIColor, icon: String, caption: String) -> (stack: UIStackView, button: UIControl) {
-        let button = UIControl().then {
-            $0.backgroundColor = fill
-            $0.layer.cornerRadius = 38
-        }
-        let iv = UIImageView().then {
-            $0.image = UIImage(
-                systemName: icon,
-                withConfiguration: UIImage.SymbolConfiguration(pointSize: 30, weight: .semibold)
-            )
-            $0.tintColor = .white
-            $0.contentMode = .scaleAspectFit
-            $0.isUserInteractionEnabled = false
-        }
-        button.addSubview(iv)
-        iv.snp.makeConstraints { $0.center.equalToSuperview(); $0.width.height.equalTo(30) }
-        button.snp.makeConstraints { $0.width.height.equalTo(76) }
-        let cap = UILabel().then {
-            $0.text = caption
-            $0.font = DSKitFontFamily.Pretendard.regular.font(size: 13)
-            $0.textColor = UIColor(hex: 0x94A3B8)
+        let status = UILabel().then {
+            $0.text = "종료 — 확인이 필요해요"
+            $0.font = DSKitFontFamily.Pretendard.semiBold.font(size: 15)
+            $0.textColor = Palette.amber
             $0.textAlignment = .center
         }
-        let stack = UIStackView(arrangedSubviews: [button, cap]).then {
-            $0.axis = .vertical; $0.spacing = 10; $0.alignment = .center
+        let texts = UIStackView(arrangedSubviews: [title, status]).then {
+            $0.axis = .vertical; $0.spacing = 8; $0.alignment = .center
         }
-        return (stack, button)
+
+        let hero = UIStackView(arrangedSubviews: [ring, texts]).then {
+            $0.axis = .vertical; $0.spacing = 36; $0.alignment = .center
+        }
+        return hero
+    }
+
+    // MARK: - Actions — [완료] 주 버튼
+
+    private func makeActions() -> UIView {
+        let complete = makePrimaryButton(title: "완료", icon: "checkmark", fill: DSColor.Warning._500)
+        complete.addAction(UIAction { [weak self] _ in self?.onComplete?() }, for: .touchUpInside)
+
+        let stack = UIStackView(arrangedSubviews: [complete]).then {
+            $0.axis = .vertical; $0.alignment = .fill
+        }
+        return stack
+    }
+
+    private func makePrimaryButton(title: String, icon: String, fill: UIColor) -> UIButton {
+        var config = UIButton.Configuration.filled()
+        config.baseBackgroundColor = fill
+        config.baseForegroundColor = .white
+        config.cornerStyle = .capsule
+        config.image = UIImage(
+            systemName: icon,
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 16, weight: .bold)
+        )
+        config.imagePadding = 8
+        config.attributedTitle = AttributedString(
+            title,
+            attributes: AttributeContainer([
+                .font: DSKitFontFamily.Pretendard.semiBold.font(size: 17)
+            ])
+        )
+        let button = UIButton(configuration: config)
+        button.snp.makeConstraints { $0.height.equalTo(56) }
+        return button
     }
 }
 
-// MARK: - Hex 색 (ZFXjS 다크 팔레트 — DSKit에 없는 값)
+// MARK: - 펄스 링 (벨 뒤 "울리는 중" 파동)
+
+private final class PulseRingView: UIView {
+
+    private let replicator = CAReplicatorLayer()
+    private let ring = CAShapeLayer()
+
+    var color: UIColor = .systemOrange {
+        didSet { ring.strokeColor = color.cgColor }
+    }
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        replicator.instanceCount = 3
+        replicator.instanceDelay = 0.9
+        ring.fillColor = UIColor.clear.cgColor
+        ring.strokeColor = color.cgColor
+        ring.lineWidth = 2
+        ring.opacity = 0
+        replicator.addSublayer(ring)
+        layer.addSublayer(replicator)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        replicator.frame = bounds
+        let side = min(bounds.width, bounds.height)
+        let inset = CGRect(
+            x: (bounds.width - side) / 2,
+            y: (bounds.height - side) / 2,
+            width: side,
+            height: side
+        )
+        ring.frame = bounds
+        ring.path = UIBezierPath(ovalIn: inset).cgPath
+    }
+
+    func start() {
+        let scale = CABasicAnimation(keyPath: "transform.scale")
+        scale.fromValue = 0.55
+        scale.toValue = 1.0
+
+        let opacity = CABasicAnimation(keyPath: "opacity")
+        opacity.fromValue = 0.45
+        opacity.toValue = 0.0
+
+        let group = CAAnimationGroup()
+        group.animations = [scale, opacity]
+        group.duration = 2.7
+        group.repeatCount = .infinity
+        group.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        ring.add(group, forKey: "pulse")
+    }
+
+    func stop() {
+        ring.removeAllAnimations()
+    }
+}
+
+// MARK: - Hex 색 (Km53q 다크 팔레트 — DSKit에 없는 값)
 private extension UIColor {
     convenience init(hex: UInt32, alpha: CGFloat = 1) {
         self.init(

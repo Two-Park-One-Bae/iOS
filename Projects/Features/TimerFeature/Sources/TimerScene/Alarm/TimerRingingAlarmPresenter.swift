@@ -7,7 +7,7 @@ import Domain
 // UseCase의 timers를 구독해 ringing 타이머가 생기면:
 //  - 사운드는 fg/bg 무관 항상 루핑 재생(BackgroundAudioKeepAlive가 백그라운드 생명을 연장한 상태).
 //  - 풀스크린 UI는 포그라운드에서만 present. 백그라운드 복귀 시 evaluate 재호출로 UI를 보충.
-// [완료]/[+5분]으로 끈다. iOS 26에서는 AlarmKit이 시스템 알람을 담당하므로 activate하지 않는다.
+// [완료]로 끈다. iOS 26에서는 AlarmKit이 시스템 알람을 담당하므로 activate하지 않는다.
 public final class TimerRingingAlarmPresenter {
 
     public static let shared = TimerRingingAlarmPresenter()
@@ -81,18 +81,16 @@ public final class TimerRingingAlarmPresenter {
 
     private func presentUI(_ timer: TreatmentTimerModel, on top: UIViewController) {
         let vc = TimerRingingAlarmViewController(timer: timer)
-        vc.onSnooze = { [weak self] in self?.apply(.snooze(timer.id)) }
         vc.onComplete = { [weak self] in self?.apply(.complete(timer.id)) }
         currentVC = vc
         top.present(vc, animated: true)
     }
 
-    private enum Action { case snooze(UUID), complete(UUID) }
+    private enum Action { case complete(UUID) }
 
     private func apply(_ action: Action) {
         guard let useCase else { return }
         switch action {
-        case .snooze(let id):   useCase.snooze(id: id)
         case .complete(let id): useCase.remove(id: id)
         }
         // UseCase 갱신 → timers 이벤트 → evaluate가 사운드/UI 정리

@@ -4,8 +4,8 @@
 //
 //  Created by 바견규 on 7/7/26.
 //
-//  시스템 알람 액션 처리 (NM-259): [완료] = 타이머 삭제 + 알람 끔,
-//  [+5분] = 지금부터 5분 재실행. 알람 확인·탭 후 랜딩 = C1(타이머 탭).
+//  시스템 알람 액션 처리 (NM-259): [완료] = 타이머 삭제 + 알람 끔.
+//  알람 확인·탭 후 랜딩 = C1(타이머 탭).
 
 import UIKit
 import UserNotifications
@@ -52,8 +52,6 @@ public final class TimerNotificationHandler: NSObject, UNUserNotificationCenterD
         switch response.actionIdentifier {
         case TimerAlarmScheduler.Action.complete:
             useCase.remove(id: id)
-        case TimerAlarmScheduler.Action.snooze:
-            useCase.snooze(id: id)
         case UNNotificationDefaultActionIdentifier:
             // 알림 본문 탭 → 앱 열고 C1 랜딩
             NotificationCenter.default.post(name: .openTimerTab, object: nil)

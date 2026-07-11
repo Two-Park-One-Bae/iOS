@@ -53,7 +53,6 @@ public final class TimerListViewModel {
         timer.state == .paused ? useCase.resume(id: timer.id) : useCase.pause(id: timer.id)
     }
     func extendOneMinute(id: UUID) { useCase.extend(id: id, by: 60) }
-    func snooze(id: UUID) { useCase.snooze(id: id) }
     func remove(id: UUID) { useCase.remove(id: id) }
     func updateMemo(id: UUID, memo: String) { useCase.updateMemo(id: id, memo: memo) }
 
