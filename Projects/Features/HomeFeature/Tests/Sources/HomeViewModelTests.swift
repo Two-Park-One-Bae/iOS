@@ -1,51 +1,49 @@
 import XCTest
 import Combine
-import Domain
 @testable import HomeFeature
 
 final class HomeViewModelTests: XCTestCase {
     var sut: HomeViewModel!
-    var mockUseCase: MockHomeUseCase!
     var cancelBag = Set<AnyCancellable>()
 
     override func setUp() {
         super.setUp()
-        mockUseCase = MockHomeUseCase()
-        sut = HomeViewModel(useCase: mockUseCase)
+        sut = HomeViewModel()
     }
 
-    func test_viewDidLoad_fetchesItems() {
-        let stub = [HomeEntity(id: 1, title: "Test", description: "Desc", imageURL: nil)]
-        mockUseCase.fetchItemsResult = .success(stub)
+    override func tearDown() {
+        sut = nil
+        cancelBag.removeAll()
+        super.tearDown()
+    }
 
-        let input = HomeViewModel.Input(
-            viewDidLoad: Just(()).eraseToAnyPublisher(),
-            itemSelected: Empty().eraseToAnyPublisher()
-        )
-        let output = sut.transform(input: input)
+    func test_drugIdentifyTapped_triggersNavigationCallback() {
+        let expectation = expectation(description: "drug identify callback fired")
+        sut.onDrugIdentifyTapped = { expectation.fulfill() }
 
-        let expectation = expectation(description: "items received")
-        output.items
-            .sink { items in
-                XCTAssertEqual(items.count, 1)
-                XCTAssertEqual(items.first?.title, "Test")
-                expectation.fulfill()
-            }
-            .store(in: &cancelBag)
+        let tap = PassthroughSubject<Void, Never>()
+        _ = sut.transform(input: HomeViewModel.Input(
+            viewDidLoad: Empty().eraseToAnyPublisher(),
+            drugIdentifyTapped: tap.eraseToAnyPublisher(),
+            treatmentTimerTapped: Empty().eraseToAnyPublisher()
+        ))
+        tap.send(())
 
         waitForExpectations(timeout: 1)
     }
-}
 
-// MARK: - Mock
-final class MockHomeUseCase: HomeUseCaseProtocol {
-    var fetchItemsResult: Result<[HomeEntity], Error> = .success([])
+    func test_treatmentTimerTapped_triggersNavigationCallback() {
+        let expectation = expectation(description: "treatment timer callback fired")
+        sut.onTreatmentTimerTapped = { expectation.fulfill() }
 
-    func fetchItems() -> AnyPublisher<[HomeEntity], Error> {
-        fetchItemsResult.publisher.eraseToAnyPublisher()
-    }
+        let tap = PassthroughSubject<Void, Never>()
+        _ = sut.transform(input: HomeViewModel.Input(
+            viewDidLoad: Empty().eraseToAnyPublisher(),
+            drugIdentifyTapped: Empty().eraseToAnyPublisher(),
+            treatmentTimerTapped: tap.eraseToAnyPublisher()
+        ))
+        tap.send(())
 
-    func fetchItem(id: Int) -> AnyPublisher<HomeEntity, Error> {
-        Empty().eraseToAnyPublisher()
+        waitForExpectations(timeout: 1)
     }
 }

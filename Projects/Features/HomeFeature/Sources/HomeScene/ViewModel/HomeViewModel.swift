@@ -1,5 +1,4 @@
 import Combine
-import Domain
 
 public final class HomeViewModel {
 
@@ -31,12 +30,9 @@ public final class HomeViewModel {
         public let error: AnyPublisher<String, Never>
     }
 
-    private let useCase: HomeUseCaseProtocol
     private var cancelBag = Set<AnyCancellable>()
 
-    public init(useCase: HomeUseCaseProtocol) {
-        self.useCase = useCase
-    }
+    public init() {}
 
     public func transform(input: Input) -> Output {
         let isLoading = PassthroughSubject<Bool, Never>()

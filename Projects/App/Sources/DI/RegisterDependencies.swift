@@ -12,13 +12,9 @@ enum RegisterDependencies {
         let container = DIContainer.shared
 
         // Network Services
-        let homeAPIService = DefaultHomeAPIService()
         let pillService = DefaultPillService.standard
 
         // Repositories
-        container.register(HomeRepositoryProtocol.self) {
-            HomeRepository(service: homeAPIService)
-        }
         container.register(PillRepositoryProtocol.self) {
             PillRepository(service: pillService)
         }
@@ -35,9 +31,6 @@ enum RegisterDependencies {
         }
 
         // UseCases
-        container.register(HomeUseCaseProtocol.self) {
-            DefaultHomeUseCase(repository: container.resolve(HomeRepositoryProtocol.self))
-        }
         container.register(PillUseCase.self) {
             DefaultPillUseCase(repository: container.resolve(PillRepositoryProtocol.self))
         }

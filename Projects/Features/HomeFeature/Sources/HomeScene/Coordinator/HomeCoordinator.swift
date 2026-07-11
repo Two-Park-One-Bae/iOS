@@ -1,18 +1,16 @@
 import UIKit
 import BaseFeatureDependency
 import Core
-import Domain
 import DrugIdentificationFeatureInterface
 import TimerFeatureInterface
 
 public final class HomeCoordinator: BaseCoordinator {
 
-    @Injected var homeUseCase: HomeUseCaseProtocol
     @Injected var drugIdentificationBuilder: DrugIdentificationFeatureBuildable
     @Injected var timerBuilder: TimerFeatureBuildable
 
     public override func start() {
-        let viewModel = HomeViewModel(useCase: homeUseCase)
+        let viewModel = HomeViewModel()
 
         viewModel.onDrugIdentifyTapped = { [weak self] in
             self?.showDrugIdentification()
