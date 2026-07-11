@@ -7,8 +7,7 @@ import TimerShared
 
 // iOS 26 AlarmKit 알람 스케줄러 — Clock 앱 동급 시스템 알람.
 // 강제종료/잠금/무음/Focus 모두 뚫고 풀스크린+루핑으로 울림(AlarmManager가 시스템 수준 관리).
-// [완료](stop)는 시스템 자동 처리 + TimerStopIntent가 모델 삭제,
-// [+5분](secondary .countdown)은 postAlert(300s) 후 재알람 + TimerSnoozeIntent가 endAt 갱신.
+// [완료](stop)는 시스템 자동 처리 + TimerStopIntent가 모델 삭제.
 // (AlarmPresentation.Alert 의 비권장 init이 iOS 26.1+ 이므로 26.1 게이트)
 @available(iOS 26.1, *)
 public final class AlarmKitAlarmScheduler: TimerAlarmScheduling {
@@ -39,8 +38,7 @@ public final class AlarmKitAlarmScheduler: TimerAlarmScheduling {
 
         let alert = AlarmPresentation.Alert(
             title: "\(label) 종료",
-            secondaryButton: AlarmButton(text: "+5분", textColor: .white, systemImageName: "gobackward"),
-            secondaryButtonBehavior: .countdown
+            stopButton: AlarmButton(text: "완료", textColor: .white, systemImageName: "checkmark")
         )
         let presentation = AlarmPresentation(
             alert: alert,
@@ -59,11 +57,10 @@ public final class AlarmKitAlarmScheduler: TimerAlarmScheduling {
             tintColor: tint
         )
         let configuration = AlarmManager.AlarmConfiguration(
-            countdownDuration: Alarm.CountdownDuration(preAlert: TimeInterval(remaining), postAlert: 300),
+            countdownDuration: Alarm.CountdownDuration(preAlert: TimeInterval(remaining), postAlert: nil),
             schedule: nil,
             attributes: attributes,
             stopIntent: TimerStopIntent(id: id.uuidString),
-            secondaryIntent: TimerSnoozeIntent(id: id.uuidString),
             sound: .default
         )
 

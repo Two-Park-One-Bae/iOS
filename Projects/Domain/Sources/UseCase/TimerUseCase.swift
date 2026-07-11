@@ -5,7 +5,7 @@
 //  Created by 바견규 on 7/7/26.
 //
 //  상태머신 (NM-258): 생성→RUNNING, RUNNING⇄PAUSED,
-//  RUNNING→RINGING(endAt 도달), RINGING→[완료]삭제 / [+5분]RUNNING,
+//  RUNNING→RINGING(endAt 도달), RINGING→[완료]삭제,
 //  RUNNING·PAUSED→정지(취소) 삭제. 완료·취소는 이력 없이 즉시 삭제(MVP).
 
 import Combine
@@ -18,8 +18,6 @@ public protocol TimerUseCase {
     func resume(id: UUID)
     /// ±시간 — endAt 이동 (C1 카드 +1분)
     func extend(id: UUID, by seconds: Int)
-    /// RINGING 확인 [+5분] — endAt = 지금 + 5분, RUNNING 복귀
-    func snooze(id: UUID)
     /// [완료] 또는 정지(취소) — 즉시 삭제
     func remove(id: UUID)
     func updateMemo(id: UUID, memo: String?)
@@ -128,22 +126,8 @@ public final class DefaultTimerUseCase: TimerUseCase {
             case .paused:
                 list[i].remaining = max(0, (list[i].remaining ?? 0) + seconds)
             case .ringing:
-                break // 울림 중 조정은 [+5분](snooze)로만
+                break // 울림 중엔 시간 조정 불가 ([완료]로만 종료)
             }
-        }
-        if let scheduled {
-            alarmScheduler.scheduleAlarm(id: id, label: scheduled.label, categoryName: scheduled.categoryName, body: scheduled.body, fireDate: scheduled.endAt)
-        }
-    }
-
-    public func snooze(id: UUID) {
-        var scheduled: (label: String, categoryName: String, body: String, endAt: Date)?
-        mutate { list in
-            guard let i = list.firstIndex(where: { $0.id == id }), list[i].state == .ringing else { return }
-            let endAt = Date().addingTimeInterval(5 * 60)
-            list[i].endAt = endAt
-            list[i].state = .running
-            scheduled = (list[i].label, list[i].category.displayName, alarmBody(duration: list[i].duration), endAt)
         }
         if let scheduled {
             alarmScheduler.scheduleAlarm(id: id, label: scheduled.label, categoryName: scheduled.categoryName, body: scheduled.body, fireDate: scheduled.endAt)
@@ -186,7 +170,6 @@ public final class DefaultTimerUseCase: TimerUseCase {
             start(preset: preset)
         case .pause(let id):  pause(id: id)
         case .resume(let id): resume(id: id)
-        case .snooze(let id): snooze(id: id)
         case .remove(let id): remove(id: id)
         }
     }

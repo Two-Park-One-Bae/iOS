@@ -171,7 +171,6 @@ public final class TimerListVC: UIViewController {
         for timer in sorted {
             if timer.state == .ringing {
                 let card = RingingTimerCardView(timer: timer)
-                card.onSnooze = { [weak self] in self?.viewModel.snooze(id: timer.id) }
                 card.onComplete = { [weak self] in self?.viewModel.remove(id: timer.id) }
                 cardsStack.addArrangedSubview(card)
             } else {

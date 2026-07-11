@@ -30,7 +30,7 @@ public enum TimerCategory: String, Codable, Equatable, Sendable, CaseIterable {
 public enum TreatmentTimerState: String, Codable, Equatable, Sendable {
     case running  // 실행 중
     case paused   // 일시정지 — 만료 발생 없음
-    case ringing  // 울림 — endAt 도달, [완료]/[+5분] 전까지 유지
+    case ringing  // 울림 — endAt 도달, [완료] 전까지 유지
 }
 
 public struct TreatmentTimerModel: Codable, Equatable, Identifiable, Sendable {
