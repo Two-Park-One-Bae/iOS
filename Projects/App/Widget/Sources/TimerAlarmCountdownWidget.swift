@@ -5,9 +5,9 @@ import TimerShared
 
 // AlarmKit 카운트다운 위젯 (iOS 26.1+ 경로) — 잠금화면 / Dynamic Island / StandBy.
 // context.state(AlarmPresentationState)의 mode 로 진행/일시정지/만료를 구분해
-// 커스텀 TimerLiveActivityWidget 과 같은 디자인(spec/design/DESIGN.pen `YNRPa`)으로 그린다.
-//  - 진행(countdown): 링 + "라벨 · 분류" + 카운트다운(fireDate 기반 자동 갱신)
-//  - 만료(alert / isStale): 앰버 벨 + "종료 — 확인 필요"
+// 커스텀 TimerLiveActivityWidget 과 같은 리프레시 디자인(DESIGN.pen r2jea·Km53q·s9CUwu)으로 그린다.
+//  - 진행(countdown): 링 + "라벨 · 분류" + 카운트다운(blue, fireDate 기반 자동 갱신)
+//  - 만료(alert / isStale): 앰버 벨 링 + "종료"
 // AlarmKit 은 알람 1개당 LA 1개라 "외 N개 진행 중" 요약은 구조상 표시하지 않는다.
 @available(iOS 26.0, *)
 struct TimerAlarmCountdownWidget: Widget {
@@ -27,10 +27,10 @@ struct TimerAlarmCountdownWidget: Widget {
                 DynamicIslandExpandedRegion(.center) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(info.title)
-                            .font(.system(size: 12))
-                            .foregroundStyle(Color.timerGrayText)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Color.timerLabelText)
                             .lineLimit(1)
-                        AlarmPrimaryText(info: info, size: 20)
+                        AlarmPrimaryText(info: info, size: 22)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -93,31 +93,24 @@ private struct AlarmLockScreenCard: View {
     let info: AlarmDisplayInfo
 
     var body: some View {
-        HStack(spacing: 12) {
-            AlarmLeadingBadge(info: info, size: 44)
+        HStack(spacing: 14) {
+            AlarmLeadingBadge(info: info, size: 48)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(info.title)
-                    .font(.system(size: 12))
-                    .foregroundStyle(Color.timerGrayText)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Color.timerLabelText)
                     .lineLimit(1)
 
-                AlarmPrimaryText(info: info, size: 20)
+                AlarmPrimaryText(info: info, size: 26)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(14)
-        .overlay {
-            if info.isRinging {
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .strokeBorder(Color.timerAmber, lineWidth: 1)
-                    .padding(1)
-            }
-        }
+        .padding(16)
     }
 }
 
-// MARK: - Leading (링 / 일시정지 / 벨)
+// MARK: - Leading (링 / 일시정지 / 벨 링)
 
 @available(iOS 26.0, *)
 private struct AlarmLeadingBadge: View {
@@ -132,7 +125,7 @@ private struct AlarmLeadingBadge: View {
         case .paused:
             BadgeCircle(systemName: "pause.fill", tint: Color.timerBlue, background: Color.timerTrack, size: size)
         case .ringing:
-            TimerBellBadge(size: size, iconSize: size * 0.5)
+            TimerExpiredRing(size: size)
         }
     }
 }
@@ -151,17 +144,17 @@ private struct AlarmPrimaryText: View {
             Text(timerInterval: start...end, countsDown: true)
                 .font(.system(size: size, weight: .bold))
                 .monospacedDigit()
-                .foregroundStyle(Color.timerTextPrimary)
+                .foregroundStyle(Color.timerBlue)
                 .lineLimit(1)
         case .paused(let remaining):
             Text(clockString(remaining))
                 .font(.system(size: size, weight: .bold))
                 .monospacedDigit()
-                .foregroundStyle(Color.timerTextPrimary)
+                .foregroundStyle(Color.timerBlue)
                 .lineLimit(1)
         case .ringing:
-            Text("종료 — 확인 필요")
-                .font(.system(size: 17, weight: .bold))
+            Text("종료")
+                .font(.system(size: 18, weight: .bold))
                 .foregroundStyle(Color.timerAmber)
                 .lineLimit(1)
         }
@@ -179,14 +172,14 @@ private struct AlarmCompactTrailing: View {
             Text(timerInterval: start...end, countsDown: true)
                 .font(.system(size: 13, weight: .semibold))
                 .monospacedDigit()
-                .foregroundStyle(Color.timerTextPrimary)
+                .foregroundStyle(Color.timerBlue)
                 .multilineTextAlignment(.trailing)
                 .frame(maxWidth: 44)
         case .paused(let remaining):
             Text(clockString(remaining))
                 .font(.system(size: 13, weight: .semibold))
                 .monospacedDigit()
-                .foregroundStyle(Color.timerTextPrimary)
+                .foregroundStyle(Color.timerBlue)
         case .ringing:
             Text("종료")
                 .font(.system(size: 13, weight: .semibold))
@@ -222,17 +215,18 @@ private struct TimerRing: View {
     }
 }
 
-/// 만료 벨 배지
-private struct TimerBellBadge: View {
+/// 만료 벨 링 (앰버 테두리 + 벨)
+private struct TimerExpiredRing: View {
 
     let size: CGFloat
-    let iconSize: CGFloat
 
     var body: some View {
         ZStack {
-            Circle().fill(Color.timerAmberDim)
+            Circle()
+                .stroke(Color.timerAmber, lineWidth: max(2, size * 0.09))
+
             Image(systemName: "bell.fill")
-                .font(.system(size: iconSize, weight: .semibold))
+                .font(.system(size: size * 0.42, weight: .semibold))
                 .foregroundStyle(Color.timerAmber)
         }
         .frame(width: size, height: size)
@@ -265,18 +259,14 @@ private func clockString(_ seconds: Int) -> String {
 // MARK: - 색상 (디자인 시스템 미링크 — 위젯 타깃 자체 정의, DESIGN.pen 기준)
 
 private extension Color {
-    /// 진행 링·키라인 파랑 (#0EA5E9)
+    /// 진행 링·키라인·카운트다운 파랑 (#0EA5E9)
     static let timerBlue = Color(red: 0.055, green: 0.647, blue: 0.914)
     /// 만료 경고 앰버 (#F59E0B)
     static let timerAmber = Color(red: 0.961, green: 0.620, blue: 0.043)
-    /// 벨 배지 배경 (#422006)
-    static let timerAmberDim = Color(red: 0.259, green: 0.125, blue: 0.024)
-    /// 보조 텍스트 회색 (#94A3B8)
-    static let timerGrayText = Color(red: 0.580, green: 0.639, blue: 0.722)
-    /// 링 트랙 (#334155)
-    static let timerTrack = Color(red: 0.200, green: 0.255, blue: 0.333)
-    /// 주 텍스트·카운트다운 (#F8FAFC)
-    static let timerTextPrimary = Color(red: 0.973, green: 0.980, blue: 0.988)
-    /// LA 카드 배경 (#0F172A)
-    static let timerCardBackground = Color(red: 0.059, green: 0.090, blue: 0.165)
+    /// 라벨 텍스트 흰색 80% (#FFFFFFCC)
+    static let timerLabelText = Color.white.opacity(0.80)
+    /// 링 트랙 흰색 15% (#FFFFFF26)
+    static let timerTrack = Color.white.opacity(0.15)
+    /// LA 카드 배경 검정 (#000000)
+    static let timerCardBackground = Color.black
 }
