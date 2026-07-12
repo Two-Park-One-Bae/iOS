@@ -13,6 +13,7 @@ import SwiftUI
 struct TimerWidgetBundle: WidgetBundle {
     var body: some Widget {
         TimerLiveActivityWidget()
+        TimerPresetWidget()   // 잠금화면 프리셋 원탭 시작 (NM-302)
         if #available(iOS 26.0, *) {
             TimerAlarmCountdownWidget()
         }
