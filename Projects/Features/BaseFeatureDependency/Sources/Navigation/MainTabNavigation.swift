@@ -1,0 +1,9 @@
+import Foundation
+
+// 홈 등에서 탭바 전환을 요청하는 알림 (뷰 push 대신 탭 이동). App(AppCoordinator)이 관찰해 처리.
+public extension Notification.Name {
+    /// 약물 식별 → 알약 탭으로 이동
+    static let selectPillTab = Notification.Name("app.selectPillTab")
+    /// 처치 타이머 → 타이머 탭으로 이동
+    static let selectTimerTab = Notification.Name("app.selectTimerTab")
+}
