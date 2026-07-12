@@ -1,5 +1,4 @@
 import UIKit
-import SwiftUI
 import BaseFeatureDependency
 import Core
 import Domain
@@ -8,6 +7,7 @@ import TimerFeature
 final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     var window: UIWindow?
     var appCoordinator: AppCoordinator?
+    private var pendingURL: URL?   // 콜드런치 딥링크 — 창이 준비된 활성화 시점에 처리
 
     func scene(
         _ scene: UIScene,
@@ -25,11 +25,11 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         window.rootViewController = navigationController
         window.makeKeyAndVisible()
 
-        // 콜드런치 시 위젯 딥링크 처리 (start() 이후여야 .openTimerTab 옵저버가 잡힘)
-        handle(url: connectionOptions.urlContexts.first?.url)
+        // 콜드런치 딥링크는 저장만 — 창이 활성화된 sceneDidBecomeActive 에서 present.
+        pendingURL = connectionOptions.urlContexts.first?.url
     }
 
-    // 위젯 "+" 딥링크(nursemate://timer/preset/pick) — 앱 열려 있을 때
+    // 위젯 딥링크 — 앱 열려 있을 때(warm)는 바로 처리.
     func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
         handle(url: URLContexts.first?.url)
     }
@@ -47,19 +47,21 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 
     private func presentWidgetOnboarding() {
-        guard let top = topMostViewController() else { return }
-        let host = UIHostingController(rootView: WidgetOnboardingView())
-        top.present(host, animated: true)
+        present(WidgetOnboardingViewController())
     }
 
     // 런처 위젯 → 전체 프리셋 목록에서 골라 즉시 시작(앱이 열려 있으니 UseCase로 정식 시작·알람 예약).
     private func presentQuickStart() {
-        guard let top = topMostViewController() else { return }
         let useCase = DIContainer.shared.resolve(TimerUseCase.self)
-        let view = TimerQuickStartPickerView(presets: useCase.presets.value) { preset in
+        let picker = TimerQuickStartPickerViewController(presets: useCase.presets.value) { preset in
             useCase.start(preset: preset)
         }
-        top.present(UIHostingController(rootView: view), animated: true)
+        present(picker)
+    }
+
+    private func present(_ viewController: UIViewController) {
+        guard let top = topMostViewController() else { return }
+        top.present(UINavigationController(rootViewController: viewController), animated: true)
     }
 
     private func topMostViewController() -> UIViewController? {
@@ -75,5 +77,11 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         // App Intent(AlarmKit)가 App Group 저장소를 직접 바꿨을 수 있음 — 먼저 재동기화.
         useCase.reload()
         useCase.refresh()
+
+        // 콜드런치 딥링크: 창이 활성화된 지금 present.
+        if let url = pendingURL {
+            pendingURL = nil
+            handle(url: url)
+        }
     }
 }
