@@ -16,6 +16,7 @@ enum TimerPresetStore {
         static let presets = "care.timer.presets"     // [TimerPresetModel]
         static let timers = "care.timer.timers"       // [TreatmentTimerModel]
         static let snapshotAt = "care.timer.snapshotAt"
+        static let pendingStart = "care.timer.pendingStart"   // 26.1 미만 위젯→앱 정식 시작 요청
     }
 
     private static var store: UserDefaults {
@@ -62,6 +63,12 @@ enum TimerPresetStore {
             duration: timer.duration
         )
         reloadWidgets()
+    }
+
+    /// 26.1 미만: 위젯은 타이머를 직접 만들지 않고 앱을 연 뒤 이 값을 남긴다 →
+    /// 앱이 `TimerUseCase.start` 로 정식 시작(Live Activity + 알림)한다.
+    static func setPendingStart(_ id: UUID) {
+        store.set(id.uuidString, forKey: Keys.pendingStart)
     }
 
     /// [완료] 등으로 타이머 제거 (위젯 stop 인텐트가 호출).

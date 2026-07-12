@@ -26,10 +26,21 @@ public struct StartPresetTimerIntent: AppIntent {
     public init() {}
     public init(presetId: UUID) { self.presetId = presetId.uuidString }
 
+    // 26.1+ = 무음(AlarmKit가 카운트다운 표시 담당). 미만 = 앱을 열어 정식 시작
+    // (Live Activity 는 앱 포그라운드에서만 시작 가능 → 위젯 프로세스에선 못 띄운다).
+    public var openAppWhenRun: Bool {
+        if #available(iOS 26.1, *) { return false }
+        return true
+    }
+
     public func perform() async throws -> some IntentResult {
         guard let uuid = UUID(uuidString: presetId),
               let preset = TimerPresetStore.preset(id: uuid) else { return .result() }
-        await TimerPresetStore.startTimer(preset: preset)   // 앱 안 열고 조용히 시작(버전별 알람)
+        if #available(iOS 26.1, *) {
+            await TimerPresetStore.startTimer(preset: preset)   // 무음 AlarmKit
+        } else {
+            TimerPresetStore.setPendingStart(preset.id)         // 앱이 열려서 정식 시작(Live Activity)
+        }
         return .result()
     }
 }
