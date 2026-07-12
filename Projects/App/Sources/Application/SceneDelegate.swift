@@ -41,9 +41,21 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
             presentWidgetOnboarding()
         } else if url.path.contains("quickstart") {
             presentQuickStart()
+        } else if url.path.contains("/start") {
+            startPreset(from: url)
         } else {
             NotificationCenter.default.post(name: .openTimerTab, object: nil)
         }
+    }
+
+    // 설정형 위젯(26.1 미만) → 지정 프리셋을 정식 시작(Live Activity + 알림).
+    private func startPreset(from url: URL) {
+        guard let raw = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+                .queryItems?.first(where: { $0.name == "preset" })?.value,
+              let id = UUID(uuidString: raw) else { return }
+        let useCase = DIContainer.shared.resolve(TimerUseCase.self)
+        guard let preset = useCase.presets.value.first(where: { $0.id == id }) else { return }
+        useCase.start(preset: preset)
     }
 
     private func presentWidgetOnboarding() {
@@ -78,23 +90,10 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         useCase.reload()
         useCase.refresh()
 
-        // 26.1 미만: 위젯이 남긴 pending 프리셋을 앱에서 정식 시작(Live Activity + 알림).
-        startPendingWidgetTimer(useCase)
-
         // 콜드런치 딥링크: 창이 활성화된 지금 present.
         if let url = pendingURL {
             pendingURL = nil
             handle(url: url)
         }
-    }
-
-    // 위젯(26.1 미만)이 openAppWhenRun 으로 앱을 열고 남긴 시작 요청을 처리.
-    private func startPendingWidgetTimer(_ useCase: TimerUseCase) {
-        let suite = UserDefaults(suiteName: "group.app.nursemate.timer")
-        guard let raw = suite?.string(forKey: "care.timer.pendingStart"),
-              let id = UUID(uuidString: raw) else { return }
-        suite?.removeObject(forKey: "care.timer.pendingStart")
-        guard let preset = useCase.presets.value.first(where: { $0.id == id }) else { return }
-        useCase.start(preset: preset)
     }
 }

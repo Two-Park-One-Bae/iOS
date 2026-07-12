@@ -55,12 +55,18 @@ struct RectangularView: View {
 
     var body: some View {
         if let preset {
-            Button(intent: StartPresetTimerIntent(presetId: preset.id)) {
+            if #available(iOS 26.1, *) {
+                // 26.1+ : 무음 시작(AlarmKit)
+                Button(intent: StartPresetTimerIntent(presetId: preset.id)) {
+                    content(preset: preset)
+                }
+                .buttonStyle(.plain)
+            } else {
+                // 26.1 미만 : 앱을 열어 정식 시작(Live Activity + 알림). widgetURL 이 확실히 앱을 연다.
                 content(preset: preset)
+                    .widgetURL(TimerWidgetDeepLink.startPreset(id: preset.id))
             }
-            .buttonStyle(.plain)
         } else {
-            // 잠금화면 accessory 는 Link 가 잘 안 먹으므로 widgetURL 로 앱(온보딩)을 연다.
             emptyContent.widgetURL(TimerWidgetDeepLink.howTo)
         }
     }
@@ -95,13 +101,12 @@ struct CircularView: View {
 
     var body: some View {
         if let preset {
-            Button(intent: StartPresetTimerIntent(presetId: preset.id)) {
-                VStack(spacing: 1) {
-                    Image(systemName: "timer").font(.system(size: 12))
-                    Text("\(preset.duration / 60)").font(.system(size: 13, weight: .bold))
-                }
+            if #available(iOS 26.1, *) {
+                Button(intent: StartPresetTimerIntent(presetId: preset.id)) { filled(preset) }
+                    .buttonStyle(.plain)
+            } else {
+                filled(preset).widgetURL(TimerWidgetDeepLink.startPreset(id: preset.id))
             }
-            .buttonStyle(.plain)
         } else {
             VStack(spacing: 2) {
                 Image(systemName: "plus.circle.fill").font(.system(size: 16))
@@ -112,6 +117,13 @@ struct CircularView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .widgetURL(TimerWidgetDeepLink.howTo)
+        }
+    }
+
+    private func filled(_ preset: TimerPresetModel) -> some View {
+        VStack(spacing: 1) {
+            Image(systemName: "timer").font(.system(size: 12))
+            Text("\(preset.duration / 60)").font(.system(size: 13, weight: .bold))
         }
     }
 }

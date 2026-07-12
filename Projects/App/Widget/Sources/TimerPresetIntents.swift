@@ -26,21 +26,12 @@ public struct StartPresetTimerIntent: AppIntent {
     public init() {}
     public init(presetId: UUID) { self.presetId = presetId.uuidString }
 
-    // 26.1+ = 무음(AlarmKit가 카운트다운 표시 담당). 미만 = 앱을 열어 정식 시작
-    // (Live Activity 는 앱 포그라운드에서만 시작 가능 → 위젯 프로세스에선 못 띄운다).
-    public var openAppWhenRun: Bool {
-        if #available(iOS 26.1, *) { return false }
-        return true
-    }
-
+    // 이 버튼 인텐트는 26.1+ 위젯에서만 렌더된다(무음 AlarmKit).
+    // 26.1 미만은 위젯이 widgetURL 로 앱을 열어 정식 시작(TimerWidgetDeepLink.startPreset).
     public func perform() async throws -> some IntentResult {
         guard let uuid = UUID(uuidString: presetId),
               let preset = TimerPresetStore.preset(id: uuid) else { return .result() }
-        if #available(iOS 26.1, *) {
-            await TimerPresetStore.startTimer(preset: preset)   // 무음 AlarmKit
-        } else {
-            TimerPresetStore.setPendingStart(preset.id)         // 앱이 열려서 정식 시작(Live Activity)
-        }
+        await TimerPresetStore.startTimer(preset: preset)
         return .result()
     }
 }
@@ -54,4 +45,8 @@ public enum TimerWidgetDeepLink {
     public static let howTo = URL(string: "nursemate://timer/widget/howto")!
     /// 런처 위젯 탭 → 전체 프리셋에서 골라 시작.
     public static let quickStart = URL(string: "nursemate://timer/quickstart")!
+    /// 설정형 위젯(26.1 미만) 탭 → 앱 열어 해당 프리셋 정식 시작.
+    public static func startPreset(id: UUID) -> URL {
+        URL(string: "nursemate://timer/start?preset=\(id.uuidString)")!
+    }
 }
