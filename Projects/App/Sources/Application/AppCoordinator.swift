@@ -2,6 +2,8 @@ import UIKit
 import BaseFeatureDependency
 import TabBarFeature
 import TimerFeature
+import HomeFeature
+import DrugIdentificationFeature
 
 final class AppCoordinator: BaseCoordinator {
 
@@ -9,28 +11,32 @@ final class AppCoordinator: BaseCoordinator {
 
     override func start() {
         showTabBar()
-        observeTimerLanding()
+        observeTabSwitching()
     }
 
     private func showTabBar() {
         let tabBarCoordinator = TabBarCoordinator(
             navigationController: navigationController,
             homeBuilder: HomeFeatureBuilder(),
-            timerBuilder: TimerBuilder()
+            timerBuilder: TimerBuilder(),
+            drugBuilder: DrugIdentificationBuilder()
         )
         self.tabBarCoordinator = tabBarCoordinator
         addChild(tabBarCoordinator)
         tabBarCoordinator.start()
     }
 
-    // 알람 본문 탭 → C1 타이머 탭 랜딩 (spec)
-    private func observeTimerLanding() {
-        NotificationCenter.default.addObserver(
-            forName: .openTimerTab,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
+    // 탭 전환 진입점: 알람 랜딩(.openTimerTab) + 홈 버튼(.selectTimerTab/.selectPillTab)
+    private func observeTabSwitching() {
+        let nc = NotificationCenter.default
+        nc.addObserver(forName: .openTimerTab, object: nil, queue: .main) { [weak self] _ in
             self?.tabBarCoordinator?.switchToTimerTab()
+        }
+        nc.addObserver(forName: .selectTimerTab, object: nil, queue: .main) { [weak self] _ in
+            self?.tabBarCoordinator?.switchToTimerTab()
+        }
+        nc.addObserver(forName: .selectPillTab, object: nil, queue: .main) { [weak self] _ in
+            self?.tabBarCoordinator?.switchToPillTab()
         }
     }
 }

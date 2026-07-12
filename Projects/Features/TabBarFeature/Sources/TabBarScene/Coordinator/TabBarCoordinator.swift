@@ -2,6 +2,7 @@ import UIKit
 import BaseFeatureDependency
 import HomeFeatureInterface
 import TimerFeatureInterface
+import DrugIdentificationFeatureInterface
 import DSKit
 
 public final class TabBarCoordinator: CoordinatorProtocol {
@@ -13,6 +14,7 @@ public final class TabBarCoordinator: CoordinatorProtocol {
 
     private let homeBuilder: HomeFeatureBuildable
     private let timerBuilder: TimerFeatureBuildable
+    private let drugBuilder: DrugIdentificationFeatureBuildable
     private var tabBarVC: TabBarVC?
 
     // MARK: - Init
@@ -20,11 +22,13 @@ public final class TabBarCoordinator: CoordinatorProtocol {
     public init(
         navigationController: UINavigationController,
         homeBuilder: HomeFeatureBuildable,
-        timerBuilder: TimerFeatureBuildable
+        timerBuilder: TimerFeatureBuildable,
+        drugBuilder: DrugIdentificationFeatureBuildable
     ) {
         self.navigationController = navigationController
         self.homeBuilder = homeBuilder
         self.timerBuilder = timerBuilder
+        self.drugBuilder = drugBuilder
     }
 
     // MARK: - Start
@@ -48,6 +52,11 @@ public final class TabBarCoordinator: CoordinatorProtocol {
         tabBarVC?.selectedIndex = 2
     }
 
+    /// 약물 식별 — 알약 탭으로 전환
+    public func switchToPillTab() {
+        tabBarVC?.selectedIndex = 1
+    }
+
     // MARK: - Private
 
     // 탭 구성 (디자인): 홈 / 알약 / 타이머 / 설정
@@ -59,6 +68,9 @@ public final class TabBarCoordinator: CoordinatorProtocol {
         homeNav.tabBarItem = UITabBarItem(title: "홈", image: DSIcon.house.uiImage, tag: 0)
 
         let pillNav = UINavigationController()
+        let pillCoordinator = drugBuilder.makeDrugIdentificationCoordinator(navigationController: pillNav)
+        pillCoordinator.start()
+        addChild(pillCoordinator)
         pillNav.tabBarItem = UITabBarItem(title: "알약", image: UIImage(systemName: "pills"), tag: 1)
 
         let timerNav = UINavigationController()

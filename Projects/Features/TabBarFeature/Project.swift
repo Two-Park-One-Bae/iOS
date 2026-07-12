@@ -11,6 +11,7 @@ let project = Project.makeModule(
         Dep.Features.Base.Base,
         Dep.Features.Home.Interface,
         Dep.Features.Timer.Interface,
+        Dep.Features.DrugIdentification.Interface,
     ],
     interfaceDependencies: [
         Dep.Features.Base.Base,
