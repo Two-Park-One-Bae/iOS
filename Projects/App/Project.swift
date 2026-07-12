@@ -96,6 +96,8 @@ let project = Project(
             infoPlist: .extendingDefault(with: [
                 "CFBundleDisplayName": "널스메이트 타이머",
                 "NSSupportsLiveActivities": true,
+                // 위젯에서 시작한 타이머의 AlarmKit 예약(iOS 26.1+)에 필요 (NM-302)
+                "NSAlarmKitUsageDescription": "치료 타이머 종료 알람을 예약·알림하기 위해 필요합니다.",
                 "NSExtension": [
                     "NSExtensionPointIdentifier": "com.apple.widgetkit-extension"
                 ],

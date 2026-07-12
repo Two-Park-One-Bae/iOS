@@ -37,9 +37,10 @@ enum TimerPresetStore {
 
     // MARK: - 원탭 시작 (앱 안 열고 조용히 — NM-302 "+" 프리셋 시작)
 
-    /// 러닝 타이머를 공유 저장소에 추가하고 만료 알림을 예약한다.
+    /// 러닝 타이머를 공유 저장소에 추가하고 만료 알람을 예약한다.
     /// 앱은 다음 활성화 때 `TimerUseCase.reload()`(SceneDelegate)로 이 타이머를 흡수한다.
-    static func startTimer(preset: TimerPresetModel) {
+    /// 버전별: iOS 26.1+ → AlarmKit(앱과 동일), 미만 → 로컬 알림.
+    static func startTimer(preset: TimerPresetModel) async {
         let endAt = Date().addingTimeInterval(TimeInterval(preset.duration))
         let timer = TreatmentTimerModel(
             label: preset.label,
@@ -53,11 +54,40 @@ enum TimerPresetStore {
         timers.append(timer)
         saveTimers(timers)
 
-        scheduleExpiryNotification(id: timer.id, label: timer.label, duration: timer.duration, fireDate: endAt)
+        await scheduleAlarm(
+            id: timer.id,
+            label: timer.label,
+            categoryName: timer.category.displayName,
+            fireDate: endAt,
+            duration: timer.duration
+        )
         reloadWidgets()
     }
 
-    // MARK: - Private (타이머 저장 · 만료 알림)
+    /// [완료] 등으로 타이머 제거 (위젯 stop 인텐트가 호출).
+    static func removeTimer(id: UUID) {
+        var timers = loadTimers()
+        timers.removeAll { $0.id == id }
+        saveTimers(timers)
+    }
+
+    // MARK: - Private (알람 예약 · 타이머 저장)
+
+    // iOS 26.1+ 는 AlarmKit(앱 경로와 동일한 시스템 알람), 미만·실패 시 로컬 알림 폴백.
+    private static func scheduleAlarm(id: UUID, label: String, categoryName: String, fireDate: Date, duration: Int) async {
+        let remaining = max(1, Int(fireDate.timeIntervalSinceNow.rounded()))
+        #if canImport(AlarmKit)
+        if #available(iOS 26.1, *) {
+            do {
+                try await TimerWidgetAlarmScheduler.schedule(id: id, label: label, categoryName: categoryName, seconds: remaining)
+                return
+            } catch {
+                // 권한 미승인 등 실패 → 로컬 알림 폴백
+            }
+        }
+        #endif
+        scheduleExpiryNotification(id: id, label: label, duration: duration, fireDate: fireDate)
+    }
 
     private static func loadTimers() -> [TreatmentTimerModel] {
         guard let data = store.data(forKey: Keys.timers),

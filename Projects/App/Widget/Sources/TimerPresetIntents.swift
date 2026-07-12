@@ -29,7 +29,7 @@ public struct StartPresetTimerIntent: AppIntent {
     public func perform() async throws -> some IntentResult {
         guard let uuid = UUID(uuidString: presetId),
               let preset = TimerPresetStore.preset(id: uuid) else { return .result() }
-        TimerPresetStore.startTimer(preset: preset)   // 앱 안 열고 조용히 시작
+        await TimerPresetStore.startTimer(preset: preset)   // 앱 안 열고 조용히 시작(버전별 알람)
         return .result()
     }
 }
