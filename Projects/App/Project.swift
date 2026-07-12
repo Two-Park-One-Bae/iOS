@@ -21,6 +21,11 @@ let project = Project(
                 "CLARITY_PROJECT_ID": "$(CLARITY_PROJECT_ID)",
                 "NSCameraUsageDescription": "알약 사진 촬영을 위해 카메라 접근이 필요합니다.",
                 "NSPhotoLibraryUsageDescription": "앨범에서 알약 사진을 선택하기 위해 접근이 필요합니다.",
+                // 위젯 "+" 딥링크(nursemate://timer/preset/pick) 로 앱을 여는 URL 스킴 (NM-302)
+                "CFBundleURLTypes": [[
+                    "CFBundleURLName": "\(Environment.bundlePrefix).app",
+                    "CFBundleURLSchemes": ["nursemate"],
+                ]],
                 "NSSupportsLiveActivities": true,
                 "UIBackgroundModes": ["audio"],
                 "NSAlarmKitUsageDescription": "치료 타이머 종료 알람을 예약·알림하기 위해 필요합니다.",
@@ -91,6 +96,8 @@ let project = Project(
             infoPlist: .extendingDefault(with: [
                 "CFBundleDisplayName": "널스메이트 타이머",
                 "NSSupportsLiveActivities": true,
+                // 위젯에서 시작한 타이머의 AlarmKit 예약(iOS 26.1+)에 필요 (NM-302)
+                "NSAlarmKitUsageDescription": "치료 타이머 종료 알람을 예약·알림하기 위해 필요합니다.",
                 "NSExtension": [
                     "NSExtensionPointIdentifier": "com.apple.widgetkit-extension"
                 ],
@@ -99,9 +106,11 @@ let project = Project(
             entitlements: .dictionary([
                 "com.apple.security.application-groups": .array([.string("group.app.nursemate.timer")])
             ]),
-            // 공유 계약 모듈만 링크 — Live Activity/AlarmKit 타입을 TimerFeature와 동일하게 맞춘다.
+            // 공유 계약 모듈 링크 — Live Activity/AlarmKit 타입을 TimerFeature와 동일하게 맞춘다.
+            // TimerDomain — 프리셋 위젯(NM-302)이 TimerPresetModel/TreatmentTimerModel 을 그대로 사용.
             dependencies: [
                 Dep.Modules.TimerShared.TimerShared,
+                Dep.Modules.TimerDomain.TimerDomain,
             ],
             settings: .settings(base: XCConfig.base)
         ),
