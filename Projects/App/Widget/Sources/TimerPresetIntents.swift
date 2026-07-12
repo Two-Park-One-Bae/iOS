@@ -41,4 +41,6 @@ public enum TimerWidgetDeepLink {
     public static let pickPreset = URL(string: "nursemate://timer/preset/pick")!
     /// 미설정 위젯 탭 → 위젯 설정 방법 온보딩.
     public static let howTo = URL(string: "nursemate://timer/widget/howto")!
+    /// 런처 위젯 탭 → 전체 프리셋에서 골라 시작.
+    public static let quickStart = URL(string: "nursemate://timer/quickstart")!
 }

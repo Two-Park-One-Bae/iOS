@@ -34,11 +34,13 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         handle(url: URLContexts.first?.url)
     }
 
-    // NM-302 위젯 딥링크: /widget/howto → 설정 온보딩, 그 외 → 타이머 탭.
+    // NM-302 위젯 딥링크: /widget/howto → 설정 온보딩, /quickstart → 빠른 시작, 그 외 → 타이머 탭.
     private func handle(url: URL?) {
         guard let url, url.scheme == "nursemate", url.host == "timer" else { return }
         if url.path.contains("howto") {
             presentWidgetOnboarding()
+        } else if url.path.contains("quickstart") {
+            presentQuickStart()
         } else {
             NotificationCenter.default.post(name: .openTimerTab, object: nil)
         }
@@ -48,6 +50,16 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         guard let top = topMostViewController() else { return }
         let host = UIHostingController(rootView: WidgetOnboardingView())
         top.present(host, animated: true)
+    }
+
+    // 런처 위젯 → 전체 프리셋 목록에서 골라 즉시 시작(앱이 열려 있으니 UseCase로 정식 시작·알람 예약).
+    private func presentQuickStart() {
+        guard let top = topMostViewController() else { return }
+        let useCase = DIContainer.shared.resolve(TimerUseCase.self)
+        let view = TimerQuickStartPickerView(presets: useCase.presets.value) { preset in
+            useCase.start(preset: preset)
+        }
+        top.present(UIHostingController(rootView: view), animated: true)
     }
 
     private func topMostViewController() -> UIViewController? {
