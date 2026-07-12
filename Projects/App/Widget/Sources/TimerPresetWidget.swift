@@ -75,12 +75,15 @@ struct RectangularView: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(preset.label)
                 .font(.system(size: 13, weight: .semibold))
+                .minimumScaleFactor(0.6)
                 .lineLimit(1)
             HStack(spacing: 3) {
                 Image(systemName: "timer")
                     .font(.system(size: 12, weight: .semibold))
                 Text(preset.widgetDurationText)
                     .font(.system(size: 16, weight: .bold))
+                    .minimumScaleFactor(0.6)
+                    .lineLimit(1)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
@@ -120,11 +123,23 @@ struct CircularView: View {
         }
     }
 
+    // 두칸(Rectangular)과 동일한 구성 — 좁은 원형이라 minimumScaleFactor 로 잘림 대신 축소.
     private func filled(_ preset: TimerPresetModel) -> some View {
         VStack(spacing: 1) {
-            Image(systemName: "timer").font(.system(size: 12))
-            Text("\(preset.duration / 60)").font(.system(size: 13, weight: .bold))
+            Text(preset.label)
+                .font(.system(size: 11, weight: .semibold))
+                .minimumScaleFactor(0.4)
+                .lineLimit(1)
+            HStack(spacing: 2) {
+                Image(systemName: "timer").font(.system(size: 9, weight: .semibold))
+                Text(preset.widgetDurationText)
+                    .font(.system(size: 12, weight: .bold))
+                    .minimumScaleFactor(0.5)
+                    .lineLimit(1)
+            }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.horizontal, 1)
     }
 }
 
