@@ -27,10 +27,10 @@ open class BaseService<Target: TargetType> {
     // 실제 네트워크 요청을 보내는 Moya 프로바이더. lazy로 선언해 첫 접근 시점에 생성
     private lazy var defaultProvider: MoyaProvider<API> = {
         let configuration = URLSessionConfiguration.default
-        // 서버가 응답하지 않을 때 10초 후 타임아웃
-        configuration.timeoutIntervalForRequest = 10
-        // 리소스 전체 다운로드 최대 허용 시간
-        configuration.timeoutIntervalForResource = 10
+        // 응답 대기(패킷 간) 타임아웃. pill-attributes는 서버측 Gemini 추출로 수십 초 걸림.
+        configuration.timeoutIntervalForRequest = 60
+        // 이미지 업로드 + AI 처리 전체를 커버하는 리소스 타임아웃.
+        configuration.timeoutIntervalForResource = 120
         // 캐시 무시: 항상 서버에서 최신 데이터를 받아옴
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
 
