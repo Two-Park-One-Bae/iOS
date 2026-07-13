@@ -72,6 +72,9 @@ let project = Project(
                 "WKApplication": true,
                 "WKCompanionAppBundleIdentifier": "\(Environment.bundlePrefix).app",
                 "CFBundleDisplayName": "널스메이트",
+                // 애플워치 기본 타이머처럼 — 만료 시각에 WKExtendedRuntimeSession(alarm)을 예약해
+                // 시계 화면/손목 내림에서도 시스템 알람+지속 진동이 뜨게 함(startAtDate 권한).
+                "WKBackgroundModes": ["alarm"],
             ]),
             sources: ["../Watch/WatchExtension/Sources/**"],
             resources: [
