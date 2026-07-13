@@ -23,7 +23,7 @@ public protocol PillRepositoryProtocol {
         formulation: PillFormulationModel?,
         front: PillFaceModel?,
         back: PillFaceModel?,
-        page: Int,
+        cursor: String?,
         size: Int
     ) -> AnyPublisher<PillCandidatePageModel, Error>
 }

@@ -23,7 +23,7 @@ public protocol PillUseCase {
         formulation: PillFormulationModel?,
         front: PillFaceModel?,
         back: PillFaceModel?,
-        page: Int,
+        cursor: String?,
         size: Int
     )
 
@@ -66,7 +66,7 @@ public final class DefaultPillUseCase: PillUseCase {
         formulation: PillFormulationModel?,
         front: PillFaceModel?,
         back: PillFaceModel?,
-        page: Int,
+        cursor: String?,
         size: Int
     ) {
         repository.fetchPillCandidates(
@@ -76,7 +76,7 @@ public final class DefaultPillUseCase: PillUseCase {
             formulation: formulation,
             front: front,
             back: back,
-            page: page,
+            cursor: cursor,
             size: size
         )
         .catch { [weak self] error in

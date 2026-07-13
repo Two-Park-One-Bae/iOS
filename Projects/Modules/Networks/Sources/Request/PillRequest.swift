@@ -33,27 +33,28 @@ public struct PillAttributeItemRequest: Encodable {
     }
 }
 
-// POST /api/v0/pill-candidates 요청 바디 (전부 선택, 부분 입력 허용)
+// POST /api/v0/pill-candidates 요청 바디 (색 필터는 필수·non-null, 나머지는 선택)
 public struct PillCandidateRequest: Encodable {
-    public let colors: [PillColor]?
+    // 색 필터(required). 빈 배열이면 색 조건 제외. null 금지(OpenAPI required).
+    public let colors: [PillColor]
     public let isTransparent: Bool?
     public let shape: PillShape?
     public let formulation: PillFormulation?
     public let front: PillFaceRequest?
     public let back: PillFaceRequest?
-    // 0-base 페이지 번호
-    public let page: Int
+    // 다음 페이지 커서. 첫 페이지는 nil(생략). 직전 응답의 nextCursor.
+    public let cursor: String?
     // 페이지 크기 (기본 20)
     public let size: Int
 
     public init(
-        colors: [PillColor]? = nil,
+        colors: [PillColor],
         isTransparent: Bool? = nil,
         shape: PillShape? = nil,
         formulation: PillFormulation? = nil,
         front: PillFaceRequest? = nil,
         back: PillFaceRequest? = nil,
-        page: Int = 0,
+        cursor: String? = nil,
         size: Int = 20
     ) {
         self.colors = colors
@@ -62,7 +63,7 @@ public struct PillCandidateRequest: Encodable {
         self.formulation = formulation
         self.front = front
         self.back = back
-        self.page = page
+        self.cursor = cursor
         self.size = size
     }
 }

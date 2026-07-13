@@ -120,7 +120,7 @@ final class PillEditViewModel {
             formulation: formulation,
             front: front,
             back: back,
-            page: 0,
+            cursor: nil,
             size: 20
         )
     }
