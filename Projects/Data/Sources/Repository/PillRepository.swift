@@ -22,14 +22,19 @@ public final class PillRepository: PillRepositoryProtocol {
         originalImage: String,
         items: [(pillId: String, segmentation: [[Double]], croppedImage: String)]
     ) -> AnyPublisher<[PillAttributeModel], Error> {
+        // OpenAPI 스키마에 맞춰 감싼다: 이미지 → {mimeType, data}, 폴리곤 → {type, points}.
+        // 원본은 jpeg, 크롭 썸네일은 png 로 인코딩됨(ViewModel 기준).
         let requestItems = items.map {
             PillAttributeItemRequest(
                 pillId: $0.pillId,
-                segmentation: $0.segmentation,
-                croppedImage: $0.croppedImage
+                segmentation: SegmentationRequest(type: "POLYGON", points: $0.segmentation),
+                croppedImage: PillImageRequest(mimeType: "image/png", data: $0.croppedImage)
             )
         }
-        let request = PillAttributeRequest(originalImage: originalImage, items: requestItems)
+        let request = PillAttributeRequest(
+            originalImage: PillImageRequest(mimeType: "image/jpeg", data: originalImage),
+            items: requestItems
+        )
 
         return service.fetchPillAttributes(request: request)
             .map { $0.map { $0.toDomain() } }
