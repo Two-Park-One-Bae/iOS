@@ -100,7 +100,7 @@ let project = Project(
             name: "WatchComplication",
             destinations: [.appleWatch],
             product: .appExtension,
-            bundleId: "\(Environment.bundlePrefix).app.watchapp.complication",
+            bundleId: "\(Environment.bundlePrefix).app.watchapp.presetcomplication",
             deploymentTargets: .watchOS("10.0"),
             infoPlist: .extendingDefault(with: [
                 "CFBundleDisplayName": "널스메이트 프리셋",
