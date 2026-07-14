@@ -14,11 +14,22 @@ public struct TimerSyncSnapshot: Codable, Equatable, Sendable {
     public let snapshotAt: Date
     public let timers: [TreatmentTimerModel]
     public let presets: [TimerPresetModel]
+    /// 폰이 AlarmKit(iOS 26.1+)으로 알람을 처리하는지.
+    /// true면 AlarmKit이 워치까지 울리므로 워치는 자체 알람(WKExtendedRuntimeSession)을 안 켠다(중복 방지).
+    /// nil/false(구형 폰)면 워치가 자기 세션 알람을 켜서 확실히 울린다.
+    /// (옵셔널 — 구버전 스냅샷과 하위호환)
+    public let alarmKitActive: Bool?
 
-    public init(snapshotAt: Date, timers: [TreatmentTimerModel], presets: [TimerPresetModel]) {
+    public init(
+        snapshotAt: Date,
+        timers: [TreatmentTimerModel],
+        presets: [TimerPresetModel],
+        alarmKitActive: Bool? = nil
+    ) {
         self.snapshotAt = snapshotAt
         self.timers = timers
         self.presets = presets
+        self.alarmKitActive = alarmKitActive
     }
 }
 

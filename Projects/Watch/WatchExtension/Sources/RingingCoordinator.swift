@@ -2,20 +2,19 @@ import SwiftUI
 import WatchKit
 import TimerDomain
 
-// 애플워치 기본 타이머처럼 — 만료 시 시스템 알람 + 지속 진동 + e0iD7H 화면.
+// 만료 알람 조율 — 폰 AlarmKit 유무에 따라 워치 자체 알람을 켤지 결정.
 //
-// 핵심은 WKExtendedRuntimeSession(alarm 모드): running 타이머의 endAt 에 세션을 예약하면
-// 시계 화면·손목 내림·앱 종료 상태여도 그 시각에 워치가 깨어나 알람을 띄우고 끌 때까지 진동한다.
-// (예약 start(at:) 은 앱이 포그라운드일 때만 가능 — 워치 앱을 본 타이머가 대상)
-//
-// 앱이 떠 있을 때는 자체 시계(ticker)로도 만료를 잡아 e0iD7H 오버레이 + 반복 햅틱을 띄운다.
-// 앱을 한 번도 안 연 폰-시작 타이머는 WatchNotificationScheduler(로컬 알림)가 보조로 울린다.
+// - 폰 iOS 26.1+ (alarmKitActive=true): AlarmKit이 워치까지 울림 → 워치 세션 안 켬(중복 방지).
+//     워치는 앱 열렸을 때 e0iD7H만 표시. "무슨 타이머인지"는 배너 알림(WatchNotificationScheduler).
+// - 폰 iOS < 26.1 (alarmKitActive=false/nil): AlarmKit 없음 → 워치가 WKExtendedRuntimeSession(alarm)을
+//     endAt 에 예약해 자체적으로 확실히 울린다(시계 화면/손목 내림에서도).
 @MainActor
 final class RingingCoordinator: NSObject, ObservableObject, WKExtendedRuntimeSessionDelegate {
 
     @Published var ringing: TreatmentTimerModel?
 
     private var timers: [TreatmentTimerModel] = []
+    private var alarmKitActive = false   // 폰이 AlarmKit으로 알람 담당(워치까지 울림)
     private var haptics: Task<Void, Never>?
     private var ticker: Task<Void, Never>?
 
@@ -27,6 +26,7 @@ final class RingingCoordinator: NSObject, ObservableObject, WKExtendedRuntimeSes
 
     func sync(_ snapshot: TimerSyncSnapshot?) {
         timers = snapshot?.timers ?? []
+        alarmKitActive = snapshot?.alarmKitActive ?? false
         evaluate()
         restartTicker()
         arm()
@@ -74,6 +74,7 @@ final class RingingCoordinator: NSObject, ObservableObject, WKExtendedRuntimeSes
     // sessionHaptic=true 면 notifyUser 가 진동을 담당(중복 방지), false 면 앱 내 반복 햅틱.
     private func present(_ timer: TreatmentTimerModel, sessionHaptic: Bool) {
         ticker?.cancel(); ticker = nil
+        stopHaptics()   // 기존 반복 햅틱 정리 — 중복 방지
         ringing = timer
         if !sessionHaptic { startHaptics() }
     }
@@ -93,11 +94,14 @@ final class RingingCoordinator: NSObject, ObservableObject, WKExtendedRuntimeSes
         haptics = nil
     }
 
-    // MARK: 알람 세션 (기본 타이머 동작)
+    // MARK: 알람 세션 (폰이 AlarmKit 없을 때만)
 
-    // 표시 중이 아니면, 가장 먼저 만료될 running 타이머의 endAt 에 세션을 (재)예약.
     private func arm() {
-        guard ringing == nil else { return }   // 울리는 중엔 현재 세션 유지
+        guard ringing == nil else { return }         // 울리는 중엔 현재 세션 유지
+        guard !alarmKitActive else {                 // 폰이 AlarmKit 담당 → 워치 세션 불필요
+            invalidateSession()
+            return
+        }
         let now = Date()
         let next = timers
             .filter { $0.state == .running && $0.endAt > now }
@@ -122,13 +126,12 @@ final class RingingCoordinator: NSObject, ObservableObject, WKExtendedRuntimeSes
         armedEndAt = nil
     }
 
-    // MARK: WKExtendedRuntimeSessionDelegate — 예약 시각 도달
+    // MARK: WKExtendedRuntimeSessionDelegate
 
     nonisolated func extendedRuntimeSessionDidStart(_ extendedRuntimeSession: WKExtendedRuntimeSession) {
         Task { @MainActor in
             let fired = timers.first { $0.id == armedId }
             present(fired ?? placeholder(), sessionHaptic: true)
-            // 끌 때까지 반복 진동(기본 타이머 알람과 동일).
             extendedRuntimeSession.notifyUser(hapticType: .notification) { _ in 1.0 }
         }
     }
@@ -141,13 +144,13 @@ final class RingingCoordinator: NSObject, ObservableObject, WKExtendedRuntimeSes
         error: Error?
     ) {
         Task { @MainActor in
+            stopHaptics()   // [중단]/세션 종료 시 반복 햅틱도 정지
             if session === extendedRuntimeSession {
                 session = nil; armedId = nil; armedEndAt = nil
             }
         }
     }
 
-    // armedId 에 해당하는 스냅샷이 아직 없을 때 표시용 폴백.
     private func placeholder() -> TreatmentTimerModel {
         TreatmentTimerModel(label: "타이머 종료", category: .treatment, duration: 0, endAt: Date(), state: .ringing)
     }
