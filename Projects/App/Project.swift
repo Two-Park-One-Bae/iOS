@@ -72,6 +72,9 @@ let project = Project(
                 "WKApplication": true,
                 "WKCompanionAppBundleIdentifier": "\(Environment.bundlePrefix).app",
                 "CFBundleDisplayName": "널스메이트",
+                // 폰 < iOS 26.1(AlarmKit 없음)일 때, 워치가 만료 시각에 WKExtendedRuntimeSession(alarm)을
+                // 예약해 자체적으로 확실히 울리기 위한 백그라운드 모드. 26.1+ 폰이면 워치는 세션을 안 켠다.
+                "WKBackgroundModes": ["alarm"],
             ]),
             sources: ["../Watch/WatchExtension/Sources/**"],
             resources: [

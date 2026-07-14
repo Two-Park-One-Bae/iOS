@@ -30,9 +30,15 @@ struct TimerWidgetStopIntent: LiveActivityIntent {
 @available(iOS 26.1, *)
 enum TimerWidgetAlarmScheduler {
     static func schedule(id: UUID, label: String, categoryName: String, seconds: Int) async throws {
+        // 분류 태그 + 처치명을 헤드라인으로: "[처치] 수혈 바이탈".
+        // 완료 버튼 텍스트·체크마크를 빨강(#EF4444)으로 — 전체화면 알람에서 색 넣을 수 있는 텍스트.
         let alert = AlarmPresentation.Alert(
-            title: "\(label) 종료",
-            stopButton: AlarmButton(text: "완료", textColor: .white, systemImageName: "checkmark")
+            title: "❗ [\(categoryName)] \(label)",
+            stopButton: AlarmButton(
+                text: "완료",
+                textColor: Color(red: 0.937, green: 0.267, blue: 0.267),
+                systemImageName: "checkmark"
+            )
         )
         let presentation = AlarmPresentation(
             alert: alert,
@@ -48,7 +54,7 @@ enum TimerWidgetAlarmScheduler {
         let attributes = AlarmAttributes<CareTimerAlarmMetadata>(
             presentation: presentation,
             metadata: CareTimerAlarmMetadata(label: label, categoryName: categoryName, duration: seconds),
-            tintColor: Color(red: 0.961, green: 0.620, blue: 0.043)
+            tintColor: Color(red: 0.937, green: 0.267, blue: 0.267)   // 빨강 #EF4444 (경고·알람)
         )
         let configuration = AlarmManager.AlarmConfiguration(
             countdownDuration: Alarm.CountdownDuration(preAlert: TimeInterval(seconds), postAlert: nil),

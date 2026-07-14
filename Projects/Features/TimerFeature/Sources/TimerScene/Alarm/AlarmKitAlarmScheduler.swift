@@ -34,11 +34,13 @@ public final class AlarmKitAlarmScheduler: TimerAlarmScheduling {
 
     public func scheduleAlarm(id: UUID, label: String, categoryName: String, body: String, fireDate: Date) {
         let remaining = max(1, Int(fireDate.timeIntervalSinceNow.rounded()))
-        let tint = Color(red: 0.961, green: 0.620, blue: 0.043)
+        let tint = Color(red: 0.937, green: 0.267, blue: 0.267)   // 빨강 #EF4444 (경고·알람)
 
+        // 분류 태그 + 처치명을 헤드라인으로: "[처치] 수혈 바이탈".
+        // 완료 버튼 텍스트·체크마크를 빨강(#EF4444)으로 — 전체화면 알람에서 색 넣을 수 있는 텍스트.
         let alert = AlarmPresentation.Alert(
-            title: "\(label) 종료",
-            stopButton: AlarmButton(text: "완료", textColor: .white, systemImageName: "checkmark")
+            title: "❗ [\(categoryName)] \(label)",
+            stopButton: AlarmButton(text: "완료", textColor: tint, systemImageName: "checkmark")
         )
         let presentation = AlarmPresentation(
             alert: alert,

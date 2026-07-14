@@ -53,6 +53,9 @@ final class WatchConnectivityManager: NSObject, ObservableObject {
         // 최신 snapshotAt 만 채택 — 늦게 도착한 오래된 스냅샷이 최신 상태를 덮지 않게.
         if let current = snapshot, incoming.snapshotAt <= current.snapshotAt { return }
         snapshot = incoming
+        // 백그라운드 수신(앱 닫힘 포함)에서도 실행 — running 타이머를 endAt 에 로컬 알림 예약.
+        // 이것이 "앱 상태 무관 무조건 울림"의 핵심.
+        WatchNotificationScheduler.reconcile(with: incoming.timers)
         // 새 타이머가 스냅샷에 반영됐으면(개수 증가) "시작하는 중" 해제 — 기존 타이머가 있어도 정확.
         if isStarting, incoming.timers.count > startingBaseline {
             isStarting = false
