@@ -11,6 +11,8 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
     ) -> Bool {
         RegisterDependencies.register()
         FirebaseService.configure()
+        // Remote Config fetch + 게이팅(강제 업데이트·점검)은 window 를 소유한 SceneDelegate 가
+        // sceneDidBecomeActive 에서 담당한다(포그라운드 복귀 시에도 최신값 반영).
         ClarityService.configure()
         AmplitudeService.track(AppLaunchEvent())
         if #available(iOS 26.1, *) {

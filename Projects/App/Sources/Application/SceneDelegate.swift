@@ -8,6 +8,7 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     var window: UIWindow?
     var appCoordinator: AppCoordinator?
     private var pendingURL: URL?   // 콜드런치 딥링크 — 창이 준비된 활성화 시점에 처리
+    private var appGate: AppGate?  // Remote Config 차단 화면(강제 업데이트·점검)
 
     func scene(
         _ scene: UIScene,
@@ -24,6 +25,8 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
         window.rootViewController = navigationController
         window.makeKeyAndVisible()
+
+        appGate = AppGate(windowScene: windowScene)
 
         // 콜드런치 딥링크는 저장만 — 창이 활성화된 sceneDidBecomeActive 에서 present.
         pendingURL = connectionOptions.urlContexts.first?.url
@@ -89,6 +92,12 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         // App Intent(AlarmKit)가 App Group 저장소를 직접 바꿨을 수 있음 — 먼저 재동기화.
         useCase.reload()
         useCase.refresh()
+
+        // Remote Config 최신값 fetch 후 강제 업데이트/점검 게이트 갱신(포그라운드 복귀 포함).
+        Task { @MainActor in
+            await RemoteConfigService.shared.fetchAndActivate()
+            appGate?.evaluate()
+        }
 
         // 콜드런치 딥링크: 창이 활성화된 지금 present.
         if let url = pendingURL {
