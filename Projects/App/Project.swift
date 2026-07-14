@@ -75,6 +75,10 @@ let project = Project(
                 // 폰 < iOS 26.1(AlarmKit 없음)일 때, 워치가 만료 시각에 WKExtendedRuntimeSession(alarm)을
                 // 예약해 자체적으로 확실히 울리기 위한 백그라운드 모드. 26.1+ 폰이면 워치는 세션을 안 켠다.
                 "WKBackgroundModes": ["alarm"],
+                // 컴플리케이션 딥링크(nursemate://presets) 를 앱이 onOpenURL 로 받기 위한 스킴 (NM-303)
+                "CFBundleURLTypes": [[
+                    "CFBundleURLSchemes": ["nursemate"],
+                ]],
             ]),
             sources: ["../Watch/WatchExtension/Sources/**"],
             resources: [
@@ -84,9 +88,27 @@ let project = Project(
             dependencies: [
                 // 폰·워치 공용 타이머 도메인 — 동기화 스냅샷을 같은 타입으로 디코드
                 Dep.Modules.TimerDomain.TimerDomain,
+                // 컴플리케이션(워치 위젯) embed — 워치 앱 설치 시 함께 설치 (NM-303)
+                .target(name: "WatchWidget"),
             ],
             // configurations 를 붙여야 xcconfig 의 DEVELOPMENT_TEAM·자동서명이 적용된다.
             // (없으면 워치 앱에 프로비저닝 프로파일이 안 잡혀 "could not be installed")
+            settings: .settings(base: XCConfig.base, configurations: XCConfig.app)
+        ),
+        // watchOS 컴플리케이션(위젯 익스텐션) — 시계 페이스 → 프리셋 그리드 딥링크 (NM-303)
+        .target(
+            name: "WatchWidget",
+            destinations: [.appleWatch],
+            product: .appExtension,
+            bundleId: "\(Environment.bundlePrefix).app.watchapp.widget",
+            deploymentTargets: .watchOS("10.0"),
+            infoPlist: .extendingDefault(with: [
+                "CFBundleDisplayName": "널스메이트 프리셋",
+                "NSExtension": [
+                    "NSExtensionPointIdentifier": "com.apple.widgetkit-extension",
+                ],
+            ]),
+            sources: ["../Watch/WatchWidget/Sources/**"],
             settings: .settings(base: XCConfig.base, configurations: XCConfig.app)
         ),
         // 잠금화면 Live Activity · Dynamic Island (spec: 잠금화면 실시간 표시)

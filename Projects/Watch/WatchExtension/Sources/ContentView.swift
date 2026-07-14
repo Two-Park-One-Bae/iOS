@@ -9,6 +9,7 @@ struct ContentView: View {
     @EnvironmentObject private var connectivity: WatchConnectivityManager
     @StateObject private var ringing = RingingCoordinator()
     @Environment(\.scenePhase) private var scenePhase
+    @State private var showPresetGrid = false   // 컴플리케이션 딥링크 목적지(D7MpNK)
 
     var body: some View {
         // 울림 화면은 fullScreenCover 대신 ZStack 오버레이로 — watchOS 에서 확실히 최상단을 덮는다.
@@ -45,6 +46,14 @@ struct ContentView: View {
         // 백그라운드에서 만료 스냅샷이 도착했다가 포그라운드로 돌아온 경우 반영.
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { ringing.sync(connectivity.snapshot) }
+        }
+        // 컴플리케이션 탭(nursemate://presets) → 프리셋 그리드(D7MpNK) 시트로 표시.
+        .onOpenURL { url in
+            if url.host == "presets" { showPresetGrid = true }
+        }
+        .sheet(isPresented: $showPresetGrid) {
+            PresetGridView(onStarted: { showPresetGrid = false })
+                .environmentObject(connectivity)
         }
     }
 }
