@@ -41,7 +41,7 @@ struct TimerAlarmCountdownWidget: Widget {
             } minimal: {
                 AlarmLeadingBadge(info: info, size: 20)
             }
-            .keylineTint(info.isRinging ? Color.timerAmber : Color.timerBlue)
+            .keylineTint(info.isRinging ? Color.timerRinging : Color.timerBlue)
         }
     }
 }
@@ -155,7 +155,7 @@ private struct AlarmPrimaryText: View {
         case .ringing:
             Text("종료")
                 .font(.system(size: 18, weight: .bold))
-                .foregroundStyle(Color.timerAmber)
+                .foregroundStyle(Color.timerRinging)
                 .lineLimit(1)
         }
     }
@@ -183,7 +183,7 @@ private struct AlarmCompactTrailing: View {
         case .ringing:
             Text("종료")
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Color.timerAmber)
+                .foregroundStyle(Color.timerRinging)
         }
     }
 }
@@ -223,11 +223,11 @@ private struct TimerExpiredRing: View {
     var body: some View {
         ZStack {
             Circle()
-                .stroke(Color.timerAmber, lineWidth: max(2, size * 0.09))
+                .stroke(Color.timerRinging, lineWidth: max(2, size * 0.09))
 
             Image(systemName: "bell.fill")
                 .font(.system(size: size * 0.42, weight: .semibold))
-                .foregroundStyle(Color.timerAmber)
+                .foregroundStyle(Color.timerRinging)
         }
         .frame(width: size, height: size)
     }
@@ -261,8 +261,8 @@ private func clockString(_ seconds: Int) -> String {
 private extension Color {
     /// 진행 링·키라인·카운트다운 파랑 (#0EA5E9)
     static let timerBlue = Color(red: 0.055, green: 0.647, blue: 0.914)
-    /// 만료 경고 앰버 (#F59E0B)
-    static let timerAmber = Color(red: 0.961, green: 0.620, blue: 0.043)
+    /// 만료·울림 빨강 (#EF4444) — AlarmKit tintColor와 통일
+    static let timerRinging = Color(red: 0.937, green: 0.267, blue: 0.267)
     /// 라벨 텍스트 흰색 80% (#FFFFFFCC)
     static let timerLabelText = Color.white.opacity(0.80)
     /// 링 트랙 흰색 15% (#FFFFFF26)
