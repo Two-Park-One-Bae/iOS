@@ -60,13 +60,22 @@ platform :ios do
       xcodeproj: "Projects/App/App.xcodeproj"
     )
 
-    update_code_signing_settings(
-      use_automatic_signing: false,
-      path: "Projects/App/App.xcodeproj",
-      targets: ["App"],
-      code_sign_identity: "iPhone Distribution",
-      profile_name: "match AppStore app.nursemate.app"
-    )
+    # App + 임베드되는 익스텐션(워치앱·위젯·컴플리케이션) 각각을 해당 match 프로파일로 수동 서명.
+    signing = {
+      "App"               => "app.nursemate.app",
+      "WatchApp"          => "app.nursemate.app.watchapp",
+      "TimerWidget"       => "app.nursemate.app.timerwidget",
+      "WatchComplication" => "app.nursemate.app.watchapp.presetcomplication",
+    }
+    signing.each do |target, bundle_id|
+      update_code_signing_settings(
+        use_automatic_signing: false,
+        path: "Projects/App/App.xcodeproj",
+        targets: [target],
+        code_sign_identity: "iPhone Distribution",
+        profile_name: "match AppStore #{bundle_id}"
+      )
+    end
 
     build_app(
       workspace: "Application.xcworkspace",
@@ -78,9 +87,7 @@ platform :ios do
       export_options: {
         method: "app-store",
         signingStyle: "manual",
-        provisioningProfiles: {
-          "app.nursemate.app" => "match AppStore app.nursemate.app"
-        }
+        provisioningProfiles: signing.each_with_object({}) { |(_, bundle_id), h| h[bundle_id] = "match AppStore #{bundle_id}" }
       }
     )
 
@@ -116,13 +123,22 @@ platform :ios do
       xcodeproj: "Projects/App/App.xcodeproj"
     )
 
-    update_code_signing_settings(
-      use_automatic_signing: false,
-      path: "Projects/App/App.xcodeproj",
-      targets: ["App"],
-      code_sign_identity: "iPhone Distribution",
-      profile_name: "match AppStore app.nursemate.app"
-    )
+    # App + 임베드되는 익스텐션(워치앱·위젯·컴플리케이션) 각각을 해당 match 프로파일로 수동 서명.
+    signing = {
+      "App"               => "app.nursemate.app",
+      "WatchApp"          => "app.nursemate.app.watchapp",
+      "TimerWidget"       => "app.nursemate.app.timerwidget",
+      "WatchComplication" => "app.nursemate.app.watchapp.presetcomplication",
+    }
+    signing.each do |target, bundle_id|
+      update_code_signing_settings(
+        use_automatic_signing: false,
+        path: "Projects/App/App.xcodeproj",
+        targets: [target],
+        code_sign_identity: "iPhone Distribution",
+        profile_name: "match AppStore #{bundle_id}"
+      )
+    end
 
     build_app(
       workspace: "Application.xcworkspace",
@@ -134,9 +150,7 @@ platform :ios do
       export_options: {
         method: "app-store",
         signingStyle: "manual",
-        provisioningProfiles: {
-          "app.nursemate.app" => "match AppStore app.nursemate.app"
-        }
+        provisioningProfiles: signing.each_with_object({}) { |(_, bundle_id), h| h[bundle_id] = "match AppStore #{bundle_id}" }
       }
     )
 
