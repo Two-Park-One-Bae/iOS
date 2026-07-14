@@ -83,7 +83,9 @@ platform :ios do
       configuration: "Release",
       export_method: "app-store",
       output_directory: "build",
-      xcargs: "DEVELOPMENT_TEAM=#{ENV.fetch('DEVELOPMENT_TEAM', '')}",
+      # 프레임워크 타깃(TimerDomain 등)이 아카이브 시 개발용("iOS Development") 인증서를 찾다
+      # 실패하는 문제 방지 — 아카이브 전체를 배포 인증서로 서명(프레임워크는 프로파일 없이 서명됨).
+      xcargs: "DEVELOPMENT_TEAM=#{ENV.fetch('DEVELOPMENT_TEAM', '')} CODE_SIGN_IDENTITY='Apple Distribution'",
       export_options: {
         method: "app-store",
         signingStyle: "manual",
@@ -146,7 +148,9 @@ platform :ios do
       configuration: "Release",
       export_method: "app-store",
       output_directory: "build",
-      xcargs: "DEVELOPMENT_TEAM=#{ENV.fetch('DEVELOPMENT_TEAM', '')}",
+      # 프레임워크 타깃(TimerDomain 등)이 아카이브 시 개발용("iOS Development") 인증서를 찾다
+      # 실패하는 문제 방지 — 아카이브 전체를 배포 인증서로 서명(프레임워크는 프로파일 없이 서명됨).
+      xcargs: "DEVELOPMENT_TEAM=#{ENV.fetch('DEVELOPMENT_TEAM', '')} CODE_SIGN_IDENTITY='Apple Distribution'",
       export_options: {
         method: "app-store",
         signingStyle: "manual",
