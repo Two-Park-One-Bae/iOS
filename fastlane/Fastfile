@@ -164,4 +164,15 @@ platform :ios do
       skip_waiting_for_build_processing: false
     )
   end
+
+  desc "Regenerate App Store signing profiles for all targets (match --force)"
+  desc "타깃·capability 추가 후 수동 트리거로 실행. certificates repo에 재발급 프로파일을 커밋한다."
+  lane :sync_signing do
+    match(
+      type: "appstore",
+      api_key: api_key,
+      force: true,      # 유효하더라도 프로파일 재발급(capability 반영 + 신규 번들 ID)
+      readonly: false   # certificates repo 에 쓰기(재발급본 커밋)
+    )
+  end
 end
