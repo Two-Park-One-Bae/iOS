@@ -8,6 +8,7 @@ let project = Project.makeModule(
     externalDependencies: [
         .SPM.FirebaseAnalytics,
         .SPM.FirebaseCrashlytics,
+        .SPM.FirebaseRemoteConfig,
         .SPM.AmplitudeSwift,
         .SPM.Clarity,
     ]

@@ -12,6 +12,8 @@ public struct XCConfig {
         "SWIFT_EMIT_LOC_STRINGS": "YES",
         "VERSIONING_SYSTEM": "apple-generic",
         "CURRENT_PROJECT_VERSION": "1",
+        // Firebase(RemoteConfig 등) 정적 링크 시 ObjC 카테고리 dead-strip 방지
+        "OTHER_LDFLAGS": ["$(inherited)", "-ObjC"],
     ]
 
     public static let framework: [Configuration] = [
