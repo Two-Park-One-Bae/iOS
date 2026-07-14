@@ -7,13 +7,35 @@
 
 import Foundation
 
+// OpenAPI `Image` 스키마 — 이미지는 문자열이 아니라 { mimeType, data } 객체.
+public struct PillImageRequest: Encodable {
+    public let mimeType: String   // 예: image/jpeg, image/png
+    public let data: String       // base64 인코딩 바이트(data URI 프리픽스 없이 순수 base64)
+
+    public init(mimeType: String, data: String) {
+        self.mimeType = mimeType
+        self.data = data
+    }
+}
+
+// OpenAPI `Segmentation` 스키마 — 폴리곤은 배열이 아니라 { type, points } 객체.
+public struct SegmentationRequest: Encodable {
+    public let type: String        // BBOX | POLYGON
+    public let points: [[Double]]  // 원본 좌표. POLYGON=꼭짓점, BBOX=[[x,y,w,h]]
+
+    public init(type: String, points: [[Double]]) {
+        self.type = type
+        self.points = points
+    }
+}
+
 // POST /api/v0/pill-attributes 요청 바디
 public struct PillAttributeRequest: Encodable {
-    // 원본 이미지 base64 (인프라 구축 전 임시 직접 전송. 이후 S3 key 방식으로 교체 예정)
-    public let originalImage: String
+    // 원본 이미지(인프라 구축 전 임시 직접 전송. 이후 S3 key 방식으로 교체 예정)
+    public let originalImage: PillImageRequest
     public let items: [PillAttributeItemRequest]
 
-    public init(originalImage: String, items: [PillAttributeItemRequest]) {
+    public init(originalImage: PillImageRequest, items: [PillAttributeItemRequest]) {
         self.originalImage = originalImage
         self.items = items
     }
@@ -23,10 +45,10 @@ public struct PillAttributeRequest: Encodable {
 public struct PillAttributeItemRequest: Encodable {
     // 세션 내 로컬 식별자. 응답의 pillId와 매핑 키로 사용
     public let pillId: String
-    public let segmentation: [[Double]]  // [[x1,y1],[x2,y2],...] 폴리곤 좌표
-    public let croppedImage: String      // 크롭 이미지 base64
+    public let segmentation: SegmentationRequest  // 폴리곤 객체
+    public let croppedImage: PillImageRequest      // 크롭 이미지 객체
 
-    public init(pillId: String, segmentation: [[Double]], croppedImage: String) {
+    public init(pillId: String, segmentation: SegmentationRequest, croppedImage: PillImageRequest) {
         self.pillId = pillId
         self.segmentation = segmentation
         self.croppedImage = croppedImage
