@@ -88,19 +88,19 @@ let project = Project(
             dependencies: [
                 // 폰·워치 공용 타이머 도메인 — 동기화 스냅샷을 같은 타입으로 디코드
                 Dep.Modules.TimerDomain.TimerDomain,
-                // 컴플리케이션(워치 위젯) embed — 워치 앱 설치 시 함께 설치 (NM-303)
-                .target(name: "WatchWidget"),
+                // 워치 컴플리케이션 embed — 워치 앱 설치 시 함께 설치 (NM-303)
+                .target(name: "WatchComplication"),
             ],
             // configurations 를 붙여야 xcconfig 의 DEVELOPMENT_TEAM·자동서명이 적용된다.
             // (없으면 워치 앱에 프로비저닝 프로파일이 안 잡혀 "could not be installed")
             settings: .settings(base: XCConfig.base, configurations: XCConfig.app)
         ),
-        // watchOS 컴플리케이션(위젯 익스텐션) — 시계 페이스 → 프리셋 그리드 딥링크 (NM-303)
+        // watchOS 컴플리케이션(WidgetKit accessory) — 시계 페이스 → 프리셋 그리드 딥링크 (NM-303)
         .target(
-            name: "WatchWidget",
+            name: "WatchComplication",
             destinations: [.appleWatch],
             product: .appExtension,
-            bundleId: "\(Environment.bundlePrefix).app.watchapp.widget",
+            bundleId: "\(Environment.bundlePrefix).app.watchapp.complication",
             deploymentTargets: .watchOS("10.0"),
             infoPlist: .extendingDefault(with: [
                 "CFBundleDisplayName": "널스메이트 프리셋",
@@ -108,7 +108,7 @@ let project = Project(
                     "NSExtensionPointIdentifier": "com.apple.widgetkit-extension",
                 ],
             ]),
-            sources: ["../Watch/WatchWidget/Sources/**"],
+            sources: ["../Watch/WatchComplication/Sources/**"],
             settings: .settings(base: XCConfig.base, configurations: XCConfig.app)
         ),
         // 잠금화면 Live Activity · Dynamic Island (spec: 잠금화면 실시간 표시)

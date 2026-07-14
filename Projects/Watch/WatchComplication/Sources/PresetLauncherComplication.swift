@@ -4,7 +4,7 @@ import SwiftUI
 // NM-303 워치 컴플리케이션 — 시계 페이스에 올려 탭하면 앱의 프리셋 그리드(D7MpNK)를 연다.
 // 데이터 표시는 없는 "런처" 성격 — widgetURL(nursemate://presets)로 앱을 열고, 앱이 시트로 그리드 표시.
 @main
-struct WatchWidgetBundle: WidgetBundle {
+struct WatchComplicationBundle: WidgetBundle {
     var body: some Widget {
         PresetLauncherComplication()
     }
