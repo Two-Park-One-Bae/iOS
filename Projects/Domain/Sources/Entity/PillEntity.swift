@@ -72,26 +72,20 @@ public struct PillCandidateModel: Equatable {
     }
 }
 
-// 후보 목록 + 페이지네이션
+// 후보 목록 + 커서 페이지네이션
 public struct PillCandidatePageModel: Equatable {
     public let candidates: [PillCandidateModel]
-    public let page: Int
-    public let size: Int
-    public let totalElements: Int
-    public let totalPages: Int
+    public let nextCursor: String?   // 다음 페이지 커서. nil이면 마지막 페이지
+    public let hasNext: Bool
 
     public init(
         candidates: [PillCandidateModel],
-        page: Int,
-        size: Int,
-        totalElements: Int,
-        totalPages: Int
+        nextCursor: String?,
+        hasNext: Bool
     ) {
         self.candidates = candidates
-        self.page = page
-        self.size = size
-        self.totalElements = totalElements
-        self.totalPages = totalPages
+        self.nextCursor = nextCursor
+        self.hasNext = hasNext
     }
 }
 

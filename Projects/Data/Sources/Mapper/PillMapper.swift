@@ -118,11 +118,9 @@ extension PillCandidateEntity {
 extension PillCandidatePageEntity {
     public func toDomain() -> PillCandidatePageModel {
         PillCandidatePageModel(
-            candidates:    candidates.map { $0.toDomain() },
-            page:          page,
-            size:          size,
-            totalElements: totalElements,
-            totalPages:    totalPages
+            candidates: candidates.map { $0.toDomain() },
+            nextCursor: nextCursor,
+            hasNext:    hasNext
         )
     }
 }

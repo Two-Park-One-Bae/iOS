@@ -53,18 +53,16 @@ final class MockPillRepository: PillRepositoryProtocol {
         formulation: PillFormulationModel?,
         front: PillFaceModel?,
         back: PillFaceModel?,
-        page: Int,
+        cursor: String?,
         size: Int
     ) -> AnyPublisher<PillCandidatePageModel, Error> {
         // 데모: 투명 알약으로 검색하면 "조건에 맞는 후보가 없어요" 빈 상태를 보여준다.
         // 토글을 끄면 다시 후보가 나타난다.
         if isTransparent == true {
             let empty = PillCandidatePageModel(
-                candidates:    [],
-                page:          page,
-                size:          size,
-                totalElements: 0,
-                totalPages:    0
+                candidates: [],
+                nextCursor: nil,
+                hasNext:    false
             )
             return Just(empty)
                 .setFailureType(to: Error.self)
@@ -86,10 +84,8 @@ final class MockPillRepository: PillRepositoryProtocol {
                     pillImageUrl: nil
                 ),
             ],
-            page:          page,
-            size:          size,
-            totalElements: 2,
-            totalPages:    1
+            nextCursor: nil,
+            hasNext:    false
         )
         return Just(stub)
             .setFailureType(to: Error.self)

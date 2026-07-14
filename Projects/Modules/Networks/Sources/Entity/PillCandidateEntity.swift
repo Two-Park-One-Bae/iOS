@@ -15,11 +15,9 @@ public struct PillCandidateEntity: Decodable {
     public let pillImageUrl: String?  // 낱알 본체 이미지 (실물 시각 대조)
 }
 
-// POST /api/v0/pill-candidates 응답. 품목명 등 안정 정렬
+// POST /api/v0/pill-candidates 응답 (커서 페이지네이션, NM-158)
 public struct PillCandidatePageEntity: Decodable {
     public let candidates: [PillCandidateEntity]
-    public let page: Int
-    public let size: Int
-    public let totalElements: Int
-    public let totalPages: Int
+    public let nextCursor: String?   // 다음 페이지 커서. null이면 마지막 페이지
+    public let hasNext: Bool
 }

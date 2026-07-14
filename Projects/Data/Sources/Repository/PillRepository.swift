@@ -48,18 +48,18 @@ public final class PillRepository: PillRepositoryProtocol {
         formulation: PillFormulationModel?,
         front: PillFaceModel?,
         back: PillFaceModel?,
-        page: Int,
+        cursor: String?,
         size: Int
     ) -> AnyPublisher<PillCandidatePageModel, Error> {
-        // Domain 모델 → Network Request 모델 변환
+        // Domain 모델 → Network Request 모델 변환. colors는 required·non-null(nil이면 빈 배열).
         let request = PillCandidateRequest(
-            colors: colors?.compactMap { $0.toNetwork() },
+            colors: colors?.compactMap { $0.toNetwork() } ?? [],
             isTransparent: isTransparent,
             shape: shape?.toNetwork(),
             formulation: formulation?.toNetwork(),
             front: front?.toNetwork(),
             back: back?.toNetwork(),
-            page: page,
+            cursor: cursor,
             size: size
         )
 
