@@ -13,6 +13,8 @@ final class PillEditVC: UIViewController {
     var onConfirm: ((PillCandidateModel) -> Void)?
     var onCancel: (() -> Void)?
     var onBackTapped: (() -> Void)?
+    // 후보 ⓘ 탭 → 세부정보 진입 (pillCode)
+    var onSelectDetail: ((String) -> Void)?
 
     // MARK: - Properties
 
@@ -330,6 +332,7 @@ final class PillEditVC: UIViewController {
         for candidate in candidates {
             let row = CandidateRowView(candidate: candidate)
             row.onTap = { [weak self] in self?.selectCandidate(row) }
+            row.onInfoTap = { [weak self] in self?.onSelectDetail?(candidate.pillCode) }
             candidatesStack.addArrangedSubview(row)
             candidateRows.append(row)
         }

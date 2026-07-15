@@ -8,6 +8,7 @@ import Domain
 final class CandidateRowView: UIView {
 
     var onTap: (() -> Void)?
+    var onInfoTap: (() -> Void)?
 
     let candidate: PillCandidateModel
     private var isSelected = false
@@ -71,7 +72,14 @@ final class CandidateRowView: UIView {
         }
         name.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
-        let row = UIStackView(arrangedSubviews: [radio, thumbs, texts]).then {
+        // 세부정보 진입 (라디오 선택과 별개 — 버튼이 터치를 소비해 행 탭과 분리)
+        let info = UIButton(type: .system)
+        info.setImage(UIImage(systemName: "info.circle"), for: .normal)
+        info.tintColor = DSColor.Primary._500
+        info.addAction(UIAction { [weak self] _ in self?.onInfoTap?() }, for: .touchUpInside)
+        info.snp.makeConstraints { $0.width.height.equalTo(24) }
+
+        let row = UIStackView(arrangedSubviews: [radio, thumbs, texts, info]).then {
             $0.axis = .horizontal
             $0.spacing = 12
             $0.alignment = .center

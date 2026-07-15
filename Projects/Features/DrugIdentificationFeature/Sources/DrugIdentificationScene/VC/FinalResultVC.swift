@@ -12,6 +12,8 @@ final class FinalResultVC: UIViewController {
     var onShare: (() -> Void)?
     var onComplete: (() -> Void)?
     var onBackTapped: (() -> Void)?
+    // 카드 탭 → 세부정보 진입 (pillCode, 썸네일)
+    var onSelectDetail: ((String, UIImage?) -> Void)?
 
     // MARK: - Properties
 
@@ -199,14 +201,15 @@ final class FinalResultVC: UIViewController {
         }
         name.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
-        let check = UIImageView().then {
-            $0.image = DSIcon.checkCircle.uiImage
-            $0.tintColor = DSColor.Secondary._500
+        // 세부정보 진입 안내 아이콘 (탭 → 세부정보)
+        let info = UIImageView().then {
+            $0.image = UIImage(systemName: "info.circle")
+            $0.tintColor = DSColor.Primary._500
             $0.contentMode = .scaleAspectFit
         }
-        check.snp.makeConstraints { $0.width.height.equalTo(22) }
+        info.snp.makeConstraints { $0.width.height.equalTo(22) }
 
-        let row = UIStackView(arrangedSubviews: [thumb, texts, check]).then {
+        let row = UIStackView(arrangedSubviews: [thumb, texts, info]).then {
             $0.axis = .horizontal
             $0.spacing = 12
             $0.alignment = .center
@@ -216,6 +219,16 @@ final class FinalResultVC: UIViewController {
             $0.top.bottom.equalToSuperview().inset(14)
             $0.leading.trailing.equalToSuperview().inset(14)
         }
+
+        // 카드 전체를 탭 영역으로 — 세부정보 진입
+        let tapButton = UIButton(type: .system)
+        let pillCode = candidate.pillCode
+        let thumbnail = pill.thumbnail
+        tapButton.addAction(UIAction { [weak self] _ in
+            self?.onSelectDetail?(pillCode, thumbnail)
+        }, for: .touchUpInside)
+        card.addSubview(tapButton)
+        tapButton.snp.makeConstraints { $0.edges.equalToSuperview() }
         return card
     }
 
