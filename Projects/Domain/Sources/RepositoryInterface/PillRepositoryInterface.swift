@@ -26,4 +26,7 @@ public protocol PillRepositoryProtocol {
         cursor: String?,
         size: Int
     ) -> AnyPublisher<PillCandidatePageModel, Error>
+
+    // pillCode → 알약 세부정보 조회 (NM-312)
+    func fetchPillDetail(pillCode: String) -> AnyPublisher<PillDetailModel, Error>
 }

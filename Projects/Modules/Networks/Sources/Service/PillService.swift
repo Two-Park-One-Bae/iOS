@@ -15,6 +15,7 @@ public typealias DefaultPillService = BaseService<PillAPI>
 public protocol PillService {
     func fetchPillAttributes(request: PillAttributeRequest) -> AnyPublisher<[PillAttributeEntity], Error>
     func fetchPillCandidates(request: PillCandidateRequest) -> AnyPublisher<PillCandidatePageEntity, Error>
+    func fetchPillDetail(pillCode: String) -> AnyPublisher<PillDetailEntity, Error>
 }
 
 extension DefaultPillService: PillService {
@@ -25,5 +26,10 @@ extension DefaultPillService: PillService {
 
     public func fetchPillCandidates(request: PillCandidateRequest) -> AnyPublisher<PillCandidatePageEntity, Error> {
         requestObjectInCombine(.pillCandidates(request: request))
+    }
+
+    public func fetchPillDetail(pillCode: String) -> AnyPublisher<PillDetailEntity, Error> {
+        // 404(세부정보 없음)를 '세부정보 없음' 상태로 분기할 수 있도록 에러 코드를 보존하는 버전 사용 (NM-309)
+        requestObjectWithNetworkErrorInCombine(.pillDetails(pillCode: pillCode))
     }
 }

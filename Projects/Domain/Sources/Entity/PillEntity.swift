@@ -89,7 +89,122 @@ public struct PillCandidatePageModel: Equatable {
     }
 }
 
+// MARK: - Pill Detail (NM-312)
+
+// 알약 세부정보 (성분·성상·허가문서). 허가문서는 구조화된 블록 목록.
+public struct PillDetailModel: Equatable {
+    public let pillCode: String
+    public let name: String
+    public let companyName: String
+    public let classification: PillClassificationModel
+    public let appearance: String?
+    public let ingredients: [IngredientModel]
+    public let storageMethod: String?
+    public let validTerm: String?
+    public let packUnit: String?
+    public let documents: [LicenseDocModel]
+
+    public init(
+        pillCode: String,
+        name: String,
+        companyName: String,
+        classification: PillClassificationModel,
+        appearance: String?,
+        ingredients: [IngredientModel],
+        storageMethod: String?,
+        validTerm: String?,
+        packUnit: String?,
+        documents: [LicenseDocModel]
+    ) {
+        self.pillCode = pillCode
+        self.name = name
+        self.companyName = companyName
+        self.classification = classification
+        self.appearance = appearance
+        self.ingredients = ingredients
+        self.storageMethod = storageMethod
+        self.validTerm = validTerm
+        self.packUnit = packUnit
+        self.documents = documents
+    }
+}
+
+public struct IngredientModel: Equatable {
+    public let name: String
+    public let amount: String
+    public let unit: String
+
+    public init(name: String, amount: String, unit: String) {
+        self.name = name
+        self.amount = amount
+        self.unit = unit
+    }
+}
+
+public struct LicenseDocModel: Equatable {
+    public let type: LicenseDocTypeModel
+    public let blocks: [BlockModel]
+
+    public init(type: LicenseDocTypeModel, blocks: [BlockModel]) {
+        self.type = type
+        self.blocks = blocks
+    }
+}
+
+// 문서 블록. 모르는 블록 타입은 매핑 단계에서 제외되어 여기엔 알려진 타입만 존재.
+public enum BlockModel: Equatable {
+    case heading(content: [SpanModel])
+    case paragraph(content: [SpanModel])
+    case table(caption: [SpanModel]?, rows: [TableRowModel])
+    case image(src: String)
+}
+
+public struct TableRowModel: Equatable {
+    public let cells: [TableCellModel]
+
+    public init(cells: [TableCellModel]) {
+        self.cells = cells
+    }
+}
+
+public struct TableCellModel: Equatable {
+    public let content: [SpanModel]
+    public let colspan: Int
+    public let rowspan: Int
+    public let header: Bool
+
+    public init(content: [SpanModel], colspan: Int, rowspan: Int, header: Bool) {
+        self.content = content
+        self.colspan = colspan
+        self.rowspan = rowspan
+        self.header = header
+    }
+}
+
+// 텍스트 조각. style이 nil이면 일반 텍스트.
+public struct SpanModel: Equatable {
+    public let text: String
+    public let style: SpanStyleModel?
+
+    public init(text: String, style: SpanStyleModel?) {
+        self.text = text
+        self.style = style
+    }
+}
+
 // MARK: - Enums
+
+public enum PillClassificationModel: String, Equatable {
+    case etc, otc, unknown
+}
+
+public enum LicenseDocTypeModel: String, Equatable {
+    case effect, dosage, caution, unknown
+}
+
+public enum SpanStyleModel: String, Equatable {
+    case sup, sub
+}
 
 public enum PillColorModel: String, Equatable {
     case white, yellow, orange, pink, red, brown

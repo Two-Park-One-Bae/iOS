@@ -27,8 +27,12 @@ public protocol PillUseCase {
         size: Int
     )
 
+    // 후보 선택 확정(pillCode) → 세부정보 조회 (NM-312)
+    func fetchPillDetail(pillCode: String)
+
     var pillAttributes: PassthroughSubject<[PillAttributeModel], Never> { get }
     var pillCandidates: PassthroughSubject<PillCandidatePageModel, Never> { get }
+    var pillDetail:     PassthroughSubject<PillDetailModel, Never> { get }
     var errorMessage:   PassthroughSubject<String, Never> { get }
 }
 
@@ -38,6 +42,7 @@ public final class DefaultPillUseCase: PillUseCase {
 
     public let pillAttributes = PassthroughSubject<[PillAttributeModel], Never>()
     public let pillCandidates = PassthroughSubject<PillCandidatePageModel, Never>()
+    public let pillDetail     = PassthroughSubject<PillDetailModel, Never>()
     public let errorMessage   = PassthroughSubject<String, Never>()
 
     public init(repository: PillRepositoryProtocol) {
@@ -87,5 +92,18 @@ public final class DefaultPillUseCase: PillUseCase {
             self?.pillCandidates.send(page)
         }
         .store(in: &cancellables)
+    }
+
+    public func fetchPillDetail(pillCode: String) {
+        repository.fetchPillDetail(pillCode: pillCode)
+            .catch { [weak self] error in
+                // 404(세부정보 없음)는 상위 UI에서 '세부정보 없음' 상태로 분기 예정 (NM-309)
+                self?.errorMessage.send(error.localizedDescription)
+                return Empty<PillDetailModel, Never>()
+            }
+            .sink { [weak self] detail in
+                self?.pillDetail.send(detail)
+            }
+            .store(in: &cancellables)
     }
 }
