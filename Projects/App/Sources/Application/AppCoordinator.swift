@@ -38,5 +38,8 @@ final class AppCoordinator: BaseCoordinator {
         nc.addObserver(forName: .selectPillTab, object: nil, queue: .main) { [weak self] _ in
             self?.tabBarCoordinator?.switchToPillTab()
         }
+        nc.addObserver(forName: .selectHomeTab, object: nil, queue: .main) { [weak self] _ in
+            self?.tabBarCoordinator?.switchToHomeTab()
+        }
     }
 }

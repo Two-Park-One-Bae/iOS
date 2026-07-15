@@ -47,6 +47,11 @@ public final class TabBarCoordinator: CoordinatorProtocol {
 
     // MARK: - Public
 
+    /// 홈 탭으로 전환 (예: 촬영 취소 후 복귀)
+    public func switchToHomeTab() {
+        tabBarVC?.selectedIndex = 0
+    }
+
     /// 알람 탭 랜딩 = C1 (spec) — 타이머 탭으로 전환
     public func switchToTimerTab() {
         tabBarVC?.selectedIndex = 2
@@ -55,6 +60,8 @@ public final class TabBarCoordinator: CoordinatorProtocol {
     /// 약물 식별 — 알약 탭으로 전환
     public func switchToPillTab() {
         tabBarVC?.selectedIndex = 1
+        // 프로그래밍 방식 전환은 tabBarController(didSelect:)를 트리거하지 않으므로 직접 알림.
+        NotificationCenter.default.post(name: .pillTabSelected, object: nil)
     }
 
     // MARK: - Private
