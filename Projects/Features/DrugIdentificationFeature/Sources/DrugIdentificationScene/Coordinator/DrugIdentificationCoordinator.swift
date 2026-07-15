@@ -11,9 +11,34 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
         return picker
     }()
 
+    private var pillTabObserver: NSObjectProtocol?
+
     public override func start() {
         setupOverlay()
         setupCameraPickerCallbacks()
+
+        // 알약 탭의 루트 — 카메라는 이 위에 모달로 뜬다. 탭바가 런치 시 모든 탭을 미리 빌드해도
+        // 여기선 카메라를 띄우지 않아, 앱 시작하자마자 촬영 화면이 뜨는 문제를 막는다.
+        let root = UIViewController()
+        root.view.backgroundColor = .systemBackground
+        navigationController.setViewControllers([root], animated: false)
+
+        // 알약 탭이 실제로 선택될 때만 카메라를 present (사용자 탭 + 프로그래밍 전환 모두).
+        pillTabObserver = NotificationCenter.default.addObserver(
+            forName: .pillTabSelected, object: nil, queue: .main
+        ) { [weak self] _ in
+            self?.presentCameraIfAppropriate()
+        }
+    }
+
+    deinit {
+        if let pillTabObserver { NotificationCenter.default.removeObserver(pillTabObserver) }
+    }
+
+    /// 알약 탭 루트에서(식별 결과 등이 push되지 않았고 모달도 없을 때) 카메라를 present.
+    private func presentCameraIfAppropriate() {
+        guard navigationController.presentedViewController == nil,
+              navigationController.viewControllers.count <= 1 else { return }
         cameraPicker.present(from: navigationController, source: .camera)
     }
 
@@ -45,6 +70,11 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
         }
         cameraPicker.onPermissionDenied = { [weak self] _ in
             self?.showPermissionDenied()
+        }
+        cameraPicker.onCancelled = { [weak self] in
+            // 촬영 취소 → 알약 탭 루트는 빈 화면이므로 홈 탭으로 복귀.
+            self?.navigationController.popToRootViewController(animated: false)
+            NotificationCenter.default.post(name: .selectHomeTab, object: nil)
         }
     }
 

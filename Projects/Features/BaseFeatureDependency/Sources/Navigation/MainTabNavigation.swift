@@ -6,4 +6,8 @@ public extension Notification.Name {
     static let selectPillTab = Notification.Name("app.selectPillTab")
     /// 처치 타이머 → 타이머 탭으로 이동
     static let selectTimerTab = Notification.Name("app.selectTimerTab")
+    /// 홈 탭으로 이동 (예: 촬영 취소 후 복귀)
+    static let selectHomeTab = Notification.Name("app.selectHomeTab")
+    /// 알약 탭이 실제로 선택됨 → 약물 식별 카메라 present 트리거
+    static let pillTabSelected = Notification.Name("app.pillTabSelected")
 }
