@@ -95,7 +95,11 @@ public final class CameraPicker: NSObject {
     }
 
     private func showCamera() {
-        guard UIImagePickerController.isSourceTypeAvailable(.camera) else { return }
+        // 카메라 미지원(시뮬레이터 등)이면 갤러리로 폴백 — 개발/데모에서 흐름 테스트 가능.
+        guard UIImagePickerController.isSourceTypeAvailable(.camera) else {
+            showPhotoLibrary()
+            return
+        }
         let picker = UIImagePickerController()
         picker.sourceType = .camera
         picker.delegate = self

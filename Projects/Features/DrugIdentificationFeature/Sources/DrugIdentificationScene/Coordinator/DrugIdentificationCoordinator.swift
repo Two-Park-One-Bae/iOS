@@ -159,6 +159,21 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
         }
         // 완료 → 홈 이동. 메인 앱 연동 시 Coordinator 종료/디스미스 처리
         vc.onComplete = { /* TODO: 홈 화면으로 이동 */ }
+        // ⑨ 카드 탭 → ⑩ 세부정보 진입 (NM-317)
+        vc.onSelectDetail = { [weak self] pillCode, thumbnail in
+            self?.showPillDetail(pillCode: pillCode, thumbnail: thumbnail)
+        }
+        navigationController.pushViewController(vc, animated: true)
+    }
+
+    // MARK: - ⑩ 세부정보
+
+    private func showPillDetail(pillCode: String, thumbnail: UIImage?) {
+        let viewModel = PillDetailViewModel(pillCode: pillCode)
+        let vc = PillDetailVC(viewModel: viewModel, headerImage: thumbnail)
+        vc.onBackTapped = { [weak self] in
+            self?.navigationController.popViewController(animated: true)
+        }
         navigationController.pushViewController(vc, animated: true)
     }
 
@@ -184,6 +199,10 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
             )
             self?.navigationController.popViewController(animated: true)
         }
+        // ⑧ 후보 ⓘ → ⑩ 세부정보 진입 (NM-317)
+        vc.onSelectDetail = { [weak self] pillCode in
+            self?.showPillDetail(pillCode: pillCode, thumbnail: pill.thumbnail)
+        }
         navigationController.pushViewController(vc, animated: true)
     }
 
@@ -204,6 +223,9 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
         vc.onConfirm = { [weak self] candidate in
             self?.resultVC?.addManualPill(index: index, candidate: candidate)
             self?.navigationController.popViewController(animated: true)
+        }
+        vc.onSelectDetail = { [weak self] pillCode in
+            self?.showPillDetail(pillCode: pillCode, thumbnail: nil)
         }
         navigationController.pushViewController(vc, animated: true)
     }
