@@ -82,9 +82,6 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
 
     private func showPreview(image: UIImage) {
         let vc = PhotoPreviewVC(image: image)
-        vc.onBackTapped = { [weak self] in
-            self?.navigationController.popViewController(animated: true)
-        }
         vc.onRetake = { [weak self] in
             guard let self else { return }
             self.navigationController.popViewController(animated: false)
