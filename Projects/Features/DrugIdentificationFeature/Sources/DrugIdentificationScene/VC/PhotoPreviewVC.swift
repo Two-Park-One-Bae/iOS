@@ -9,7 +9,6 @@ final class PhotoPreviewVC: UIViewController {
 
     var onRetake: (() -> Void)?
     var onUsePhoto: (() -> Void)?
-    var onBackTapped: (() -> Void)?
 
     // MARK: - Properties
 
@@ -17,7 +16,8 @@ final class PhotoPreviewVC: UIViewController {
 
     // MARK: - UI
 
-    private let navBar = DSNavBar(title: "미리보기").then {
+    // 미리보기는 하단 재촬영/이 사진 사용으로 이동하므로 뒤로 버튼 없는 타이틀바 사용.
+    private let navBar = DSTitleBar(title: "미리보기").then {
         $0.translatesAutoresizingMaskIntoConstraints = false
     }
 
@@ -53,7 +53,6 @@ final class PhotoPreviewVC: UIViewController {
     private func setUI() {
         view.backgroundColor = DSColor.bgApp
         photoImageView.image = capturedImage
-        navBar.onBackTapped = { [weak self] in self?.onBackTapped?() }
     }
 
     private func setLayout() {
