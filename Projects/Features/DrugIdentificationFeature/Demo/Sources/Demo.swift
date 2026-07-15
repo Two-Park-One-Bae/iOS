@@ -65,5 +65,8 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         window?.rootViewController = rootController
         window?.makeKeyAndVisible()
         coordinator.start()
+        // 메인 앱에선 탭바가 알약 탭 선택 시 .pillTabSelected 를 쏴 카메라를 띄운다.
+        // 데모는 탭바가 없으므로 직접 발행해 촬영 흐름을 시작한다.
+        NotificationCenter.default.post(name: .pillTabSelected, object: nil)
     }
 }
