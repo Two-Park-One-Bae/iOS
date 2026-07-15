@@ -125,6 +125,110 @@ extension PillCandidatePageEntity {
     }
 }
 
+// MARK: - Pill Detail (NM-312)
+
+extension PillDetailEntity {
+    public func toDomain() -> PillDetailModel {
+        PillDetailModel(
+            pillCode:       pillCode,
+            name:           name,
+            companyName:    companyName,
+            classification: classification.toDomain(),
+            appearance:     appearance,
+            ingredients:    ingredients.map { $0.toDomain() },
+            storageMethod:  storageMethod,
+            validTerm:      validTerm,
+            packUnit:       packUnit,
+            documents:      documents.map { $0.toDomain() }
+        )
+    }
+}
+
+extension IngredientEntity {
+    public func toDomain() -> IngredientModel {
+        IngredientModel(name: name, amount: amount, unit: unit)
+    }
+}
+
+extension LicenseDocEntity {
+    public func toDomain() -> LicenseDocModel {
+        // 모르는 블록 타입(.unknown)은 제외 — 호환성 규칙(domains/pill-detail.md)
+        LicenseDocModel(type: type.toDomain(), blocks: blocks.compactMap { $0.toDomain() })
+    }
+}
+
+extension BlockEntity {
+    public func toDomain() -> BlockModel? {
+        switch self {
+        case .heading(let content):
+            return .heading(content: content.map { $0.toDomain() })
+        case .paragraph(let content):
+            return .paragraph(content: content.map { $0.toDomain() })
+        case .table(let caption, let rows):
+            return .table(caption: caption?.map { $0.toDomain() }, rows: rows.map { $0.toDomain() })
+        case .image(let src):
+            return .image(src: src)
+        case .unknown:
+            return nil
+        }
+    }
+}
+
+extension TableRowEntity {
+    public func toDomain() -> TableRowModel {
+        TableRowModel(cells: cells.map { $0.toDomain() })
+    }
+}
+
+extension TableCellEntity {
+    public func toDomain() -> TableCellModel {
+        TableCellModel(
+            content: content.map { $0.toDomain() },
+            colspan: colspan,
+            rowspan: rowspan,
+            header:  header
+        )
+    }
+}
+
+extension SpanEntity {
+    public func toDomain() -> SpanModel {
+        SpanModel(text: text, style: style?.toDomain())
+    }
+}
+
+extension PillClassification {
+    public func toDomain() -> PillClassificationModel {
+        switch self {
+        case .etc:     return .etc
+        case .otc:     return .otc
+        case .unknown: return .unknown
+        }
+    }
+}
+
+extension LicenseDocType {
+    public func toDomain() -> LicenseDocTypeModel {
+        switch self {
+        case .effect:  return .effect
+        case .dosage:  return .dosage
+        case .caution: return .caution
+        case .unknown: return .unknown
+        }
+    }
+}
+
+extension SpanStyle {
+    // 모르는 style은 일반 텍스트로 렌더 → nil
+    public func toDomain() -> SpanStyleModel? {
+        switch self {
+        case .sup:     return .sup
+        case .sub:     return .sub
+        case .unknown: return nil
+        }
+    }
+}
+
 // MARK: - Domain → Network (Request 변환용)
 
 extension PillColorModel {

@@ -67,4 +67,10 @@ public final class PillRepository: PillRepositoryProtocol {
             .map { $0.toDomain() }
             .eraseToAnyPublisher()
     }
+
+    public func fetchPillDetail(pillCode: String) -> AnyPublisher<PillDetailModel, Error> {
+        service.fetchPillDetail(pillCode: pillCode)
+            .map { $0.toDomain() }
+            .eraseToAnyPublisher()
+    }
 }
