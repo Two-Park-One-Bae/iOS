@@ -54,8 +54,12 @@ public final class TimerRingingAlarmPresenter {
             return
         }
 
-        // 사운드: ringing이 있으면 항상 재생 보증 (fg/bg 무관, 이미 재생 중이면 no-op)
-        AlarmSoundPlayer.shared.start()
+        // 울림 방식: 소리 모드일 때만 비프 재생. 진동·무음은 소리 없음.
+        if RingModeStore.shared.current == .sound {
+            AlarmSoundPlayer.shared.start()
+        } else {
+            AlarmSoundPlayer.shared.stop()
+        }
 
         // 같은 타이머 유지 — 포그라운드인데 UI가 없으면 보충 (백그라운드 사운드만 상태에서 복귀 등)
         if presentedID == target.id {

@@ -86,7 +86,8 @@ public final class TabBarCoordinator: CoordinatorProtocol {
         addChild(timerCoordinator)
         timerNav.tabBarItem = UITabBarItem(title: "타이머", image: UIImage(systemName: "timer"), tag: 2)
 
-        let settingsNav = UINavigationController()
+        let settingsNav = UINavigationController(rootViewController: timerBuilder.makeSettingsViewController())
+        settingsNav.setNavigationBarHidden(true, animated: false)
         settingsNav.tabBarItem = UITabBarItem(title: "설정", image: DSIcon.settings.uiImage, tag: 3)
 
         return [homeNav, pillNav, timerNav, settingsNav]

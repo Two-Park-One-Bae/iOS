@@ -76,6 +76,19 @@ public final class TimerCoordinator: BaseCoordinator {
         presentAsSheet(vc, height: 325)
     }
 
+    // MARK: - 첫 시작 — 울림 방식 선택 (YbkNe)
+
+    // 첫 타이머 시작이면 울림 방식 시트를 먼저 띄우고, 확인 시 시작. 이후부턴 바로 시작.
+    private func startPreset(_ preset: TimerPresetModel) {
+        guard !RingModeStore.shared.hasChosen else {
+            viewModel?.start(preset: preset)
+            return
+        }
+        let ringSheet = RingModeSheetViewController()
+        ringSheet.onConfirm = { [weak self] _ in self?.viewModel?.start(preset: preset) }
+        navigationController.present(ringSheet, animated: true)
+    }
+
     // MARK: - C3 프리셋 시트
 
     private func showPresetSheet() {
@@ -84,8 +97,7 @@ public final class TimerCoordinator: BaseCoordinator {
         sheet.updatePresets(viewModel?.currentPresets ?? [])
 
         sheet.onSelectPreset = { [weak self, weak sheet] preset in
-            self?.viewModel?.start(preset: preset) // 원탭 즉시 시작
-            sheet?.dismiss(animated: true)
+            sheet?.dismiss(animated: true) { self?.startPreset(preset) }
         }
         sheet.onAddPreset = { [weak self, weak sheet] in
             guard let sheet else { return }
