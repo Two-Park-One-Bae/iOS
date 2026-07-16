@@ -2,6 +2,7 @@ import Foundation
 import Combine
 import AlarmKit
 import SwiftUI
+import Core
 import Domain
 import TimerShared
 
@@ -58,12 +59,16 @@ public final class AlarmKitAlarmScheduler: TimerAlarmScheduling {
             metadata: CareTimerAlarmMetadata(label: label, categoryName: categoryName, duration: remaining),
             tintColor: tint
         )
+        // 울림 방식: 소리=기본 알람음+진동 / 진동·무음=무음 사운드 파일(소리 없음, 시스템 진동은 유지).
+        // (AlarmKit 알람은 발화 시 항상 진동하므로 무음도 진동은 남음 — AlarmVibeDemo 검증)
+        let useSound = RingModeStore.shared.current == .sound
+
         let configuration = AlarmManager.AlarmConfiguration(
             countdownDuration: Alarm.CountdownDuration(preAlert: TimeInterval(remaining), postAlert: nil),
             schedule: nil,
             attributes: attributes,
             stopIntent: TimerStopIntent(id: id.uuidString),
-            sound: .default
+            sound: useSound ? .default : .named("silence.caf")
         )
 
         Task { try? await AlarmManager.shared.schedule(id: id, configuration: configuration) }

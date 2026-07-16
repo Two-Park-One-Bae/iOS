@@ -9,4 +9,8 @@ public final class TimerBuilder: TimerFeatureBuildable {
     public func makeTimerCoordinator(navigationController: UINavigationController) -> CoordinatorProtocol {
         TimerCoordinator(navigationController: navigationController)
     }
+
+    public func makeSettingsViewController() -> UIViewController {
+        SettingsViewController()
+    }
 }
