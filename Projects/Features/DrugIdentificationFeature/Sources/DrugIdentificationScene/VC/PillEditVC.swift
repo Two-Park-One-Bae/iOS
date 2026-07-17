@@ -70,6 +70,7 @@ final class PillEditVC: UIViewController {
         $0.textAlignment = .center
     }
     private let emptyView = PillEditVC.makeEmptyView()
+    private let loadingView = PillEditVC.makeLoadingView()
 
     private let footer = UIView().then {
         $0.backgroundColor = DSColor.bgApp
@@ -112,13 +113,15 @@ final class PillEditVC: UIViewController {
         formulationPanel.setSelected(viewModel.formulation)
         transparencyRow.setOn(viewModel.isTransparent)
         imprintSummary.update(front: viewModel.front, back: viewModel.back)
-        [colorPanel, colorDivider, transparencyRow, shapePanel, formulationPanel, imprintPanel, emptyView].forEach { $0.isHidden = true }
+        [colorPanel, colorDivider, transparencyRow, shapePanel, formulationPanel, imprintPanel, emptyView, loadingView].forEach { $0.isHidden = true }
         footer.isHidden = true
     }
 
     private func setLayout() {
         view.addSubview(navBar)
         view.addSubview(scrollView)
+        view.addSubview(emptyView)     // 스크롤 콘텐츠 밖 오버레이 — 스크롤 레이아웃 루프 회피
+        view.addSubview(loadingView)   // 검색 중 스피너 (동일하게 오버레이)
         view.addSubview(footer)
         scrollView.addSubview(contentStack)
 
@@ -136,10 +139,23 @@ final class PillEditVC: UIViewController {
         }
 
         contentStack.addArrangedSubview(makeAttributeCard())
-        contentStack.addArrangedSubview(makeCandidateHeader())
+        let candidateHeader = makeCandidateHeader()
+        contentStack.addArrangedSubview(candidateHeader)
         contentStack.addArrangedSubview(candidatesStack)
         contentStack.addArrangedSubview(selectHint)
-        contentStack.addArrangedSubview(emptyView)
+
+        // emptyView 는 스크롤 콘텐츠가 아니라, 목록이 뜰 자리(후보 헤더 바로 아래)에 겹쳐 띄운다.
+        // 스크롤 콘텐츠에서 분리돼야 무한 레이아웃 루프가 안 난다(검증됨). 너비는 24 인셋으로 고정.
+        emptyView.snp.makeConstraints {
+            $0.top.equalTo(candidateHeader.snp.bottom).offset(24)
+            $0.leading.equalTo(scrollView.frameLayoutGuide).offset(24)
+            $0.trailing.equalTo(scrollView.frameLayoutGuide).offset(-24)
+        }
+        loadingView.snp.makeConstraints {
+            $0.top.equalTo(candidateHeader.snp.bottom).offset(24)
+            $0.leading.equalTo(scrollView.frameLayoutGuide).offset(24)
+            $0.trailing.equalTo(scrollView.frameLayoutGuide).offset(-24)
+        }
 
         setupFooter()
     }
@@ -265,7 +281,9 @@ final class PillEditVC: UIViewController {
         colorPanel.onSelect = { [weak self] color in
             self?.viewModel.updateColors([color]); self?.refreshChips()
         }
-        transparencyRow.onToggle = { [weak self] on in self?.viewModel.setTransparent(on) }
+        transparencyRow.onToggle = { [weak self] on in
+            self?.viewModel.setTransparent(on)
+        }
         shapePanel.onSelect = { [weak self] shape in
             self?.viewModel.updateShape(shape); self?.refreshChips()
         }
@@ -310,24 +328,39 @@ final class PillEditVC: UIViewController {
         let output = viewModel.transform(
             input: PillEditViewModel.Input(viewDidLoad: viewDidLoadSubject.eraseToAnyPublisher())
         )
+        // 빈 상태(emptyView/candidatesStack) 토글은 renderCandidates 한 곳에서만 처리한다.
+        // (candidates·isEmpty 두 sink 가 같은 전환에 스택뷰 isHidden 을 각각 건드리면
+        //  스크롤뷰 레이아웃이 중복 무효화돼 Severe Hang 을 유발했음)
         output.candidates
             .receive(on: DispatchQueue.main)
             .sink { [weak self] candidates in self?.renderCandidates(candidates) }
             .store(in: &cancelBag)
-        output.isEmpty
+
+        // 검색 중: 스피너 표시 + 목록/빈 상태는 잠시 숨김. 응답이 오면 isSearching=false 가
+        // 먼저 발화(스피너 숨김)되고 이어서 candidates 가 renderCandidates 로 목록/빈 상태를 그린다.
+        output.isSearching
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] isEmpty in
-                self?.emptyView.isHidden = !isEmpty
-                self?.candidatesStack.isHidden = isEmpty
+            .sink { [weak self] searching in
+                guard let self else { return }
+                self.setHidden(self.loadingView, !searching)
+                if searching {
+                    self.setHidden(self.candidatesStack, true)
+                    self.setHidden(self.emptyView, true)
+                    self.setHidden(self.selectHint, true)
+                }
             }
             .store(in: &cancelBag)
+    }
+
+    /// isHidden 을 실제 값이 바뀔 때만 설정 — UIStackView 의 hidden 재처리/레이아웃 진동 방지.
+    private func setHidden(_ view: UIView, _ hidden: Bool) {
+        if view.isHidden != hidden { view.isHidden = hidden }
     }
 
     private func renderCandidates(_ candidates: [PillCandidateModel]) {
         candidateRows.forEach { $0.removeFromSuperview() }
         candidateRows.removeAll()
         selectedCandidate = nil
-        updateFooterVisibility()
 
         for candidate in candidates {
             let row = CandidateRowView(candidate: candidate)
@@ -336,7 +369,12 @@ final class PillEditVC: UIViewController {
             candidatesStack.addArrangedSubview(row)
             candidateRows.append(row)
         }
-        selectHint.isHidden = candidates.isEmpty
+
+        let isEmpty = candidates.isEmpty
+        setHidden(candidatesStack, isEmpty)
+        setHidden(emptyView, !isEmpty)
+        setHidden(selectHint, isEmpty)
+        updateFooterVisibility()
     }
 
     private func selectCandidate(_ row: CandidateRowView) {
@@ -347,9 +385,10 @@ final class PillEditVC: UIViewController {
 
     private func updateFooterVisibility() {
         let hasSelection = selectedCandidate != nil
-        footer.isHidden = !hasSelection
-        selectHint.isHidden = hasSelection || candidateRows.isEmpty
-        scrollView.contentInset.bottom = hasSelection ? footer.frame.height : 0
+        setHidden(footer, !hasSelection)
+        setHidden(selectHint, hasSelection || candidateRows.isEmpty)
+        let inset = hasSelection ? footer.frame.height : 0
+        if scrollView.contentInset.bottom != inset { scrollView.contentInset.bottom = inset }
     }
 
     // MARK: - Chip Refresh
@@ -402,6 +441,31 @@ final class PillEditVC: UIViewController {
         }
     }
 
+    private static func makeLoadingView() -> UIView {
+        let container = UIView()
+        let spinner = UIActivityIndicatorView(style: .medium)
+        spinner.color = DSColor.textTertiary
+        spinner.startAnimating()
+        let label = UILabel().then {
+            $0.text = "후보를 찾고 있어요"
+            $0.font = DSKitFontFamily.Pretendard.regular.font(size: 13)
+            $0.textColor = DSColor.textTertiary
+            $0.textAlignment = .center
+        }
+        container.addSubview(spinner)
+        container.addSubview(label)
+        spinner.snp.makeConstraints {
+            $0.top.equalToSuperview().offset(32)
+            $0.centerX.equalToSuperview()
+        }
+        label.snp.makeConstraints {
+            $0.top.equalTo(spinner.snp.bottom).offset(10)
+            $0.leading.trailing.equalToSuperview()
+            $0.bottom.equalToSuperview().inset(8)
+        }
+        return container
+    }
+
     private static func makeEmptyView() -> UIView {
         let container = UIView()
         let circle = UIView().then {
@@ -430,16 +494,23 @@ final class PillEditVC: UIViewController {
             $0.textAlignment = .center
             $0.numberOfLines = 0
         }
-        let texts = UIStackView(arrangedSubviews: [title, desc]).then {
-            $0.axis = .vertical; $0.spacing = 6; $0.alignment = .center
+        // emptyView 는 오버레이(스크롤 밖)라 내용 크기대로 top 기준 배치.
+        // 너비는 상위(setLayout)에서 24 인셋으로 고정되므로 멀티라인 라벨 높이도 안정적.
+        container.addSubview(circle)
+        container.addSubview(title)
+        container.addSubview(desc)
+        circle.snp.makeConstraints {
+            $0.top.equalToSuperview().offset(8)
+            $0.centerX.equalToSuperview()
         }
-        let stack = UIStackView(arrangedSubviews: [circle, texts]).then {
-            $0.axis = .vertical; $0.spacing = 14; $0.alignment = .center
-        }
-        container.addSubview(stack)
-        stack.snp.makeConstraints {
-            $0.top.bottom.equalToSuperview().inset(40)
+        title.snp.makeConstraints {
+            $0.top.equalTo(circle.snp.bottom).offset(14)
             $0.leading.trailing.equalToSuperview()
+        }
+        desc.snp.makeConstraints {
+            $0.top.equalTo(title.snp.bottom).offset(6)
+            $0.leading.trailing.equalToSuperview()
+            $0.bottom.equalToSuperview()
         }
         return container
     }

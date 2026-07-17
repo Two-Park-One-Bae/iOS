@@ -39,6 +39,9 @@ public protocol PillUseCase {
 public final class DefaultPillUseCase: PillUseCase {
     private let repository: PillRepositoryProtocol
     private var cancellables = Set<AnyCancellable>()
+    // 후보 조회는 실시간 재호출되므로 전용 cancellable 로 관리 —
+    // 새 호출 시 이전 in-flight 요청을 취소해 동시 요청 누적/응답 뒤섞임을 막는다.
+    private var candidatesCancellable: AnyCancellable?
 
     public let pillAttributes = PassthroughSubject<[PillAttributeModel], Never>()
     public let pillCandidates = PassthroughSubject<PillCandidatePageModel, Never>()
@@ -74,7 +77,8 @@ public final class DefaultPillUseCase: PillUseCase {
         cursor: String?,
         size: Int
     ) {
-        repository.fetchPillCandidates(
+        // 이전 요청을 취소하고 최신 요청만 유지(switch-to-latest 효과).
+        candidatesCancellable = repository.fetchPillCandidates(
             colors: colors,
             isTransparent: isTransparent,
             shape: shape,
@@ -91,7 +95,6 @@ public final class DefaultPillUseCase: PillUseCase {
         .sink { [weak self] page in
             self?.pillCandidates.send(page)
         }
-        .store(in: &cancellables)
     }
 
     public func fetchPillDetail(pillCode: String) {
