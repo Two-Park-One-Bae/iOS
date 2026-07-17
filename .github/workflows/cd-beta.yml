@@ -17,6 +17,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          lfs: true   # CoreML 모델 가중치(weight.bin)가 LFS 추적 → 안 받으면 포인터가 번들돼 로드 실패
 
       - name: Set up Xcode
         uses: maxim-lobanov/setup-xcode@v1
@@ -52,14 +54,6 @@ jobs:
           DEVELOPMENT_TEAM = ${DEVELOPMENT_TEAM}
           EOF
 
-      - name: Debug Secrets (safe — 값 노출 없이 길이만)
-        env:
-          BASE_URL: ${{ secrets.BASE_URL }}
-        run: |
-          echo "secret BASE_URL 길이(env): ${#BASE_URL}"
-          echo "=== Secrets.xcconfig 각 줄 값 길이(값 미노출) ==="
-          awk -F' = ' '{ v=$2; gsub(/^ +| +$/,"",v); print $1 " -> len=" length(v) }' XCConfig/Secrets.xcconfig
-
       - name: Write GoogleService-Info.plist
         env:
           GOOGLE_SERVICE_INFO_PLIST: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST }}
@@ -92,12 +86,6 @@ jobs:
 
       - name: Tuist generate
         run: tuist generate --no-open
-
-      - name: Debug resolved BASE_URL (safe — 길이만)
-        run: |
-          LEN=$(xcodebuild -workspace Application.xcworkspace -scheme App -configuration Release -showBuildSettings 2>/dev/null \
-            | awk -F'= ' '/ BASE_URL =/{ gsub(/ /,"",$2); print length($2); exit }')
-          echo "Release 구성 최종 해석 BASE_URL 길이: ${LEN:-0}"
 
       - name: Deploy to TestFlight (Internal)
         env:
