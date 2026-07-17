@@ -11,6 +11,9 @@ final class AnalysisFailedVC: UIViewController {
     var onBack: (() -> Void)?
     var onBackTapped: (() -> Void)?
 
+    /// [임시 진단] 실제 실패 원인(에러 설명)을 화면에 노출 — 원인 확인 후 제거
+    var detailMessage: String?
+
     // MARK: - UI
 
     private let navBar = DSNavBar(title: "").then {
@@ -63,6 +66,10 @@ final class AnalysisFailedVC: UIViewController {
         setUI()
         setLayout()
         setActions()
+        // [임시 진단] TestFlight 등 로그를 못 보는 빌드에서 실제 원인을 화면에 표시
+        if let detailMessage, !detailMessage.isEmpty {
+            descLabel.text = "네트워크 연결을 확인하고 다시 시도해 주세요\n\n[원인] \(detailMessage)"
+        }
     }
 
     // MARK: - Setup

@@ -109,7 +109,7 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
             self?.showNotFound(image: image, replacing: loadingVC)
         }
         loadingVC.onFailure = { [weak self] message in
-            self?.showFailure(replacing: loadingVC)
+            self?.showFailure(replacing: loadingVC, message: message)
         }
 
         navigationController.pushViewController(loadingVC, animated: true)
@@ -251,8 +251,9 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
 
     // MARK: - ⑦ 분석 실패
 
-    private func showFailure(replacing loadingVC: UIViewController) {
+    private func showFailure(replacing loadingVC: UIViewController, message: String) {
         let vc = AnalysisFailedVC()
+        vc.detailMessage = message   // [임시 진단] 실제 원인 화면 노출
         vc.onBackTapped = { [weak self] in
             self?.navigationController.popViewController(animated: true)
         }
