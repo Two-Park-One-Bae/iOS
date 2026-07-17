@@ -16,6 +16,7 @@ let project = Project.makeModule(
         Dep.Features.Base.Base,
         .SPM.SnapKit,
         .SPM.Then,
+        .SPM.Kingfisher,
     ],
     interfaceDependencies: [
         Dep.Features.Base.Base,

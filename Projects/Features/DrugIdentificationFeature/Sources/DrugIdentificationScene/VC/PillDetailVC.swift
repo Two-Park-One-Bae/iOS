@@ -4,6 +4,7 @@ import SnapKit
 import Then
 import DSKit
 import Domain
+import Kingfisher
 
 // ⑩ 세부정보 — pillCode로 성분·성상·허가문서(효능효과/용법용량/주의사항)를 조회해 렌더.
 final class PillDetailVC: UIViewController {
@@ -15,7 +16,7 @@ final class PillDetailVC: UIViewController {
     // MARK: - Dependencies
 
     private let viewModel: PillDetailViewModel
-    private let headerImage: UIImage?
+    private let imageUrl: String?   // 서버 낱알 이미지 URL (헤더에 표시)
 
     private let viewDidLoadSubject = PassthroughSubject<Void, Never>()
     private let retrySubject = PassthroughSubject<Void, Never>()
@@ -35,9 +36,9 @@ final class PillDetailVC: UIViewController {
 
     // MARK: - Init
 
-    init(viewModel: PillDetailViewModel, headerImage: UIImage?) {
+    init(viewModel: PillDetailViewModel, imageUrl: String?) {
         self.viewModel = viewModel
-        self.headerImage = headerImage
+        self.imageUrl = imageUrl
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -229,12 +230,14 @@ final class PillDetailVC: UIViewController {
         container.addArrangedSubview(name)
         container.addArrangedSubview(company)
 
-        if let headerImage {
-            let imageView = UIImageView(image: headerImage)
+        if let imageUrl, let url = URL(string: imageUrl) {
+            let imageView = UIImageView()
             imageView.contentMode = .scaleAspectFit
             imageView.backgroundColor = DSColor.Neutral._100
             imageView.layer.cornerRadius = 12
             imageView.clipsToBounds = true
+            // 상세는 초점 이미지라 다운샘플 없이 원본급으로 선명하게(단일 이미지·메모리 부담 적음).
+            imageView.kf.setImage(with: url, options: [.transition(.fade(0.25))])
             container.setCustomSpacing(12, after: company)
             container.addArrangedSubview(imageView)
             imageView.snp.makeConstraints { $0.height.equalTo(150) }
