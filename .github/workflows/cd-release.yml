@@ -47,9 +47,13 @@ jobs:
           DEVELOPMENT_TEAM: ${{ secrets.DEVELOPMENT_TEAM }}
         run: |
           mkdir -p XCConfig
+          # xcconfig 은 값 안의 "//" 를 주석 처리하므로 스킴의 "://" 에 $() 를 끼워 회피.
+          # (이미 회피형이면 "://" 가 없어 그대로 통과 — 멱등)
+          BASE_URL_ESC=$(printf '%s' "${BASE_URL}" | sed 's#://#:/$()/#')
           cat > XCConfig/Secrets.xcconfig << EOF
           AMPLITUDE_API_KEY = ${AMPLITUDE_API_KEY}
-          BASE_URL = ${BASE_URL}
+          BASE_URL_DEBUG = ${BASE_URL_ESC}
+          BASE_URL_RELEASE = ${BASE_URL_ESC}
           CLARITY_PROJECT_ID = ${CLARITY_PROJECT_ID}
           DEVELOPMENT_TEAM = ${DEVELOPMENT_TEAM}
           EOF
