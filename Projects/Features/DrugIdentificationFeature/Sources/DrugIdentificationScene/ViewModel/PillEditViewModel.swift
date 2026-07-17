@@ -15,6 +15,7 @@ final class PillEditViewModel {
     struct Output {
         let candidates: AnyPublisher<[PillCandidateModel], Never>
         let isEmpty: AnyPublisher<Bool, Never>
+        let isSearching: AnyPublisher<Bool, Never>
     }
 
     // MARK: - Dependencies
@@ -38,6 +39,9 @@ final class PillEditViewModel {
     // MARK: - Streams
 
     private let candidatesSubject = CurrentValueSubject<[PillCandidateModel], Never>([])
+    private let searchingSubject = PassthroughSubject<Bool, Never>()
+    // 속성 편집 → 재조회 트리거. 연타/빠른 변경 시 디바운스로 마지막 값만 검색(상용 검색앱 방식).
+    private let editTrigger = PassthroughSubject<Void, Never>()
     private var didLoad = false
     private var cancelBag = Set<AnyCancellable>()
 
@@ -60,6 +64,7 @@ final class PillEditViewModel {
         pillUseCase.pillCandidates
             .receive(on: DispatchQueue.main)
             .sink { [weak self] page in
+                self?.searchingSubject.send(false)
                 self?.candidatesSubject.send(page.candidates)
             }
             .store(in: &cancelBag)
@@ -72,13 +77,20 @@ final class PillEditViewModel {
             }
             .store(in: &cancelBag)
 
+        // 편집 트리거를 300ms 디바운스 → 손을 멈춘 뒤 한 번만 재조회.
+        editTrigger
+            .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
+            .sink { [weak self] in self?.fetchCandidates() }
+            .store(in: &cancelBag)
+
         let isEmpty = candidatesSubject
             .map { $0.isEmpty }
             .eraseToAnyPublisher()
 
         return Output(
             candidates: candidatesSubject.eraseToAnyPublisher(),
-            isEmpty: isEmpty
+            isEmpty: isEmpty,
+            isSearching: searchingSubject.eraseToAnyPublisher()
         )
     }
 
@@ -86,33 +98,34 @@ final class PillEditViewModel {
 
     func updateColors(_ colors: [PillColorModel]) {
         self.colors = colors
-        fetchCandidates()
+        editTrigger.send(())
     }
 
     func setTransparent(_ isTransparent: Bool) {
         self.isTransparent = isTransparent
-        fetchCandidates()
+        editTrigger.send(())
     }
 
     func updateShape(_ shape: PillShapeModel?) {
         self.shape = shape
-        fetchCandidates()
+        editTrigger.send(())
     }
 
     func updateFormulation(_ formulation: PillFormulationModel?) {
         self.formulation = formulation
-        fetchCandidates()
+        editTrigger.send(())
     }
 
     func updateImprint(front: PillFaceModel?, back: PillFaceModel?) {
         self.front = front
         self.back = back
-        fetchCandidates()
+        editTrigger.send(())
     }
 
     // MARK: - Fetch
 
     private func fetchCandidates() {
+        searchingSubject.send(true)
         pillUseCase.fetchPillCandidates(
             colors: colors.isEmpty ? nil : colors,
             isTransparent: isTransparent,
