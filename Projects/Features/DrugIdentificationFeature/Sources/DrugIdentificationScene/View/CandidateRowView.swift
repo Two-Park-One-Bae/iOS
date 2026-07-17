@@ -3,6 +3,7 @@ import SnapKit
 import Then
 import DSKit
 import Domain
+import Kingfisher
 
 // ⑧ 후보 리스트의 후보 1개 (라디오 + 앞/뒤 썸네일 + 이름 + 회사)
 final class CandidateRowView: UIView {
@@ -46,13 +47,19 @@ final class CandidateRowView: UIView {
         ring.snp.makeConstraints { $0.edges.equalToSuperview() }
         dot.snp.makeConstraints { $0.center.equalToSuperview(); $0.width.height.equalTo(10) }
 
-        // Thumbs
-        let front = makeThumb()
-        let back = makeThumb()
-        let thumbs = UIStackView(arrangedSubviews: [front, back]).then {
-            $0.axis = .horizontal
-            $0.spacing = 4
-            $0.alignment = .center
+        // Thumb — 서버 낱알 이미지(pillImageUrl)를 Kingfisher로 로드.
+        // 작은 셀이라 표시 크기(72×38)로 다운샘플 → 풀사이즈 디코드 낭비·메모리 절감.
+        let thumb = makeThumb()
+        if let urlString = candidate.pillImageUrl, let url = URL(string: urlString) {
+            thumb.kf.setImage(
+                with: url,
+                options: [
+                    .processor(DownsamplingImageProcessor(size: CGSize(width: 72, height: 38))),
+                    .scaleFactor(UIScreen.main.scale),
+                    .cacheOriginalImage,
+                    .transition(.fade(0.2)),
+                ]
+            )
         }
 
         // Texts
@@ -79,7 +86,7 @@ final class CandidateRowView: UIView {
         info.addAction(UIAction { [weak self] _ in self?.onInfoTap?() }, for: .touchUpInside)
         info.snp.makeConstraints { $0.width.height.equalTo(24) }
 
-        let row = UIStackView(arrangedSubviews: [radio, thumbs, texts, info]).then {
+        let row = UIStackView(arrangedSubviews: [radio, thumb, texts, info]).then {
             $0.axis = .horizontal
             $0.spacing = 12
             $0.alignment = .center
@@ -93,14 +100,14 @@ final class CandidateRowView: UIView {
         addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(tapped)))
     }
 
-    private func makeThumb() -> UIView {
+    private func makeThumb() -> UIImageView {
         let v = UIImageView().then {
             $0.backgroundColor = DSColor.Neutral._100
             $0.layer.cornerRadius = 8
             $0.clipsToBounds = true
-            $0.contentMode = .scaleAspectFit
+            $0.contentMode = .scaleAspectFill
         }
-        v.snp.makeConstraints { $0.width.height.equalTo(38) }
+        v.snp.makeConstraints { $0.width.equalTo(72); $0.height.equalTo(38) }
         return v
     }
 

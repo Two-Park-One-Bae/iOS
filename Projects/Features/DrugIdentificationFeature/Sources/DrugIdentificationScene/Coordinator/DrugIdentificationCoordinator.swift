@@ -160,17 +160,17 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
         // 완료 → 홈 이동. 메인 앱 연동 시 Coordinator 종료/디스미스 처리
         vc.onComplete = { /* TODO: 홈 화면으로 이동 */ }
         // ⑨ 카드 탭 → ⑩ 세부정보 진입 (NM-317)
-        vc.onSelectDetail = { [weak self] pillCode, thumbnail in
-            self?.showPillDetail(pillCode: pillCode, thumbnail: thumbnail)
+        vc.onSelectDetail = { [weak self] pillCode, imageUrl in
+            self?.showPillDetail(pillCode: pillCode, imageUrl: imageUrl)
         }
         navigationController.pushViewController(vc, animated: true)
     }
 
     // MARK: - ⑩ 세부정보
 
-    private func showPillDetail(pillCode: String, thumbnail: UIImage?) {
+    private func showPillDetail(pillCode: String, imageUrl: String?) {
         let viewModel = PillDetailViewModel(pillCode: pillCode)
-        let vc = PillDetailVC(viewModel: viewModel, headerImage: thumbnail)
+        let vc = PillDetailVC(viewModel: viewModel, imageUrl: imageUrl)
         vc.onBackTapped = { [weak self] in
             self?.navigationController.popViewController(animated: true)
         }
@@ -200,8 +200,8 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
             self?.navigationController.popViewController(animated: true)
         }
         // ⑧ 후보 ⓘ → ⑩ 세부정보 진입 (NM-317)
-        vc.onSelectDetail = { [weak self] pillCode in
-            self?.showPillDetail(pillCode: pillCode, thumbnail: pill.thumbnail)
+        vc.onSelectDetail = { [weak self] pillCode, imageUrl in
+            self?.showPillDetail(pillCode: pillCode, imageUrl: imageUrl)
         }
         navigationController.pushViewController(vc, animated: true)
     }
@@ -224,8 +224,8 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
             self?.resultVC?.addManualPill(index: index, candidate: candidate)
             self?.navigationController.popViewController(animated: true)
         }
-        vc.onSelectDetail = { [weak self] pillCode in
-            self?.showPillDetail(pillCode: pillCode, thumbnail: nil)
+        vc.onSelectDetail = { [weak self] pillCode, imageUrl in
+            self?.showPillDetail(pillCode: pillCode, imageUrl: imageUrl)
         }
         navigationController.pushViewController(vc, animated: true)
     }
