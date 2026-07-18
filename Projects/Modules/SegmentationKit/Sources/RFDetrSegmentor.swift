@@ -88,7 +88,10 @@ public final class RFDetrSegmentor: @unchecked Sendable {
         originalDataSize: Int = 0
     ) -> (crops: [CroppedDetection], time: TimeInterval, transferReport: TransferSizeReport) {
         let empty = TransferSizeReport(cropsCount: 0, cropsPNGBytes: 0, cropsJPEGBytes: 0, originalBytes: originalDataSize)
-        guard let cgImage = original.cgImage else { return ([], 0, empty) }
+        // 추론(makeInputArray)은 orientation을 세운 upright 이미지에서 box·mask를 계산한다.
+        // 크롭도 반드시 같은 정규화 이미지에서 잘라야 좌표가 일치한다. original.cgImage 를
+        // 그대로 쓰면 카메라 사진(.right 등)의 회전 안 된 raw 버퍼라 좌표가 어긋난다.
+        guard let cgImage = normalizedCGImage(from: original) else { return ([], 0, empty) }
         let started = CFAbsoluteTimeGetCurrent()
         let crops = detections.compactMap { cropWithMask(cgImage: cgImage, detection: $0) }
         let time = CFAbsoluteTimeGetCurrent() - started
