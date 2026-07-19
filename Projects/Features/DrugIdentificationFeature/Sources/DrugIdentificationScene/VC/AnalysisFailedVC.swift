@@ -23,8 +23,7 @@ final class AnalysisFailedVC: UIViewController {
     }
 
     private let iconView = UIImageView().then {
-        let config = UIImage.SymbolConfiguration(pointSize: 34, weight: .medium)
-        $0.image = UIImage(systemName: "wifi.slash", withConfiguration: config)
+        $0.image = DSIcon.wifiOff.uiImage
         $0.tintColor = DSColor.Error._500
         $0.contentMode = .scaleAspectFit
     }

@@ -202,7 +202,7 @@ final class FinalResultVC: UIViewController {
 
         // 세부정보 진입 안내 아이콘 (탭 → 세부정보)
         let info = UIImageView().then {
-            $0.image = UIImage(systemName: "info.circle")
+            $0.image = DSIcon.info.uiImage
             $0.tintColor = DSColor.Primary._500
             $0.contentMode = .scaleAspectFit
         }

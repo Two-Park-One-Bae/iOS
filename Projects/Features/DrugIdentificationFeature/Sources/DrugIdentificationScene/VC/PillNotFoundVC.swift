@@ -46,8 +46,7 @@ final class PillNotFoundVC: UIViewController {
     }
 
     private let iconView = UIImageView().then {
-        let config = UIImage.SymbolConfiguration(pointSize: 44, weight: .regular)
-        $0.image = UIImage(systemName: "questionmark.magnifyingglass", withConfiguration: config)
+        $0.image = DSIcon.searchX.uiImage
         $0.tintColor = DSColor.Neutral._0
         $0.contentMode = .scaleAspectFit
     }

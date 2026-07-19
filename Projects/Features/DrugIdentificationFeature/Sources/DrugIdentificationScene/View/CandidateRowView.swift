@@ -81,7 +81,7 @@ final class CandidateRowView: UIView {
 
         // 세부정보 진입 (라디오 선택과 별개 — 버튼이 터치를 소비해 행 탭과 분리)
         let info = UIButton(type: .system)
-        info.setImage(UIImage(systemName: "info.circle"), for: .normal)
+        info.setImage(DSIcon.info.uiImage, for: .normal)
         info.tintColor = DSColor.Primary._500
         info.addAction(UIAction { [weak self] _ in self?.onInfoTap?() }, for: .touchUpInside)
         info.snp.makeConstraints { $0.width.height.equalTo(24) }
