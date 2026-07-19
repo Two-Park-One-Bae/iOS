@@ -132,6 +132,16 @@ public enum DSIcon: String {
     case moon = "Icons/ic_moon"
     case app = "Icons/ic_app"
 
+    // MARK: - System & State
+
+    case signal = "Icons/ic_signal"
+    case battery = "Icons/ic_battery"
+    case wifiOff = "Icons/ic_wifi_off"
+    case cameraOff = "Icons/ic_camera_off"
+    case searchX = "Icons/ic_search_x"
+    case zap = "Icons/ic_zap"
+    case circle = "Icons/ic_circle"
+
     // MARK: - UIImage
 
     public var uiImage: UIImage {
