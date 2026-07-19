@@ -151,12 +151,7 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
         vc.onBackTapped = { [weak self] in
             self?.navigationController.popViewController(animated: true)
         }
-        // 스펙 NM-136: 공유는 텍스트 복사(MVP·화면 유지)
-        vc.onShare = {
-            let text = results.map { "\($0.pill.index). \($0.candidate.pillName ?? "이름 미상")" }
-                .joined(separator: "\n")
-            UIPasteboard.general.string = text
-        }
+        // 공유는 FinalResultVC 가 시스템 공유 시트(텍스트+PDF)를 직접 띄운다(PillShareComposer).
         // 완료 → 홈 이동. 메인 앱 연동 시 Coordinator 종료/디스미스 처리
         vc.onComplete = { /* TODO: 홈 화면으로 이동 */ }
         // ⑨ 카드 탭 → ⑩ 세부정보 진입 (NM-317)
