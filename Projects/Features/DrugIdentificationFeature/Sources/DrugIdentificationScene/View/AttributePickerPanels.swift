@@ -146,7 +146,8 @@ final class ShapeGlyphView: UIView {
 /// Grid of 16 color swatches (2 rows of 8) with a multi-select hint.
 final class ColorPickerPanel: UIView {
 
-    var onSelect: ((PillColorModel) -> Void)?
+    /// 다중 선택 — 탭할 때마다 토글되고, 현재 선택된 전체 색 배열을 전달한다.
+    var onSelectionChanged: (([PillColorModel]) -> Void)?
 
     /// Source-compat shim: transparency now lives in `TransparencyRowView`.
     /// Kept so existing callers still compile; the panel itself never fires it.
@@ -173,7 +174,8 @@ final class ColorPickerPanel: UIView {
     ]
 
     private var cells: [SwatchCell] = []
-    private var selected: PillColorModel?
+    /// 탭 순서를 유지하는 선택 목록 (칩 요약에서 첫 색을 대표로 쓴다).
+    private var selectedColors: [PillColorModel] = []
 
     init() {
         super.init(frame: .zero)
@@ -291,15 +293,24 @@ final class ColorPickerPanel: UIView {
     }
 
     private func handleTap(_ model: PillColorModel) {
-        setSelected(model)
-        onSelect?(model)
+        if let index = selectedColors.firstIndex(of: model) {
+            selectedColors.remove(at: index)
+        } else {
+            selectedColors.append(model)
+        }
+        applyHighlights()
+        onSelectionChanged?(selectedColors)
     }
 
-    /// Highlights the given color (idempotent, safe before/after layout).
-    func setSelected(_ color: PillColorModel?) {
-        selected = color
+    /// Highlights the given colors (idempotent, safe before/after layout).
+    func setSelected(_ colors: [PillColorModel]) {
+        selectedColors = colors
+        applyHighlights()
+    }
+
+    private func applyHighlights() {
         for cell in cells {
-            let on = cell.model == color
+            let on = selectedColors.contains(cell.model)
             cell.swatch.layer.borderColor = (on ? DSColor.Primary._500 : DSColor.Neutral._200).cgColor
             cell.swatch.layer.borderWidth = on ? 2.5 : 1
             cell.label.textColor = on ? DSColor.Primary._600 : DSColor.textTertiary

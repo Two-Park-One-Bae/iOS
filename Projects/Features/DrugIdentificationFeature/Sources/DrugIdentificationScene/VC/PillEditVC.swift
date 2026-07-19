@@ -108,7 +108,7 @@ final class PillEditVC: UIViewController {
         view.backgroundColor = DSColor.bgApp
         navBar.onBackTapped = { [weak self] in self?.onBackTapped?() }
         refreshChips()
-        colorPanel.setSelected(viewModel.colors.first)
+        colorPanel.setSelected(viewModel.colors)
         shapePanel.setSelected(viewModel.shape)
         formulationPanel.setSelected(viewModel.formulation)
         transparencyRow.setOn(viewModel.isTransparent)
@@ -278,8 +278,8 @@ final class PillEditVC: UIViewController {
         shapeChip.addAction(UIAction { [weak self] _ in self?.togglePanel(.shape) }, for: .touchUpInside)
         formulationChip.addAction(UIAction { [weak self] _ in self?.togglePanel(.formulation) }, for: .touchUpInside)
 
-        colorPanel.onSelect = { [weak self] color in
-            self?.viewModel.updateColors([color]); self?.refreshChips()
+        colorPanel.onSelectionChanged = { [weak self] colors in
+            self?.viewModel.updateColors(colors); self?.refreshChips()
         }
         transparencyRow.onToggle = { [weak self] on in
             self?.viewModel.setTransparent(on)
@@ -394,15 +394,26 @@ final class PillEditVC: UIViewController {
     // MARK: - Chip Refresh
 
     private func refreshChips() {
-        let color = viewModel.colors.first
+        let colors = viewModel.colors
         let dot = UIView().then {
-            $0.backgroundColor = color?.swatchColor ?? DSColor.Neutral._300
+            $0.backgroundColor = colors.first?.swatchColor ?? DSColor.Neutral._300
             $0.layer.cornerRadius = 7
             $0.layer.borderWidth = 1
             $0.layer.borderColor = DSColor.Neutral._200.cgColor
         }
         dot.snp.makeConstraints { $0.width.height.equalTo(14) }
-        colorChip.configure(leading: dot, value: viewModel.isTransparent ? "무색" : (color?.displayName ?? "선택"))
+        // 다중 선택: 1개면 색 이름, 여러 개면 "첫색 외 N".
+        let colorValue: String
+        if viewModel.isTransparent {
+            colorValue = "무색"
+        } else if colors.isEmpty {
+            colorValue = "선택"
+        } else if colors.count == 1 {
+            colorValue = colors[0].displayName
+        } else {
+            colorValue = "\(colors[0].displayName) 외 \(colors.count - 1)"
+        }
+        colorChip.configure(leading: dot, value: colorValue)
 
         if let shape = viewModel.shape {
             let glyph = ShapeGlyphView(shape: shape)
