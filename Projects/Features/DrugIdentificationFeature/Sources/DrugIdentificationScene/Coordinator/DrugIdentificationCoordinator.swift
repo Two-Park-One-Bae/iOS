@@ -157,8 +157,12 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
                 .joined(separator: "\n")
             UIPasteboard.general.string = text
         }
-        // 완료 → 홈 이동. 메인 앱 연동 시 Coordinator 종료/디스미스 처리
-        vc.onComplete = { /* TODO: 홈 화면으로 이동 */ }
+        // 완료 → 알약 탭 스택을 루트(빈 화면)로 정리하고 홈 탭으로 복귀.
+        // 촬영 취소 흐름과 동일. 다음에 알약 탭을 다시 선택하면 카메라가 새로 뜬다.
+        vc.onComplete = { [weak self] in
+            self?.navigationController.popToRootViewController(animated: false)
+            NotificationCenter.default.post(name: .selectHomeTab, object: nil)
+        }
         // ⑨ 카드 탭 → ⑩ 세부정보 진입 (NM-317)
         vc.onSelectDetail = { [weak self] pillCode, imageUrl in
             self?.showPillDetail(pillCode: pillCode, imageUrl: imageUrl)
