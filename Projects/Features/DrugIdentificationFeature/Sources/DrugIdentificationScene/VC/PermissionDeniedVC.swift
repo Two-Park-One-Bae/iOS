@@ -23,8 +23,7 @@ public final class PermissionDeniedVC: UIViewController {
     }
 
     private let iconView = UIImageView().then {
-        let config = UIImage.SymbolConfiguration(pointSize: 36, weight: .medium)
-        $0.image = UIImage(systemName: "camera.slash", withConfiguration: config)
+        $0.image = DSIcon.cameraOff.uiImage
         $0.tintColor = DSColor.Primary._500
         $0.contentMode = .scaleAspectFit
     }

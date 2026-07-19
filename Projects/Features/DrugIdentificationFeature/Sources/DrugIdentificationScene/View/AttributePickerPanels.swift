@@ -473,7 +473,7 @@ final class ShapePickerPanel: UIView {
 
         if model == .other {
             let iv = UIImageView().then {
-                $0.image = UIImage(systemName: "square.on.circle")
+                $0.image = DSIcon.shapes.uiImage
                 $0.tintColor = DSColor.Neutral._400
                 $0.contentMode = .scaleAspectFit
             }
@@ -713,7 +713,7 @@ final class FormulationPickerPanel: UIView {
 
         if model == .other {
             let iv = UIImageView().then {
-                $0.image = UIImage(systemName: "ellipsis")
+                $0.image = DSIcon.moreHorizontal.uiImage
                 $0.tintColor = DSColor.Neutral._400
                 $0.contentMode = .scaleAspectFit
             }

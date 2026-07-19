@@ -254,7 +254,7 @@ final class PillEditVC: UIViewController {
             $0.textColor = DSColor.textPrimary
         }
         let zap = UIImageView().then {
-            $0.image = UIImage(systemName: "bolt.fill", withConfiguration: UIImage.SymbolConfiguration(pointSize: 11, weight: .semibold))
+            $0.image = DSIcon.zap.uiImage
             $0.tintColor = DSColor.Primary._500
             $0.contentMode = .scaleAspectFit
         }
@@ -266,6 +266,7 @@ final class PillEditVC: UIViewController {
         let hintStack = UIStackView(arrangedSubviews: [zap, hint]).then {
             $0.axis = .horizontal; $0.spacing = 4; $0.alignment = .center
         }
+        zap.snp.makeConstraints { $0.width.height.equalTo(13) }
         return UIStackView(arrangedSubviews: [title, UIView(), hintStack]).then {
             $0.axis = .horizontal; $0.alignment = .center
         }
@@ -485,7 +486,7 @@ final class PillEditVC: UIViewController {
         }
         circle.snp.makeConstraints { $0.width.height.equalTo(64) }
         let icon = UIImageView().then {
-            $0.image = UIImage(systemName: "magnifyingglass", withConfiguration: UIImage.SymbolConfiguration(pointSize: 24, weight: .regular))
+            $0.image = DSIcon.searchX.uiImage
             $0.tintColor = DSColor.textTertiary
             $0.contentMode = .scaleAspectFit
         }

@@ -94,14 +94,14 @@ final class PillDetailVC: UIViewController {
             containerView.addSubview(makeContentScroll(model))
         case .notFound:
             containerView.addSubview(makeMessageView(
-                icon: "doc.text.magnifyingglass",
+                icon: .fileSearch,
                 title: "세부정보가 없어요",
                 message: "이 약은 아직 등록된 세부정보가 없습니다.",
                 retry: false
             ))
         case .failure(let message):
             containerView.addSubview(makeMessageView(
-                icon: "exclamationmark.triangle",
+                icon: .alertTriangle,
                 title: "세부정보를 불러오지 못했어요",
                 message: message,
                 retry: true
@@ -130,13 +130,13 @@ final class PillDetailVC: UIViewController {
         return container
     }
 
-    private func makeMessageView(icon: String, title: String, message: String, retry: Bool) -> UIView {
+    private func makeMessageView(icon: DSIcon, title: String, message: String, retry: Bool) -> UIView {
         let container = UIView()
 
-        let iconView = UIImageView(image: UIImage(systemName: icon))
+        let iconView = UIImageView(image: icon.uiImage)
         iconView.tintColor = DSColor.Neutral._400
         iconView.contentMode = .scaleAspectFit
-        iconView.preferredSymbolConfiguration = .init(pointSize: 44, weight: .regular)
+        iconView.snp.makeConstraints { $0.width.height.equalTo(44) }
 
         let titleLabel = UILabel()
         titleLabel.text = title

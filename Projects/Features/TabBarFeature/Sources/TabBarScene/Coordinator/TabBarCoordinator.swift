@@ -78,13 +78,13 @@ public final class TabBarCoordinator: CoordinatorProtocol {
         let pillCoordinator = drugBuilder.makeDrugIdentificationCoordinator(navigationController: pillNav)
         pillCoordinator.start()
         addChild(pillCoordinator)
-        pillNav.tabBarItem = UITabBarItem(title: "알약", image: UIImage(systemName: "pills"), tag: 1)
+        pillNav.tabBarItem = UITabBarItem(title: "알약", image: DSIcon.pill.uiImage, tag: 1)
 
         let timerNav = UINavigationController()
         let timerCoordinator = timerBuilder.makeTimerCoordinator(navigationController: timerNav)
         timerCoordinator.start()
         addChild(timerCoordinator)
-        timerNav.tabBarItem = UITabBarItem(title: "타이머", image: UIImage(systemName: "timer"), tag: 2)
+        timerNav.tabBarItem = UITabBarItem(title: "타이머", image: DSIcon.timer.uiImage, tag: 2)
 
         let settingsNav = UINavigationController(rootViewController: timerBuilder.makeSettingsViewController())
         settingsNav.setNavigationBarHidden(true, animated: false)
