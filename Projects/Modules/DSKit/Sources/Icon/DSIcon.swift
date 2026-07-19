@@ -142,6 +142,24 @@ public enum DSIcon: String {
     case zap = "Icons/ic_zap"
     case circle = "Icons/ic_circle"
 
+    // MARK: - App & Domain
+
+    case pill = "Icons/ic_pill"
+    case syringe = "Icons/ic_syringe"
+    case timer = "Icons/ic_timer"
+    case clipboardList = "Icons/ic_clipboard_list"
+    case history = "Icons/ic_history"
+    case shapes = "Icons/ic_shapes"
+    case bellRing = "Icons/ic_bell_ring"
+    case stickyNote = "Icons/ic_sticky_note"
+    case square = "Icons/ic_square"
+    case heartPulse = "Icons/ic_heart_pulse"
+    case batteryFull = "Icons/ic_battery_full"
+    case flashlight = "Icons/ic_flashlight"
+    case vibrate = "Icons/ic_vibrate"
+    case fileSearch = "Icons/ic_file_search"
+    case circlePlay = "Icons/ic_circle_play"
+
     // MARK: - UIImage
 
     public var uiImage: UIImage {
