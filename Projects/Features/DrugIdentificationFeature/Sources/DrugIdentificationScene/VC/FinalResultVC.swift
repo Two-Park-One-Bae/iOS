@@ -9,7 +9,6 @@ final class FinalResultVC: UIViewController {
 
     // MARK: - Callbacks
 
-    var onShare: (() -> Void)?
     var onComplete: (() -> Void)?
     var onBackTapped: (() -> Void)?
     // 카드 탭 → 세부정보 진입 (pillCode, 썸네일)
@@ -234,6 +233,72 @@ final class FinalResultVC: UIViewController {
 
     // MARK: - Actions
 
-    @objc private func shareTapped() { onShare?() }
+    // 인터뷰 반영: "텍스트 복사"와 "PDF로 저장"을 분리한다.
+    // - 텍스트 복사: 폰에서 바로 재입력·메신저 붙여넣기 좋게 클립보드로 (기본 흐름)
+    // - PDF로 저장: 문서로 필요할 때 파일로 저장/공유 (외부 파일이 안 열리는 병원 PC 대비 보조)
+    @objc private func shareTapped() {
+        let sheet = ShareActionSheetVC(
+            onCopyText: { [weak self] in self?.copyResultText() },
+            onSavePDF: { [weak self] in self?.saveResultPDF() }
+        )
+        present(sheet, animated: false)   // 시트가 자체 애니메이션(슬라이드 업)을 수행
+    }
+
+    private func copyResultText() {
+        UIPasteboard.general.string = PillShareComposer.plainText(pills: pills, candidates: candidates)
+        showToast("결과가 복사되었어요")
+    }
+
+    private func saveResultPDF() {
+        let text = PillShareComposer.plainText(pills: pills, candidates: candidates)
+        guard let url = PillShareComposer.pdfURL(text: text) else {
+            showToast("PDF 생성에 실패했어요")
+            return
+        }
+        let activity = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+        activity.popoverPresentationController?.sourceView = shareButton
+        activity.popoverPresentationController?.sourceRect = shareButton.bounds
+        present(activity, animated: true)
+    }
+
+    // 간단한 확인 토스트 (하단에서 잠깐 떴다 사라짐)
+    private func showToast(_ message: String) {
+        let toast = PaddingLabel().then {
+            $0.text = message
+            $0.font = DSKitFontFamily.Pretendard.medium.font(size: 13)
+            $0.textColor = DSColor.Neutral._0
+            $0.backgroundColor = DSColor.textPrimary.withAlphaComponent(0.9)
+            $0.textAlignment = .center
+            $0.layer.cornerRadius = 10
+            $0.clipsToBounds = true
+            $0.alpha = 0
+        }
+        view.addSubview(toast)
+        toast.snp.makeConstraints {
+            $0.centerX.equalToSuperview()
+            $0.bottom.equalTo(footer.snp.top).offset(-16)
+            $0.leading.greaterThanOrEqualToSuperview().offset(40)
+            $0.trailing.lessThanOrEqualToSuperview().offset(-40)
+        }
+        UIView.animate(withDuration: 0.25, animations: { toast.alpha = 1 }) { _ in
+            UIView.animate(withDuration: 0.25, delay: 1.4, options: []) {
+                toast.alpha = 0
+            } completion: { _ in toast.removeFromSuperview() }
+        }
+    }
+
     @objc private func completeTapped() { onComplete?() }
+}
+
+// 토스트용 — 상하좌우 여백이 있는 라벨.
+private final class PaddingLabel: UILabel {
+    private let inset = UIEdgeInsets(top: 10, left: 16, bottom: 10, right: 16)
+    override func drawText(in rect: CGRect) {
+        super.drawText(in: rect.inset(by: inset))
+    }
+    override var intrinsicContentSize: CGSize {
+        let s = super.intrinsicContentSize
+        return CGSize(width: s.width + inset.left + inset.right,
+                      height: s.height + inset.top + inset.bottom)
+    }
 }
