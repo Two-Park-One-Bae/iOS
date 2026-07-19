@@ -151,12 +151,7 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
         vc.onBackTapped = { [weak self] in
             self?.navigationController.popViewController(animated: true)
         }
-        // 스펙 NM-136: 공유는 텍스트 복사(MVP·화면 유지)
-        vc.onShare = {
-            let text = results.map { "\($0.pill.index). \($0.candidate.pillName ?? "이름 미상")" }
-                .joined(separator: "\n")
-            UIPasteboard.general.string = text
-        }
+        // 공유는 FinalResultVC 가 시스템 공유 시트(텍스트+PDF)를 직접 띄운다(PillShareComposer).
         // 완료 → 알약 탭 스택을 루트(빈 화면)로 정리하고 홈 탭으로 복귀.
         // 촬영 취소 흐름과 동일. 다음에 알약 탭을 다시 선택하면 카메라가 새로 뜬다.
         vc.onComplete = { [weak self] in
