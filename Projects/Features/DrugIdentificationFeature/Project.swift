@@ -20,5 +20,7 @@ let project = Project.makeModule(
     ],
     interfaceDependencies: [
         Dep.Features.Base.Base,
-    ]
+    ],
+    // 알약 모양 아이콘(Resources/Assets.xcassets/PillShapes) 번들
+    hasResources: true
 )

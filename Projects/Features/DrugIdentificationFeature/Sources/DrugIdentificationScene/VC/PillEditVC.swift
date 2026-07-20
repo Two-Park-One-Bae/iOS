@@ -417,8 +417,10 @@ final class PillEditVC: UIViewController {
         colorChip.configure(leading: dot, value: colorValue)
 
         if let shape = viewModel.shape {
+            // 모양 글리프는 bounds 비율이 모양(타원·장방형)을 결정한다 — 가로로 긴 비율이어야
+            // 원으로 찌부러지지 않는다. 결과 행(PillResultRowView)과 동일하게 맞춘다.
             let glyph = ShapeGlyphView(shape: shape)
-            glyph.snp.makeConstraints { $0.width.height.equalTo(14) }
+            glyph.snp.makeConstraints { $0.width.equalTo(17); $0.height.equalTo(11) }
             shapeChip.configure(leading: glyph, value: shape.displayName)
         } else {
             shapeChip.configure(leading: nil, value: "선택")
@@ -426,7 +428,7 @@ final class PillEditVC: UIViewController {
 
         if let formulation = viewModel.formulation {
             let icon = FormulationIconView(formulation: formulation)
-            icon.snp.makeConstraints { $0.width.equalTo(16); $0.height.equalTo(14) }
+            icon.snp.makeConstraints { $0.width.height.equalTo(16) }
             formulationChip.configure(leading: icon, value: formulation.displayName)
         } else {
             formulationChip.configure(leading: nil, value: "선택")

@@ -4,140 +4,55 @@ import Then
 import DSKit
 import Domain
 
-// MARK: - Color Swatch Mapping
-
-extension PillColorModel {
-    /// Exact swatch color per case. `.colorless` / `.unknown` return nil.
-    var swatchColor: UIColor? {
-        func hex(_ value: UInt32) -> UIColor {
-            UIColor(
-                red: CGFloat((value >> 16) & 0xFF) / 255.0,
-                green: CGFloat((value >> 8) & 0xFF) / 255.0,
-                blue: CGFloat(value & 0xFF) / 255.0,
-                alpha: 1.0
-            )
-        }
-        switch self {
-        case .white:      return hex(0xFFFFFF)
-        case .yellow:     return hex(0xFACC15)
-        case .orange:     return hex(0xFB923C)
-        case .pink:       return hex(0xF9A8D4)
-        case .red:        return hex(0xEF4444)
-        case .brown:      return hex(0x92400E)
-        case .lightGreen: return hex(0x86EFAC)
-        case .green:      return hex(0x22C55E)
-        case .teal:       return hex(0x14B8A6)
-        case .blue:       return hex(0x3B82F6)
-        case .navy:       return hex(0x1E3A8A)
-        case .magenta:    return hex(0xDB2777)
-        case .purple:     return hex(0x8B5CF6)
-        case .gray:       return hex(0x9CA3AF)
-        case .black:      return hex(0x1F2937)
-        case .colorless, .unknown: return nil
-        }
-    }
-}
+// 색상 스와치 팔레트(PillColorModel.swatchColor)는 PillColorSwatch.swift 참고.
 
 // MARK: - Shape Glyph View
 
-/// Draws a pill shape via CAShapeLayer for a given `PillShapeModel`.
-/// Default fill `DSColor.Neutral._400`; recolor via `setTint(_:)`.
+/// 알약 모양 글리프. 디자인에서 추출한 벡터 아이콘(Assets/PillShapes)을 템플릿으로 틴트해 그린다.
+///
+/// 이미지가 모양 고유 비율을 갖고 있고 `scaleAspectFit`으로 그리므로,
+/// 박스가 정사각이든 가로로 길든 원은 원·타원은 타원으로 유지된다(늘어나지 않는다).
+/// 기본색 `DSColor.Neutral._400`, `setTint(_:)`로 변경.
 final class ShapeGlyphView: UIView {
 
-    private let shape: PillShapeModel
-    private let glyph = CAShapeLayer()
-    private var fillColor: UIColor = DSColor.Neutral._400
+    private let imageView = UIImageView()
 
     init(shape: PillShapeModel) {
-        self.shape = shape
         super.init(frame: .zero)
         backgroundColor = .clear
-        glyph.fillColor = fillColor.cgColor
-        glyph.strokeColor = UIColor.clear.cgColor
-        layer.addSublayer(glyph)
+        imageView.contentMode = .scaleAspectFit
+        imageView.tintColor = DSColor.Neutral._400
+        imageView.image = shape.glyphImage
+        addSubview(imageView)
+        imageView.snp.makeConstraints { $0.edges.equalToSuperview() }
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     func setTint(_ color: UIColor) {
-        fillColor = color
-        glyph.fillColor = color.cgColor
+        imageView.tintColor = color
     }
+}
 
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        glyph.frame = bounds
-        glyph.path = path(in: bounds.insetBy(dx: 1, dy: 1))
-    }
-
-    private func path(in r: CGRect) -> CGPath {
-        switch shape {
-        case .round, .oval:
-            // bounds 비율이 이미 원/타원을 결정한다.
-            return UIBezierPath(ovalIn: r).cgPath
-
-        case .oblong:
-            // 양 끝이 완전히 둥근 스타디움(장방형).
-            return UIBezierPath(roundedRect: r, cornerRadius: r.height / 2).cgPath
-
-        case .semicircle:
-            // 위 반원 + 아래 평평한 밑변 (반원형).
-            let radius = min(r.width / 2, r.height)
-            let baseY = r.midY + radius / 2
-            let center = CGPoint(x: r.midX, y: baseY)
-            let p = UIBezierPath()
-            p.addArc(withCenter: center, radius: radius,
-                     startAngle: .pi, endAngle: 2 * .pi, clockwise: true)
-            p.close()
-            return p.cgPath
-
-        case .square:
-            return UIBezierPath(roundedRect: r, cornerRadius: min(r.width, r.height) * 0.2).cgPath
-
-        case .triangle: return roundedPolygon(in: r, sides: 3)
-        case .diamond:  return roundedPolygon(in: r, sides: 4)
-        case .pentagon: return roundedPolygon(in: r, sides: 5)
-        case .hexagon:  return roundedPolygon(in: r, sides: 6)
-        case .octagon:  return roundedPolygon(in: r, sides: 8)
-        case .other, .unknown: return roundedPolygon(in: r, sides: 6)
+private extension PillShapeModel {
+    /// PillShapes 에셋의 템플릿 이미지. `.unknown` 은 '기타'로 대체.
+    var glyphImage: UIImage? {
+        let name: String
+        switch self {
+        case .round:      name = "round"
+        case .oval:       name = "oval"
+        case .oblong:     name = "oblong"
+        case .semicircle: name = "semicircle"
+        case .square:     name = "square"
+        case .triangle:   name = "triangle"
+        case .diamond:    name = "diamond"
+        case .pentagon:   name = "pentagon"
+        case .hexagon:    name = "hexagon"
+        case .octagon:    name = "octagon"
+        case .other, .unknown: name = "other"
         }
-    }
-
-    // 꼭짓점이 위(12시)를 향하고 모서리가 둥근 정n각형. (Pencil polygon 기본 방향과 일치)
-    private func roundedPolygon(in r: CGRect) -> CGPath { roundedPolygon(in: r, sides: 6) }
-
-    private func roundedPolygon(in r: CGRect, sides: Int) -> CGPath {
-        let center = CGPoint(x: r.midX, y: r.midY)
-        let radius = min(r.width, r.height) / 2
-        let corner = radius * 0.18
-        let verts: [CGPoint] = (0..<sides).map { i in
-            let a = -.pi / 2 + CGFloat(i) * 2 * .pi / CGFloat(sides)
-            return CGPoint(x: center.x + radius * cos(a), y: center.y + radius * sin(a))
-        }
-        let path = UIBezierPath()
-        for i in 0..<sides {
-            let curr = verts[i]
-            let prev = verts[(i + sides - 1) % sides]
-            let next = verts[(i + 1) % sides]
-            let toPrev = unit(from: curr, to: prev)
-            let toNext = unit(from: curr, to: next)
-            let cr = min(corner, dist(curr, prev) / 2, dist(curr, next) / 2)
-            let p1 = CGPoint(x: curr.x + toPrev.dx * cr, y: curr.y + toPrev.dy * cr)
-            let p2 = CGPoint(x: curr.x + toNext.dx * cr, y: curr.y + toNext.dy * cr)
-            if i == 0 { path.move(to: p1) } else { path.addLine(to: p1) }
-            path.addQuadCurve(to: p2, controlPoint: curr)
-        }
-        path.close()
-        return path.cgPath
-    }
-
-    private func unit(from a: CGPoint, to b: CGPoint) -> CGVector {
-        let dx = b.x - a.x, dy = b.y - a.y
-        let len = max(0.0001, sqrt(dx * dx + dy * dy))
-        return CGVector(dx: dx / len, dy: dy / len)
-    }
-    private func dist(_ a: CGPoint, _ b: CGPoint) -> CGFloat {
-        sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y))
+        return UIImage(named: "PillShapes/\(name)", in: .module, compatibleWith: nil)?
+            .withRenderingMode(.alwaysTemplate)
     }
 }
 
