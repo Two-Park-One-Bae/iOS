@@ -210,10 +210,9 @@ public final class HomeVC: UIViewController {
 
         output.limitExceeded
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] usage in
-                guard let self else { return }
-                DSAlertCardView.present(
-                    on: self.view,
+            .sink { usage in
+                // 식별 플로우의 한도 팝업과 같은 표현을 쓴다 — dim이 탭바까지 덮는다(디자인 기준).
+                DSAlertCardView.presentOverWindow(
                     title: PillLimitAlertText.title,
                     message: PillLimitAlertText.message(resetAt: usage?.resetAt)
                 )
