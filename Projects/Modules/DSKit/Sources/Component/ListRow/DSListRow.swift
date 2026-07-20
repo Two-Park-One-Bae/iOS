@@ -49,6 +49,15 @@ public final class DSListRow: UIView {
         return label
     }()
 
+    // 부가 상태 한 줄(예: 알약 식별 남은 횟수). 기본 숨김 — 설정한 화면에서만 나타난다.
+    private let captionLabel: UILabel = {
+        let label = UILabel()
+        label.font = DSKitFontFamily.Pretendard.semiBold.font(size: 12)
+        label.textColor = DSColor.Primary._600
+        label.isHidden = true
+        return label
+    }()
+
     private let chevronView: UIImageView = {
         let iv = UIImageView()
         let config = UIImage.SymbolConfiguration(pointSize: 14, weight: .medium)
@@ -89,9 +98,10 @@ public final class DSListRow: UIView {
             iconImageView.centerYAnchor.constraint(equalTo: iconBackground.centerYAnchor)
         ])
 
-        let textStack = UIStackView(arrangedSubviews: [titleLabel, subtitleLabel])
+        let textStack = UIStackView(arrangedSubviews: [titleLabel, subtitleLabel, captionLabel])
         textStack.axis = .vertical
         textStack.spacing = 2
+        textStack.setCustomSpacing(4, after: subtitleLabel)
         textStack.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
         chevronView.setContentHuggingPriority(.required, for: .horizontal)
@@ -132,6 +142,13 @@ extension DSListRow {
 
     public func setChevronHidden(_ hidden: Bool) {
         chevronView.isHidden = hidden
+    }
+
+    /// 부가 상태 한 줄. `nil`이면 숨긴다.
+    public func setCaption(_ text: String?, color: UIColor = DSColor.Primary._600) {
+        captionLabel.text = text
+        captionLabel.textColor = color
+        captionLabel.isHidden = (text == nil)
     }
 
     public func setIconBackground(_ color: UIColor) {

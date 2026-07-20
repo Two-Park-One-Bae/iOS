@@ -10,10 +10,11 @@ import Foundation
 
 public protocol PillRepositoryProtocol {
     // 크롭 이미지 → 색·모양·제형 추출
+    // 한도 도달 시 PillLimitExceededError로 실패한다 (429 LIMIT_EXCEEDED · 미차감)
     func fetchPillAttributes(
         originalImage: String,
         items: [(pillId: String, segmentation: [[Double]], croppedImage: String)]
-    ) -> AnyPublisher<[PillAttributeModel], Error>
+    ) -> AnyPublisher<PillAttributeResultModel, Error>
 
     // 수정 속성 → 후보 알약 조회
     func fetchPillCandidates(
@@ -29,4 +30,7 @@ public protocol PillRepositoryProtocol {
 
     // pillCode → 알약 세부정보 조회 (NM-312)
     func fetchPillDetail(pillCode: String) -> AnyPublisher<PillDetailModel, Error>
+
+    // 잔여 식별 횟수 조회 (NM-331). 조회 전용 — 카운트가 늘지 않는다
+    func fetchPillUsage() -> AnyPublisher<PillUsageModel, Error>
 }

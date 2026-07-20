@@ -1,7 +1,9 @@
 import UIKit
+import Combine
 import SnapKit
 import Then
 import DSKit
+import Domain
 
 final class PhotoPreviewVC: UIViewController {
 
@@ -29,6 +31,16 @@ final class PhotoPreviewVC: UIViewController {
     private let retakeButton = SecondaryButton(title: "재촬영")
     private let usePhotoButton = PrimaryButton(title: "이 사진 사용")
 
+    // '이 사진 사용' 위에 놓이는 남은 횟수. 값을 모르면 숨긴다.
+    private let usageLabel = UILabel().then {
+        $0.font = DSKitFontFamily.Pretendard.medium.font(size: 12)
+        $0.textColor = DSColor.textTertiary
+        $0.textAlignment = .center
+        $0.isHidden = true
+    }
+
+    private var cancelBag = Set<AnyCancellable>()
+
     // MARK: - Init
 
     init(image: UIImage) {
@@ -37,6 +49,25 @@ final class PhotoPreviewVC: UIViewController {
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    /// 남은 횟수 바인딩 — 0회일 때만 경고색으로 표시한다 (NM-323).
+    func bindUsage(_ usage: AnyPublisher<PillUsageModel?, Never>) {
+        usage
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] usage in
+                guard let self else { return }
+                guard let usage else {
+                    self.usageLabel.isHidden = true
+                    return
+                }
+                self.usageLabel.isHidden = false
+                self.usageLabel.text = usage.remainingText
+                self.usageLabel.textColor = usage.isExhausted
+                    ? DSColor.Error._600
+                    : DSColor.textTertiary
+            }
+            .store(in: &cancelBag)
+    }
 
     // MARK: - Lifecycle
 
@@ -84,8 +115,14 @@ final class PhotoPreviewVC: UIViewController {
             $0.distribution = .fillEqually
         }
 
-        view.addSubview(actionBar)
-        actionBar.snp.makeConstraints {
+        // 남은 횟수는 '이 사진 사용' 위에 놓는다. 숨김 상태면 스택에서 자동으로 접힌다.
+        let bottomStack = UIStackView(arrangedSubviews: [usageLabel, actionBar]).then {
+            $0.axis = .vertical
+            $0.spacing = 8
+        }
+
+        view.addSubview(bottomStack)
+        bottomStack.snp.makeConstraints {
             $0.top.equalTo(contentFrame.snp.bottom).offset(12)
             $0.leading.trailing.equalToSuperview().inset(20)
             $0.bottom.equalTo(view.safeAreaLayoutGuide).offset(-28)

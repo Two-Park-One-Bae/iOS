@@ -3,6 +3,7 @@ import Combine
 import SnapKit
 import Then
 import DSKit
+import Domain
 
 // ④ 로딩 (식별 중) — 촬영 사진 + 스피너. ViewModel 파이프라인이 여기서 실행된다.
 final class PillLoadingVC: UIViewController {
@@ -12,6 +13,7 @@ final class PillLoadingVC: UIViewController {
     var onSuccess: (([IdentifiedPill], UIImage) -> Void)?
     var onEmpty: (() -> Void)?
     var onFailure: ((String) -> Void)?
+    var onLimitExceeded: ((PillUsageModel?) -> Void)?
     var onBackTapped: (() -> Void)?
 
     // MARK: - Properties
@@ -121,6 +123,8 @@ final class PillLoadingVC: UIViewController {
                     self.onEmpty?()
                 case let .failure(message):
                     self.onFailure?(message)
+                case let .limitExceeded(usage):
+                    self.onLimitExceeded?(usage)
                 }
             }
             .store(in: &cancelBag)
