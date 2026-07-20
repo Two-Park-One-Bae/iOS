@@ -3,6 +3,7 @@ import Combine
 import SnapKit
 import Then
 import DSKit
+import Domain
 
 public final class HomeVC: UIViewController {
 
@@ -11,6 +12,7 @@ public final class HomeVC: UIViewController {
     private let viewModel: HomeViewModel
     private var cancelBag = Set<AnyCancellable>()
 
+    private let viewWillAppearSubject = PassthroughSubject<Void, Never>()
     private let drugIdentifySubject = PassthroughSubject<Void, Never>()
     private let treatmentTimerSubject = PassthroughSubject<Void, Never>()
 
@@ -77,6 +79,12 @@ public final class HomeVC: UIViewController {
         bind()
     }
 
+    public override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        // 식별을 마치고 돌아왔을 때 남은 횟수를 갱신한다.
+        viewWillAppearSubject.send()
+    }
+
     // MARK: - Setup
 
     private func setUI() {
@@ -119,12 +127,14 @@ public final class HomeVC: UIViewController {
         return stack
     }
 
+    // 남은 횟수를 갱신해야 해서 프로퍼티로 유지한다.
+    private let drugCard = DSListRow(
+        icon: .search,
+        title: "약물 식별",
+        subtitle: "장기 처방약을 간편히 식별하고 성분 정보를 확인하세요."
+    )
+
     private func makeCardsSection() -> UIView {
-        let drugCard = DSListRow(
-            icon: .search,
-            title: "약물 식별",
-            subtitle: "장기 처방약을 간편히 식별하고 성분 정보를 확인하세요."
-        )
         drugCard.setIconBackground(DSColor.Primary._50)
         drugCard.setIconTint(DSColor.Primary._500)
         drugCard.onTap { [weak self] in self?.drugIdentifySubject.send() }
@@ -177,9 +187,37 @@ public final class HomeVC: UIViewController {
     private func bind() {
         let input = HomeViewModel.Input(
             viewDidLoad: Just(()).eraseToAnyPublisher(),
+            viewWillAppear: viewWillAppearSubject.eraseToAnyPublisher(),
             drugIdentifyTapped: drugIdentifySubject.eraseToAnyPublisher(),
             treatmentTimerTapped: treatmentTimerSubject.eraseToAnyPublisher()
         )
-        _ = viewModel.transform(input: input)
+        let output = viewModel.transform(input: input)
+
+        // 남은 횟수 — 0회일 때만 경고색, 그 외엔 기본색. 값을 모르면 표시하지 않는다.
+        output.usage
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] usage in
+                guard let usage else {
+                    self?.drugCard.setCaption(nil)
+                    return
+                }
+                self?.drugCard.setCaption(
+                    usage.remainingText,
+                    color: usage.isExhausted ? DSColor.Error._600 : DSColor.Primary._600
+                )
+            }
+            .store(in: &cancelBag)
+
+        output.limitExceeded
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] usage in
+                guard let self else { return }
+                DSAlertCardView.present(
+                    on: self.view,
+                    title: PillLimitAlertText.title,
+                    message: PillLimitAlertText.message(resetAt: usage?.resetAt)
+                )
+            }
+            .store(in: &cancelBag)
     }
 }

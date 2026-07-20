@@ -111,7 +111,9 @@ extension BaseService {
                             promise(.success(body))
                         case 400...599:
                             // 에러 응답: 서버가 RFC 9457 형식으로 내려주는 ProblemDetail decode
-                            let problem = try JSONDecoder().decode(NetworkError.self, from: value.data)
+                            var problem = try JSONDecoder().decode(NetworkError.self, from: value.data)
+                            // 확장 멤버(예: 429의 usage)를 상위 계층이 decode할 수 있도록 원문 보존
+                            problem.rawBody = value.data
                             // statusCode와 함께 APIError.network로 래핑해서 throw
                             throw APIError.network(statusCode: httpResponse.statusCode, error: problem)
                         default:
@@ -152,7 +154,8 @@ extension BaseService {
                             // continuation.resume: async 컨텍스트로 값을 돌려줌
                             continuation.resume(returning: body)
                         case 400...599:
-                            let problem = try JSONDecoder().decode(NetworkError.self, from: value.data)
+                            var problem = try JSONDecoder().decode(NetworkError.self, from: value.data)
+                            problem.rawBody = value.data
                             continuation.resume(throwing: APIError.network(statusCode: httpResponse.statusCode, error: problem))
                         default:
                             continuation.resume(throwing: APIError.unknown)

@@ -5,8 +5,49 @@
 //  Created by 바견규 on 7/2/26.
 //
 
+import Foundation
+
 import Domain
 import Networks
+
+// MARK: - Usage
+
+extension PillUsageEntity {
+    public func toDomain() -> PillUsageModel {
+        PillUsageModel(
+            limit:     limit,
+            remaining: remaining,
+            resetAt:   Self.parseResetAt(resetAt)
+        )
+    }
+
+    // resetAt은 "2026-07-18T00:00:00+09:00" 형태.
+    // ISO8601DateFormatter는 엄격해서 소수점 초 유무가 옵션과 어긋나면 nil을 반환한다 — 둘 다 시도한다.
+    private static let plainFormatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
+    }()
+
+    private static let fractionalFormatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+
+    private static func parseResetAt(_ value: String) -> Date? {
+        plainFormatter.date(from: value) ?? fractionalFormatter.date(from: value)
+    }
+}
+
+extension PillAttributeResponseEntity {
+    public func toDomain() -> PillAttributeResultModel {
+        PillAttributeResultModel(
+            items: items.map { $0.toDomain() },
+            usage: usage?.toDomain()
+        )
+    }
+}
 
 // MARK: - Attribute
 

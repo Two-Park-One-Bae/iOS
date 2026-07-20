@@ -1,7 +1,9 @@
 import UIKit
+import Combine
 import BaseFeatureDependency
 import Core
 import Domain
+import DSKit
 
 public final class DrugIdentificationCoordinator: BaseCoordinator {
 
@@ -78,6 +80,8 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
         }
     }
 
+    @Injected private var pillUseCase: PillUseCase
+
     // MARK: - ② 미리보기
 
     private func showPreview(image: UIImage) {
@@ -88,9 +92,31 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
             self.cameraPicker.present(from: self.navigationController, source: .camera)
         }
         vc.onUsePhoto = { [weak self] in
-            self?.startIdentification(image: image)
+            guard let self else { return }
+
+            // 세션 중 소진 방어: 진입 후 마지막 횟수를 쓰고 돌아온 경우, 요청을 보내지 않고 팝업만 띄운다.
+            // 값을 모르면 통과 — 최종 판정은 서버 429다 (NM-323).
+            if let usage = self.pillUseCase.pillUsage.value, usage.isExhausted {
+                self.presentLimitAlert(usage: usage)
+                return
+            }
+
+            self.startIdentification(image: image)
         }
+        // 미리보기에도 남은 횟수를 표시한다 (촬영 화면에는 표시하지 않는다).
+        vc.bindUsage(pillUseCase.pillUsage.eraseToAnyPublisher())
         navigationController.pushViewController(vc, animated: true)
+    }
+
+    /// 한도 안내 팝업 — 진입 게이트·미리보기 게이트·429가 모두 같은 문구를 쓴다.
+    private func presentLimitAlert(usage: PillUsageModel?) {
+        guard let hostView = navigationController.topViewController?.view else { return }
+
+        DSAlertCardView.present(
+            on: hostView,
+            title: PillLimitAlertText.title,
+            message: PillLimitAlertText.message(resetAt: usage?.resetAt)
+        )
     }
 
     // MARK: - ④ 로딩 → ⑤/⑥/⑦
@@ -110,6 +136,12 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
         }
         loadingVC.onFailure = { [weak self] message in
             self?.showFailure(replacing: loadingVC)
+        }
+        // 한도 도달은 실패가 아니다 — 미리보기로 되돌리고 안내 팝업만 띄운다.
+        loadingVC.onLimitExceeded = { [weak self] usage in
+            guard let self else { return }
+            self.navigationController.popViewController(animated: true)
+            self.presentLimitAlert(usage: usage)
         }
 
         navigationController.pushViewController(loadingVC, animated: true)
