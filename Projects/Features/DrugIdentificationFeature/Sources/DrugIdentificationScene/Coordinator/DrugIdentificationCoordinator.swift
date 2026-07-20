@@ -90,6 +90,7 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
         vc.onUsePhoto = { [weak self] in
             self?.startIdentification(image: image)
         }
+        vc.onExitToHome = { [weak self] in self?.exitToHome() }
         navigationController.pushViewController(vc, animated: true)
     }
 
@@ -99,9 +100,6 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
         let viewModel = DrugIdentificationViewModel(image: image)
         let loadingVC = PillLoadingVC(image: image, viewModel: viewModel)
 
-        loadingVC.onBackTapped = { [weak self] in
-            self?.navigationController.popViewController(animated: true)
-        }
         loadingVC.onSuccess = { [weak self] pills, resultImage in
             self?.showResult(pills: pills, image: resultImage, replacing: loadingVC)
         }
@@ -122,9 +120,7 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
     private func showResult(pills: [IdentifiedPill], image: UIImage, replacing loadingVC: UIViewController) {
         let vc = DrugIdentificationVC(pills: pills, image: image)
         resultVC = vc
-        vc.onBackTapped = { [weak self] in
-            self?.navigationController.popViewController(animated: true)
-        }
+        vc.onExitToHome = { [weak self] in self?.exitToHome() }
         vc.onSelectPill = { [weak self] pill in
             self?.showEdit(pill: pill)
         }
@@ -233,9 +229,7 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
 
     private func showNotFound(image: UIImage, replacing loadingVC: UIViewController) {
         let vc = PillNotFoundVC(image: image)
-        vc.onBackTapped = { [weak self] in
-            self?.navigationController.popViewController(animated: true)
-        }
+        vc.onBackTapped = { [weak self] in self?.exitToHome() }
         vc.onRetake = { [weak self] in
             guard let self else { return }
             self.navigationController.popViewController(animated: false)
@@ -252,16 +246,20 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
 
     private func showFailure(replacing loadingVC: UIViewController) {
         let vc = AnalysisFailedVC()
-        vc.onBackTapped = { [weak self] in
-            self?.navigationController.popViewController(animated: true)
-        }
+        // 네비바 뒤로·푸터 '뒤로' 모두 홈으로 — 이 화면엔 돌아갈 이전 단계가 없다.
+        vc.onBackTapped = { [weak self] in self?.exitToHome() }
+        vc.onBack = { [weak self] in self?.exitToHome() }
         vc.onRetry = { [weak self] in
             self?.navigationController.popViewController(animated: true)
         }
-        vc.onBack = { [weak self] in
-            self?.navigationController.popViewController(animated: true)
-        }
         replace(loadingVC, with: vc)
+    }
+
+    /// 식별을 중단하고 홈 탭으로 되돌린다.
+    /// 알약 탭 루트는 빈 화면이라 그대로 두면 갈 곳이 없어, 촬영 취소와 같은 경로를 쓴다.
+    private func exitToHome() {
+        navigationController.popToRootViewController(animated: false)
+        NotificationCenter.default.post(name: .selectHomeTab, object: nil)
     }
 
     // MARK: - ③ 권한 거부
