@@ -100,13 +100,18 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
         let viewModel = DrugIdentificationViewModel(image: image)
         let loadingVC = PillLoadingVC(image: image, viewModel: viewModel)
 
-        loadingVC.onSuccess = { [weak self] pills, resultImage in
+        // loadingVC 를 강하게 캡처하면 loadingVC → 클로저 → loadingVC 사이클로 안 죽는다.
+        // (죽지 않으면 분석 VM 이 공유 errorMessage 를 계속 구독해 다른 화면 오류까지 받는다.)
+        loadingVC.onSuccess = { [weak self, weak loadingVC] pills, resultImage in
+            guard let loadingVC else { return }
             self?.showResult(pills: pills, image: resultImage, replacing: loadingVC)
         }
-        loadingVC.onEmpty = { [weak self] in
+        loadingVC.onEmpty = { [weak self, weak loadingVC] in
+            guard let loadingVC else { return }
             self?.showNotFound(image: image, replacing: loadingVC)
         }
-        loadingVC.onFailure = { [weak self] message in
+        loadingVC.onFailure = { [weak self, weak loadingVC] message in
+            guard let loadingVC else { return }
             self?.showFailure(replacing: loadingVC)
         }
 
