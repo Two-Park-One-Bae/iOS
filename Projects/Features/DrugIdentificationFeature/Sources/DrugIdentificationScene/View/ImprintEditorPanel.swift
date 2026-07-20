@@ -13,8 +13,8 @@ final class ImprintEditorPanel: UIView {
     private let backEditor: FaceEditor
 
     init(front: PillFaceModel?, back: PillFaceModel?) {
-        frontEditor = FaceEditor(title: "앞면 (사진 면)", model: front)
-        backEditor = FaceEditor(title: "뒷면", model: back)
+        frontEditor = FaceEditor(title: "앞면 (사진 면)", model: front, isFront: true)
+        backEditor = FaceEditor(title: "뒷면", model: back, isFront: false)
         super.init(frame: .zero)
         setup()
     }
@@ -54,8 +54,11 @@ final class ImprintEditorPanel: UIView {
         private let markCheck = CheckboxView(text: "마크 있음")
         private let inputContainer = UIStackView()
 
-        init(title: String, model: PillFaceModel?) {
+        private let isFront: Bool
+
+        init(title: String, model: PillFaceModel?, isFront: Bool) {
             self.model = model
+            self.isFront = isFront
             super.init(frame: .zero)
             setup(title: title, model: model)
         }
@@ -67,7 +70,10 @@ final class ImprintEditorPanel: UIView {
                 $0.font = DSKitFontFamily.Pretendard.bold.font(size: 13)
                 $0.textColor = DSColor.textPrimary
             }
-            noImprintCheck.setChecked(model?.imprint?.isEmpty ?? true)
+            // 앞면(사진 면)은 각인이 보이는 면이라 항상 입력을 열어둔다 — '해당 없음' 기본 해제.
+            // (spec상 앞/뒤 각인은 MVP에서 항상 null로 와, 그대로 두면 앞면도 N/A로 접힌다.)
+            // 뒷면은 각인이 비어 있으면 N/A로 시작.
+            noImprintCheck.setChecked(isFront ? false : (model?.imprint?.isEmpty ?? true))
             noImprintCheck.onToggle = { [weak self] on in self?.setNoImprint(on) }
             let header = UIStackView(arrangedSubviews: [titleLabel, UIView(), noImprintCheck]).then {
                 $0.axis = .horizontal; $0.alignment = .center
