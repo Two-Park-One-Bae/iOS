@@ -171,11 +171,25 @@ extension CameraPicker: UIImagePickerControllerDelegate, UINavigationControllerD
 extension CameraPicker: PHPickerViewControllerDelegate {
     public func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
         picker.dismiss(animated: true)
+
+        // PHPicker는 취소도 이 델리게이트로 온다 — 결과가 비어 있으면 취소다.
+        // 여기서 그냥 return하면 호출자가 아무 통보도 못 받아 빈 화면에 갇힌다.
         guard let provider = results.first?.itemProvider,
-              provider.canLoadObject(ofClass: UIImage.self) else { return }
+              provider.canLoadObject(ofClass: UIImage.self)
+        else {
+            onCancelled?()
+            return
+        }
 
         provider.loadObject(ofClass: UIImage.self) { [weak self] object, _ in
-            guard let self, let image = object as? UIImage else { return }
+            guard let self else { return }
+
+            guard let image = object as? UIImage else {
+                // 로드 실패도 빈손으로 돌아가는 것과 같다 — 취소로 처리해 갇히지 않게 한다.
+                DispatchQueue.main.async { self.onCancelled?() }
+                return
+            }
+
             let result = self.squareMode ? self.cropToSquare(image) : image
             DispatchQueue.main.async {
                 self.onImageSelected?(result)

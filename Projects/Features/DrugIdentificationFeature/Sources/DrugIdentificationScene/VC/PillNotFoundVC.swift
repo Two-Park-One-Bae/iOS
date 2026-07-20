@@ -9,6 +9,7 @@ final class PillNotFoundVC: UIViewController {
 
     var onRetake: (() -> Void)?
     var onSelectFromGallery: (() -> Void)?
+    /// 뒤로 = 홈 복귀. 이 화면들엔 잃을 작업이 없어 확인 팝업 없이 바로 나간다.
     var onBackTapped: (() -> Void)?
 
     // MARK: - Properties
