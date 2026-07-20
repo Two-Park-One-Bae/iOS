@@ -103,4 +103,31 @@ public final class DSAlertCardView: UIView {
         parent.addSubview(dim)
         card.snp.makeConstraints { $0.center.equalToSuperview() }
     }
+
+    /// 키 윈도우 위에 띄운다 — dim이 탭바까지 덮고, 탭 전환 뒤에도 살아남는다.
+    ///
+    /// 특정 화면에 종속되지 않는 안내(예: 식별 한도)는 이걸 쓴다.
+    /// 화면 안에서만 의미 있는 안내라면 `present(on:)`으로 해당 뷰에 붙일 것.
+    public static func presentOverWindow(
+        title: String,
+        message: String?,
+        confirmTitle: String = "확인",
+        confirmed: (() -> Void)? = nil
+    ) {
+        let window = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first { $0.isKeyWindow }
+
+        // 모달이 떠 있으면 루트 뷰에 붙여봐야 가려진다 — 최상단 표시 중인 뷰컨트롤러를 찾는다.
+        // 모달이 없으면 루트(탭바 컨트롤러)라 dim이 탭바까지 덮는다(디자인 기준).
+        var top = window?.rootViewController
+        while let presented = top?.presentedViewController {
+            top = presented
+        }
+
+        guard let host = top?.view else { return }
+
+        present(on: host, title: title, message: message, confirmTitle: confirmTitle, confirmed: confirmed)
+    }
 }
