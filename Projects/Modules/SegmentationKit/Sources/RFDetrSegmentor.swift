@@ -17,13 +17,6 @@ public struct RFDETRResult: Sendable {
     public let decodeTime: TimeInterval
 }
 
-public struct TransferSizeReport {
-    public let cropsCount: Int
-    public let cropsPNGBytes: Int
-    public let cropsJPEGBytes: Int
-    public let originalBytes: Int
-}
-
 public enum RFDETRError: LocalizedError {
     case missingModel
     case imageConversion
@@ -54,60 +47,21 @@ public final class RFDetrSegmentor: @unchecked Sendable {
 
     private let model: MLModel
 
-    public static func makeInferenceImage(from data: Data) throws -> UIImage {
-        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else {
-            throw RFDETRError.imageConversion
-        }
-        let options: [CFString: Any] = [
-            kCGImageSourceCreateThumbnailFromImageAlways: true,
-            kCGImageSourceCreateThumbnailWithTransform: true,
-            kCGImageSourceThumbnailMaxPixelSize: inputSize,
-            kCGImageSourceShouldCacheImmediately: true
-        ]
-        guard let cg = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
-            throw RFDETRError.imageConversion
-        }
-        return UIImage(cgImage: cg)
-    }
-
-    public static func makeOriginalNormalizedImage(from data: Data) -> UIImage? {
-        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
-        let options: [CFString: Any] = [
-            kCGImageSourceCreateThumbnailFromImageAlways: true,
-            kCGImageSourceCreateThumbnailWithTransform: true,
-            kCGImageSourceThumbnailMaxPixelSize: 12_000,
-            kCGImageSourceShouldCacheImmediately: true
-        ]
-        guard let cg = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
-        return UIImage(cgImage: cg)
-    }
-
-    public static func cropDetections(
-        from original: UIImage,
-        detections: [RFDetection],
-        originalDataSize: Int = 0
-    ) -> (crops: [CroppedDetection], time: TimeInterval, transferReport: TransferSizeReport) {
-        let empty = TransferSizeReport(cropsCount: 0, cropsPNGBytes: 0, cropsJPEGBytes: 0, originalBytes: originalDataSize)
+    /// detection들의 마스크 크롭을 한 번의 정규화로 일괄 생성. 입력과 1:1 정렬(마스크 비면 nil).
+    ///
+    /// 메모리: 예전엔 detection마다 이 함수를 호출 → 매번 `normalizedCGImage`가 12MP 원본을
+    /// 통째로 재렌더(~48MB)했고, 게다가 버려지는 전송량 측정(pngData+평탄화+jpegData)까지 돌려
+    /// N배 스파이크를 냈다. 이제 원본 정규화는 1회, 각 크롭은 autoreleasepool로 감싸 대형 임시
+    /// 비트맵이 즉시 해제되게 한다.
+    public static func croppedImages(from original: UIImage, detections: [RFDetection]) -> [UIImage?] {
         // 추론(makeInputArray)은 orientation을 세운 upright 이미지에서 box·mask를 계산한다.
-        // 크롭도 반드시 같은 정규화 이미지에서 잘라야 좌표가 일치한다. original.cgImage 를
-        // 그대로 쓰면 카메라 사진(.right 등)의 회전 안 된 raw 버퍼라 좌표가 어긋난다.
-        guard let cgImage = normalizedCGImage(from: original) else { return ([], 0, empty) }
-        let started = CFAbsoluteTimeGetCurrent()
-        let crops = detections.compactMap { cropWithMask(cgImage: cgImage, detection: $0) }
-        let time = CFAbsoluteTimeGetCurrent() - started
-
-        var pngTotal = 0, jpegTotal = 0
-        for crop in crops {
-            pngTotal += crop.image.pngData()?.count ?? 0
-            let flatSize = crop.image.size
-            let flat = UIGraphicsImageRenderer(size: flatSize).image { ctx in
-                UIColor.white.setFill()
-                ctx.fill(CGRect(origin: .zero, size: flatSize))
-                crop.image.draw(in: CGRect(origin: .zero, size: flatSize))
-            }
-            jpegTotal += flat.jpegData(compressionQuality: 0.9)?.count ?? 0
+        // 크롭도 반드시 같은 정규화 이미지에서 잘라야 좌표가 일치한다.
+        guard let cgImage = normalizedCGImage(from: original) else {
+            return Array(repeating: nil, count: detections.count)
         }
-        return (crops, time, TransferSizeReport(cropsCount: crops.count, cropsPNGBytes: pngTotal, cropsJPEGBytes: jpegTotal, originalBytes: originalDataSize))
+        return detections.map { detection in
+            autoreleasepool { cropWithMask(cgImage: cgImage, detection: detection)?.image }
+        }
     }
 
     private static func cropWithMask(cgImage: CGImage, detection: RFDetection) -> CroppedDetection? {

@@ -8,6 +8,9 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
     private let cameraPicker: CameraPicker = {
         let picker = CameraPicker()
         picker.squareMode = true
+        // Jetsam 방지: 12MP 원본이 프리뷰·추론·결과 화면에 그대로 상주하지 않도록 진입 시 축소.
+        // 추론 입력은 내부적으로 576px, 썸네일은 작게 표시 → 2048이면 화질 여유 충분.
+        picker.maxOutputDimension = 2048
         return picker
     }()
 
