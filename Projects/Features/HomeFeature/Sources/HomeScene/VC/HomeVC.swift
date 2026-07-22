@@ -39,24 +39,16 @@ public final class HomeVC: UIViewController {
         $0.textColor = DSColor.textPrimary
     }
 
-    private lazy var greetingStack = UIStackView(arrangedSubviews: [greetingLabel, roleLabel]).then {
+    private let dateLabel = UILabel().then {
+        $0.font = DSKitFontFamily.Pretendard.regular.font(size: 13)
+        $0.textColor = DSColor.textTertiary
+        $0.text = HomeVC.todayText()
+    }
+
+    private lazy var greetingStack = UIStackView(arrangedSubviews: [greetingLabel, roleLabel, dateLabel]).then {
         $0.axis = .vertical
         $0.spacing = 2
-    }
-
-    private let chipsStack = UIStackView().then {
-        $0.axis = .horizontal
-        $0.spacing = 8
-    }
-
-    private let cardsStack = UIStackView().then {
-        $0.axis = .vertical
-        $0.spacing = 12
-    }
-
-    private let activityStack = UIStackView().then {
-        $0.axis = .vertical
-        $0.spacing = 12
+        $0.setCustomSpacing(8, after: roleLabel)
     }
 
     // MARK: - Init
@@ -112,15 +104,23 @@ public final class HomeVC: UIViewController {
         contentStack.addArrangedSubview(greetingStack)
         contentStack.addArrangedSubview(makeChipsRow())
         contentStack.addArrangedSubview(makeCardsSection())
-        contentStack.addArrangedSubview(makeActivitySection())
     }
 
+    // 오늘 날짜 — "M월 d일 EEEE"(예: 7월 23일 수요일).
+    private static func todayText() -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ko_KR")
+        formatter.dateFormat = "M월 d일 EEEE"
+        return formatter.string(from: Date())
+    }
+
+    // 활성 타이머 수를 갱신해야 해서 프로퍼티로 유지한다.
+    private let timerChip = DSChip(text: "활성 타이머 0", icon: .timer, style: .secondary)
+
     private func makeChipsRow() -> UIView {
-        let wardChip = DSChip(text: "병동 다이어 2")
-        let recentChip = DSChip(text: "최근 작업 9")
         let spacer = UIView()
 
-        let stack = UIStackView(arrangedSubviews: [wardChip, recentChip, spacer]).then {
+        let stack = UIStackView(arrangedSubviews: [timerChip, spacer]).then {
             $0.axis = .horizontal
             $0.spacing = 8
         }
@@ -129,9 +129,9 @@ public final class HomeVC: UIViewController {
 
     // 남은 횟수를 갱신해야 해서 프로퍼티로 유지한다.
     private let drugCard = DSListRow(
-        icon: .search,
-        title: "약물 식별",
-        subtitle: "장기 처방약을 간편히 식별하고 성분 정보를 확인하세요."
+        icon: .pill,
+        title: "알약 식별",
+        subtitle: "환자 지참약을 한 번에 식별하고 정보를 확인하세요."
     )
 
     private func makeCardsSection() -> UIView {
@@ -140,42 +140,15 @@ public final class HomeVC: UIViewController {
         drugCard.onTap { [weak self] in self?.drugIdentifySubject.send() }
 
         let timerCard = DSListRow(
-            icon: .clock,
+            icon: .timer,
             title: "처치 타이머",
-            subtitle: "투약일 처치 시간을 체계적으로 관리하세요."
+            subtitle: "투약 및 처치 시간을 체계적으로 관리하세요."
         )
         timerCard.setIconBackground(DSColor.Secondary._50)
         timerCard.setIconTint(DSColor.Secondary._500)
         timerCard.onTap { [weak self] in self?.treatmentTimerSubject.send() }
 
         let stack = UIStackView(arrangedSubviews: [drugCard, timerCard]).then {
-            $0.axis = .vertical
-            $0.spacing = 12
-        }
-        return stack
-    }
-
-    private func makeActivitySection() -> UIView {
-        let titleLabel = UILabel().then {
-            $0.text = "최근 활동"
-            $0.font = DSKitFontFamily.Pretendard.semiBold.font(size: 18)
-            $0.textColor = DSColor.textPrimary
-            $0.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        }
-        let moreBtn = UIButton(type: .system).then {
-            $0.setTitle("전체보기", for: .normal)
-            $0.titleLabel?.font = DSKitFontFamily.Pretendard.medium.font(size: 13)
-            $0.setTitleColor(DSColor.Primary._500, for: .normal)
-        }
-        let headerRow = UIStackView(arrangedSubviews: [titleLabel, moreBtn]).then {
-            $0.axis = .horizontal
-            $0.alignment = .center
-        }
-
-        let row = DSListRow(icon: .search, title: "이부프로펜 200mg", subtitle: "오늘 오전 9:21")
-        row.setChevronHidden(true)
-
-        let stack = UIStackView(arrangedSubviews: [headerRow, row]).then {
             $0.axis = .vertical
             $0.spacing = 12
         }
@@ -216,6 +189,14 @@ public final class HomeVC: UIViewController {
                     title: PillLimitAlertText.title,
                     message: PillLimitAlertText.message(resetAt: usage?.resetAt)
                 )
+            }
+            .store(in: &cancelBag)
+
+        // 활성 타이머 수 — 0이어도 항상 표시한다(칩이 사라지면 홈이 허전해 보임).
+        output.activeTimerCount
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] count in
+                self?.timerChip.setText("활성 타이머 \(count)")
             }
             .store(in: &cancelBag)
     }
