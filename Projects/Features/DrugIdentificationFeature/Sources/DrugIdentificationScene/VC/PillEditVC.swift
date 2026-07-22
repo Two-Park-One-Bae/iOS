@@ -18,7 +18,7 @@ final class PillEditVC: UIViewController {
     var onCancel: (() -> Void)?
     var onBackTapped: (() -> Void)?
     // 후보 ⓘ 탭 → 세부정보 진입 (pillCode, pillImageUrl)
-    var onSelectDetail: ((String, String?) -> Void)?
+    var onSelectDetail: ((String, String?, LicenseStatus) -> Void)?
 
     // MARK: - Sections / State
 
@@ -519,7 +519,7 @@ extension PillEditVC: UICollectionViewDataSource {
                 let candidate = candidates[indexPath.item]
                 cell.configure(candidate: candidate, selected: candidate.pillCode == selectedPillCode)
                 cell.onInfoTap = { [weak self] in
-                    self?.onSelectDetail?(candidate.pillCode, candidate.pillImageUrl)
+                    self?.onSelectDetail?(candidate.pillCode, candidate.pillImageUrl, candidate.licenseStatus)
                 }
                 return cell
             }

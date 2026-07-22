@@ -106,6 +106,8 @@ final class PillDetailVC: UIViewController {
                 message: message,
                 retry: true
             ))
+        case .revoked:
+            containerView.addSubview(makeRevokedView())
         }
         containerView.subviews.last?.snp.makeConstraints { $0.edges.equalToSuperview() }
     }
@@ -170,6 +172,72 @@ final class PillDetailVC: UIViewController {
                 $0.leading.trailing.equalToSuperview().inset(24)
                 $0.bottom.equalTo(container.safeAreaLayoutGuide).inset(24)
             }
+        }
+        return container
+    }
+
+    // ⑩-g 허가 종료 안내 — REVOKED 품목은 조회 없이 안내만 표시 (NM-342, 디자인 UwBjQ).
+    // 96 원형(warning-50) + file-x(warning-600 42pt) + 타이틀 20 + 설명 15(lineHeight 1.5) + '뒤로'.
+    private func makeRevokedView() -> UIView {
+        let container = UIView()
+
+        let iconBg = UIView()
+        iconBg.backgroundColor = DSColor.Warning._50
+        iconBg.layer.cornerRadius = 48
+        iconBg.snp.makeConstraints { $0.width.height.equalTo(96) }
+
+        // 디자인 아이콘은 lucide file-x — DSIcon엔 없어 가장 가까운 fileSearch 사용.
+        let iconView = UIImageView(image: DSIcon.fileSearch.uiImage)
+        iconView.tintColor = DSColor.Warning._600
+        iconView.contentMode = .scaleAspectFit
+        iconBg.addSubview(iconView)
+        iconView.snp.makeConstraints {
+            $0.center.equalToSuperview()
+            $0.width.height.equalTo(42)
+        }
+
+        let titleLabel = UILabel()
+        titleLabel.text = "허가가 종료된 약이에요"
+        titleLabel.font = DSKitFontFamily.Pretendard.bold.font(size: 20)
+        titleLabel.textColor = DSColor.textPrimary
+        titleLabel.textAlignment = .center
+
+        let messageLabel = UILabel()
+        let style = NSMutableParagraphStyle()
+        style.lineHeightMultiple = 1.5
+        style.alignment = .center
+        messageLabel.attributedText = NSAttributedString(
+            string: "허가가 취소되거나 취하된 품목이라\n세부정보가 제공되지 않아요\n후보 선택과 식별 결과에는 영향이 없어요",
+            attributes: [
+                .paragraphStyle: style,
+                .font: DSKitFontFamily.Pretendard.regular.font(size: 15),
+                .foregroundColor: DSColor.textSecondary
+            ]
+        )
+        messageLabel.numberOfLines = 0
+        messageLabel.textAlignment = .center
+
+        let texts = UIStackView(arrangedSubviews: [titleLabel, messageLabel])
+        texts.axis = .vertical
+        texts.spacing = 8
+        texts.alignment = .center
+
+        let stack = UIStackView(arrangedSubviews: [iconBg, texts])
+        stack.axis = .vertical
+        stack.spacing = 24
+        stack.alignment = .center
+        container.addSubview(stack)
+        stack.snp.makeConstraints {
+            $0.center.equalToSuperview()
+            $0.leading.trailing.equalToSuperview().inset(40)
+        }
+
+        let backButton = SecondaryButton(title: "뒤로")
+        backButton.addAction(UIAction { [weak self] _ in self?.onBackTapped?() }, for: .touchUpInside)
+        container.addSubview(backButton)
+        backButton.snp.makeConstraints {
+            $0.leading.trailing.equalToSuperview().inset(20)
+            $0.bottom.equalTo(container.safeAreaLayoutGuide).inset(28)
         }
         return container
     }
