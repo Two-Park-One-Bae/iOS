@@ -38,11 +38,14 @@ public final class HomeViewModel {
         public let usage: AnyPublisher<PillUsageModel?, Never>
         /// 한도 소진 상태에서 카드를 탭했을 때 — 안내 팝업을 띄운다.
         public let limitExceeded: AnyPublisher<PillUsageModel?, Never>
+        /// 활성(진행 중, running) 타이머 개수. 칩에 "활성 타이머 N"으로 표시한다.
+        public let activeTimerCount: AnyPublisher<Int, Never>
     }
 
     private var cancelBag = Set<AnyCancellable>()
 
     @Injected private var pillUseCase: PillUseCase
+    @Injected private var timerUseCase: TimerUseCase
 
     public init() {}
 
@@ -54,7 +57,11 @@ public final class HomeViewModel {
         // 식별을 마치고 홈으로 돌아왔을 때도 갱신되도록 willAppear마다 조회한다.
         // 조회 전용이라 카운트는 늘지 않는다 (NM-331).
         input.viewWillAppear
-            .sink { [weak self] in self?.pillUseCase.fetchPillUsage() }
+            .sink { [weak self] in
+                self?.pillUseCase.fetchPillUsage()
+                // 위젯·라이브액티비티 등 다른 프로세스에서 시작된 타이머까지 반영되도록 재동기화.
+                self?.timerUseCase.reload()
+            }
             .store(in: &cancelBag)
 
         input.drugIdentifyTapped
@@ -76,11 +83,18 @@ public final class HomeViewModel {
             .sink { [weak self] in self?.onTreatmentTimerTapped?() }
             .store(in: &cancelBag)
 
+        // 진행 중(running)인 타이머만 센다 — 일시정지·울림 제외.
+        let activeTimerCount = timerUseCase.timers
+            .map { $0.filter { $0.state == .running }.count }
+            .removeDuplicates()
+            .eraseToAnyPublisher()
+
         return Output(
             isLoading: isLoading.eraseToAnyPublisher(),
             error: error.eraseToAnyPublisher(),
             usage: pillUseCase.pillUsage.eraseToAnyPublisher(),
-            limitExceeded: limitExceeded.eraseToAnyPublisher()
+            limitExceeded: limitExceeded.eraseToAnyPublisher(),
+            activeTimerCount: activeTimerCount
         )
     }
 }
