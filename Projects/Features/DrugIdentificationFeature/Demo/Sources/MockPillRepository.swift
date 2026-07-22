@@ -89,16 +89,18 @@ final class MockPillRepository: PillRepositoryProtocol {
         let stub = PillCandidatePageModel(
             candidates: [
                 PillCandidateModel(
-                    pillCode:     "A11A1234",
-                    pillName:     "타이레놀정500밀리그람",
-                    companyName:  "한국얀센",
-                    pillImageUrl: nil
+                    pillCode:      "A11A1234",
+                    pillName:      "타이레놀정500밀리그람",
+                    companyName:   "한국얀센",
+                    pillImageUrl:  nil,
+                    licenseStatus: .normal
                 ),
                 PillCandidateModel(
-                    pillCode:     "A11A5678",
-                    pillName:     "게보린정",
-                    companyName:  "삼진제약",
-                    pillImageUrl: nil
+                    pillCode:      "A11A5678",
+                    pillName:      "게보린정",
+                    companyName:   "삼진제약",
+                    pillImageUrl:  nil,
+                    licenseStatus: .revoked
                 ),
             ],
             nextCursor: nil,

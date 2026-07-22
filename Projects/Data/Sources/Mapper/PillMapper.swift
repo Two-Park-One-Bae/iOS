@@ -148,10 +148,12 @@ extension DividingLine {
 extension PillCandidateEntity {
     public func toDomain() -> PillCandidateModel {
         PillCandidateModel(
-            pillCode:     pillCode,
-            pillName:     pillName,
-            companyName:  companyName,
-            pillImageUrl: pillImageUrl
+            pillCode:      pillCode,
+            pillName:      pillName,
+            companyName:   companyName,
+            pillImageUrl:  pillImageUrl,
+            // 미지의 값·누락은 정상 취급(배지 없음·조회 진행) — 안전측.
+            licenseStatus: licenseStatus?.uppercased() == "REVOKED" ? .revoked : .normal
         )
     }
 }

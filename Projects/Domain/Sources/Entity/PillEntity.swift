@@ -52,23 +52,32 @@ public struct PillFaceModel: Equatable {
     }
 }
 
+// 허가상태(NM-337). REVOKED = 허가 취소·취하 통합 — '허가 종료' 배지·후순위·세부정보 조회 생략 기준.
+public enum LicenseStatus: Equatable {
+    case normal
+    case revoked
+}
+
 // 후보 알약 1개
 public struct PillCandidateModel: Equatable {
     public let pillCode: String
     public let pillName: String?
     public let companyName: String?
     public let pillImageUrl: String?
+    public let licenseStatus: LicenseStatus
 
     public init(
         pillCode: String,
         pillName: String?,
         companyName: String?,
-        pillImageUrl: String?
+        pillImageUrl: String?,
+        licenseStatus: LicenseStatus
     ) {
         self.pillCode = pillCode
         self.pillName = pillName
         self.companyName = companyName
         self.pillImageUrl = pillImageUrl
+        self.licenseStatus = licenseStatus
     }
 }
 
