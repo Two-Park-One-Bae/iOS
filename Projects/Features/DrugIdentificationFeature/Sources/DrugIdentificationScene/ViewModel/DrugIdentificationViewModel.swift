@@ -13,6 +13,8 @@ public final class DrugIdentificationViewModel {
         case success(pills: [IdentifiedPill], image: UIImage)
         case empty
         case failure(message: String)
+        // 한도 도달(429) — 분석 실패 화면이 아니라 안내 팝업으로 분기한다 (NM-323)
+        case limitExceeded(usage: PillUsageModel?)
     }
 
     // MARK: - Input / Output
@@ -151,6 +153,13 @@ public final class DrugIdentificationViewModel {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] message in
                 self?.stateSubject.send(.failure(message: message))
+            }
+            .store(in: &cancelBag)
+
+        pillUseCase.limitExceeded
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] usage in
+                self?.stateSubject.send(.limitExceeded(usage: usage))
             }
             .store(in: &cancelBag)
     }

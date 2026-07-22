@@ -15,7 +15,7 @@ final class MockPillRepository: PillRepositoryProtocol {
     func fetchPillAttributes(
         originalImage: String,
         items: [(pillId: String, segmentation: [[Double]], croppedImage: String)]
-    ) -> AnyPublisher<[PillAttributeModel], Error> {
+    ) -> AnyPublisher<PillAttributeResultModel, Error> {
         let stub = items.enumerated().map { index, item -> PillAttributeModel in
             // 두 번째 알약은 색·모양·제형·각인 인식 실패 카드로 반환
             if index == 1 {
@@ -41,9 +41,26 @@ final class MockPillRepository: PillRepositoryProtocol {
                 error:         nil
             )
         }
-        return Just(stub)
+        // 데모는 한도를 소진하지 않는다 — 잔여를 넉넉히 준다. 한도 UI는 fetchPillUsage 스텁으로 확인.
+        let result = PillAttributeResultModel(items: stub, usage: Self.stubUsage(remaining: 12))
+        return Just(result)
             .setFailureType(to: Error.self)
             .eraseToAnyPublisher()
+    }
+
+    func fetchPillUsage() -> AnyPublisher<PillUsageModel, Error> {
+        Just(Self.stubUsage(remaining: 12))
+            .setFailureType(to: Error.self)
+            .eraseToAnyPublisher()
+    }
+
+    // remaining을 0으로 바꾸면 한도 소진 상태·안내 팝업을 데모에서 확인할 수 있다.
+    private static func stubUsage(remaining: Int) -> PillUsageModel {
+        PillUsageModel(
+            limit:     15,
+            remaining: remaining,
+            resetAt:   Calendar.current.startOfDay(for: Date().addingTimeInterval(86_400))
+        )
     }
 
     func fetchPillCandidates(

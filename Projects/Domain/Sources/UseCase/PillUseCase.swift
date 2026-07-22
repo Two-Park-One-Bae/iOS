@@ -30,10 +30,18 @@ public protocol PillUseCase {
     // 후보 선택 확정(pillCode) → 세부정보 조회 (NM-312)
     func fetchPillDetail(pillCode: String)
 
+    // 잔여 식별 횟수 조회 (NM-331). 조회 전용 — 카운트가 늘지 않는다
+    func fetchPillUsage()
+
     var pillAttributes: PassthroughSubject<[PillAttributeModel], Never> { get }
     var pillCandidates: PassthroughSubject<PillCandidatePageModel, Never> { get }
     var pillDetail:     PassthroughSubject<PillDetailModel, Never> { get }
     var errorMessage:   PassthroughSubject<String, Never> { get }
+
+    // 서버가 준 최신 사용량. 식별 응답·조회 어느 쪽으로도 갱신된다
+    var pillUsage:      CurrentValueSubject<PillUsageModel?, Never> { get }
+    // 한도 도달 — UI는 이걸 받아 '한도 안내 팝업'을 띄운다 (429 또는 진입 게이트)
+    var limitExceeded:  PassthroughSubject<PillUsageModel?, Never> { get }
 
     // 세부정보 조회 전용 채널 — 공유 errorMessage로 흘리면 다른 화면(분석 등)까지 새므로 분리 (NM-309)
     var pillDetailNotFound: PassthroughSubject<Void, Never> { get }
@@ -51,6 +59,8 @@ public final class DefaultPillUseCase: PillUseCase {
     public let pillCandidates = PassthroughSubject<PillCandidatePageModel, Never>()
     public let pillDetail     = PassthroughSubject<PillDetailModel, Never>()
     public let errorMessage   = PassthroughSubject<String, Never>()
+    public let pillUsage      = CurrentValueSubject<PillUsageModel?, Never>(nil)
+    public let limitExceeded  = PassthroughSubject<PillUsageModel?, Never>()
     public let pillDetailNotFound = PassthroughSubject<Void, Never>()
     public let pillDetailFailure  = PassthroughSubject<String, Never>()
 
@@ -64,11 +74,33 @@ public final class DefaultPillUseCase: PillUseCase {
     ) {
         repository.fetchPillAttributes(originalImage: originalImage, items: items)
             .catch { [weak self] error in
-                self?.errorMessage.send(error.localizedDescription)
-                return Empty<[PillAttributeModel], Never>()
+                // 429는 일반 오류(분석 실패 화면)가 아니라 한도 안내 팝업으로 분기한다
+                if let limit = error as? PillLimitExceededError {
+                    self?.pillUsage.send(limit.usage)
+                    self?.limitExceeded.send(limit.usage)
+                } else {
+                    self?.errorMessage.send(error.localizedDescription)
+                }
+                return Empty<PillAttributeResultModel, Never>()
             }
-            .sink { [weak self] attributes in
-                self?.pillAttributes.send(attributes)
+            .sink { [weak self] result in
+                // usage가 nil이면 서버가 아직 0.13.0 미적용 — 잔여를 '미확인'으로 두고 덮어쓰지 않는다
+                if let usage = result.usage {
+                    self?.pillUsage.send(usage)
+                }
+                self?.pillAttributes.send(result.items)
+            }
+            .store(in: &cancellables)
+    }
+
+    public func fetchPillUsage() {
+        repository.fetchPillUsage()
+            .catch { _ in
+                // 조회 실패는 식별을 막지 않는다 — 최종 판정은 식별 요청의 429다 (spec: 잔여 미확인 시 통과)
+                Empty<PillUsageModel, Never>()
+            }
+            .sink { [weak self] usage in
+                self?.pillUsage.send(usage)
             }
             .store(in: &cancellables)
     }

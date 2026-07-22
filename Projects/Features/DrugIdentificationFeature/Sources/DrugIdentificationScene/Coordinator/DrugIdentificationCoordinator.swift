@@ -1,7 +1,9 @@
 import UIKit
+import Combine
 import BaseFeatureDependency
 import Core
 import Domain
+import DSKit
 
 public final class DrugIdentificationCoordinator: BaseCoordinator {
 
@@ -81,6 +83,8 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
         }
     }
 
+    @Injected private var pillUseCase: PillUseCase
+
     // MARK: - ② 미리보기
 
     private func showPreview(image: UIImage) {
@@ -91,10 +95,37 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
             self.cameraPicker.present(from: self.navigationController, source: .camera)
         }
         vc.onUsePhoto = { [weak self] in
-            self?.startIdentification(image: image)
+            guard let self else { return }
+
+            // 세션 중 소진 방어: 진입 후 마지막 횟수를 쓰고 돌아온 경우, 요청을 보내지 않는다.
+            // 값을 모르면 통과 — 최종 판정은 서버 429다 (NM-323).
+            if let usage = self.pillUseCase.pillUsage.value, usage.isExhausted {
+                self.exitToHomeWithLimitAlert(usage: usage)
+                return
+            }
+
+            self.startIdentification(image: image)
         }
         vc.onExitToHome = { [weak self] in self?.exitToHome() }
+        // 미리보기에도 남은 횟수를 표시한다 (촬영 화면에는 표시하지 않는다).
+        vc.bindUsage(pillUseCase.pillUsage.eraseToAnyPublisher())
         navigationController.pushViewController(vc, animated: true)
+    }
+
+    /// 한도에 걸리면 홈으로 되돌리고 안내 팝업을 띄운다.
+    ///
+    /// 미리보기에 남겨두면 재촬영·이 사진 사용 둘 다 다시 막혀 막다른 길이 된다.
+    /// 요청 전에 막힌 경우(게이트)와 서버가 거절한 경우(429)를 사용자는 구분할 수 없으므로
+    /// 두 경로의 동작을 통일한다.
+    private func exitToHomeWithLimitAlert(usage: PillUsageModel?) {
+        navigationController.popToRootViewController(animated: false)
+        NotificationCenter.default.post(name: .selectHomeTab, object: nil)
+
+        // 탭 전환 뒤에도 보이도록 윈도우 위에 띄운다.
+        DSAlertCardView.presentOverWindow(
+            title: PillLimitAlertText.title,
+            message: PillLimitAlertText.message(resetAt: usage?.resetAt)
+        )
     }
 
     // MARK: - ④ 로딩 → ⑤/⑥/⑦
@@ -116,6 +147,10 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
         loadingVC.onFailure = { [weak self, weak loadingVC] message in
             guard let loadingVC else { return }
             self?.showFailure(replacing: loadingVC)
+        }
+        // 한도 도달은 실패가 아니다 — 미리보기로 되돌리고 안내 팝업만 띄운다.
+        loadingVC.onLimitExceeded = { [weak self] usage in
+            self?.exitToHomeWithLimitAlert(usage: usage)
         }
 
         navigationController.pushViewController(loadingVC, animated: true)

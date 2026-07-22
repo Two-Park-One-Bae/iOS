@@ -10,6 +10,8 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
         RegisterDependencies.register()
+        // App Check 팩토리는 반드시 FirebaseApp.configure() 이전에 설정해야 적용된다.
+        AppCheckService.configure()
         FirebaseService.configure()
         // Remote Config fetch + 게이팅(강제 업데이트·점검)은 window 를 소유한 SceneDelegate 가
         // sceneDidBecomeActive 에서 담당한다(포그라운드 복귀 시에도 최신값 반영).
