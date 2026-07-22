@@ -13,6 +13,7 @@ public final class PillDetailViewModel {
         case loaded(PillDetailModel)
         case notFound              // 404 — '세부정보 없음' (NM-309). 재시도 무의미.
         case failure(message: String)
+        case revoked               // 허가 종료(REVOKED) — 조회 없이 안내 (NM-336/NM-342).
     }
 
     // MARK: - Input / Output
@@ -31,18 +32,27 @@ public final class PillDetailViewModel {
     @Injected private var pillUseCase: PillUseCase
 
     private let pillCode: String
+    private let licenseStatus: LicenseStatus
     private var cancelBag = Set<AnyCancellable>()
     private let stateSubject = CurrentValueSubject<State, Never>(.loading)
 
     // MARK: - Init
 
-    init(pillCode: String) {
+    init(pillCode: String, licenseStatus: LicenseStatus = .normal) {
         self.pillCode = pillCode
+        self.licenseStatus = licenseStatus
     }
 
     // MARK: - Transform
 
     func transform(input: Input) -> Output {
+        // 허가 종료(REVOKED)는 허가정보가 없는 품목 — 조회 없이 안내만 표시한다(NM-336).
+        // '데이터 없음'·'오류'와 구분되는 별도 상태다.
+        guard licenseStatus != .revoked else {
+            stateSubject.send(.revoked)
+            return Output(state: stateSubject.eraseToAnyPublisher())
+        }
+
         bindUseCase()
 
         Publishers.Merge(input.viewDidLoad, input.retry)
