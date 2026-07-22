@@ -3,26 +3,47 @@ import SnapKit
 import Then
 import DSKit
 
-// 알약 삭제 확인 다이얼로그 카드 (콘텐츠 전용 — dim/positioning은 호출자 담당)
-final class DeleteConfirmCardView: UIView {
+/// 취소/확인 2버튼 확인 다이얼로그 카드 (콘텐츠 전용 — dim/positioning은 호출자 담당).
+///
+/// 되돌릴 수 없는 동작 앞에서 한 번 확인받는 용도. 안내만 필요하면 확인 1버튼을 쓸 것.
+final class ConfirmCardView: UIView {
 
     var onCancel: (() -> Void)?
-    var onDelete: (() -> Void)?
+    var onConfirm: (() -> Void)?
 
-    override init(frame: CGRect) {
-        super.init(frame: frame)
-        setup()
+    /// - Parameters:
+    ///   - message: 제목만으로 부족할 때만 쓴다. nil이면 줄 자체가 사라진다.
+    ///   - isDestructive: 확인 버튼을 경고색으로 — 삭제처럼 잃는 게 있는 동작에 쓴다.
+    init(
+        title: String,
+        message: String? = nil,
+        cancelTitle: String = "취소",
+        confirmTitle: String = "확인",
+        isDestructive: Bool = false
+    ) {
+        super.init(frame: .zero)
+        setup(
+            title: title,
+            message: message,
+            cancelTitle: cancelTitle,
+            confirmTitle: confirmTitle,
+            isDestructive: isDestructive
+        )
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
-    private func setup() {
-        // Card
+    private func setup(
+        title: String,
+        message: String?,
+        cancelTitle: String,
+        confirmTitle: String,
+        isDestructive: Bool
+    ) {
         backgroundColor = DSColor.Neutral._0
         layer.cornerRadius = 16
         layer.masksToBounds = false
 
-        // Shadow
         layer.shadowColor = UIColor.black.cgColor
         layer.shadowOpacity = 0.25
         layer.shadowOffset = CGSize(width: 0, height: 8)
@@ -30,43 +51,50 @@ final class DeleteConfirmCardView: UIView {
 
         snp.makeConstraints { $0.width.equalTo(300) }
 
-        // Title
-        let title = UILabel().then {
-            $0.text = "이 알약을 삭제할까요?"
+        let titleLabel = UILabel().then {
+            $0.text = title
             $0.font = DSKitFontFamily.Pretendard.bold.font(size: 16)
             $0.textColor = DSColor.textPrimary
             $0.textAlignment = .center
             $0.numberOfLines = 0
         }
 
-        // Buttons
+        let messageLabel = UILabel().then {
+            $0.text = message
+            $0.font = DSKitFontFamily.Pretendard.regular.font(size: 13)
+            $0.textColor = DSColor.textSecondary
+            $0.textAlignment = .center
+            $0.numberOfLines = 0
+            $0.isHidden = (message == nil)
+        }
+
         let cancelButton = makeButton(
-            title: "취소",
+            title: cancelTitle,
             titleColor: DSColor.textPrimary,
             background: DSColor.Neutral._100,
             action: #selector(cancelTapped)
         )
-        let deleteButton = makeButton(
-            title: "삭제",
+        let confirmButton = makeButton(
+            title: confirmTitle,
             titleColor: DSColor.Neutral._0,
-            background: DSColor.Error._500,
-            action: #selector(deleteTapped)
+            background: isDestructive ? DSColor.Error._500 : DSColor.Primary._500,
+            action: #selector(confirmTapped)
         )
-        let buttonsRow = UIStackView(arrangedSubviews: [cancelButton, deleteButton]).then {
+        let buttonsRow = UIStackView(arrangedSubviews: [cancelButton, confirmButton]).then {
             $0.axis = .horizontal
             $0.spacing = 10
             $0.distribution = .fillEqually
         }
         cancelButton.snp.makeConstraints { $0.height.equalTo(48) }
-        deleteButton.snp.makeConstraints { $0.height.equalTo(48) }
+        confirmButton.snp.makeConstraints { $0.height.equalTo(48) }
 
-        let stack = UIStackView(arrangedSubviews: [title, buttonsRow]).then {
+        let stack = UIStackView(arrangedSubviews: [titleLabel, messageLabel, buttonsRow]).then {
             $0.axis = .vertical
             $0.spacing = 8
             $0.alignment = .center
         }
         // 버튼 행 위쪽에 추가 여백 (top padding 8)
-        stack.setCustomSpacing(16, after: title)
+        stack.setCustomSpacing(16, after: messageLabel)
 
         addSubview(stack)
         stack.snp.makeConstraints {
@@ -104,5 +132,5 @@ final class DeleteConfirmCardView: UIView {
     }
 
     @objc private func cancelTapped() { onCancel?() }
-    @objc private func deleteTapped() { onDelete?() }
+    @objc private func confirmTapped() { onConfirm?() }
 }

@@ -67,16 +67,15 @@ public final class PillDetailViewModel {
             }
             .store(in: &cancelBag)
 
-        pillUseCase.errorMessage
+        // 세부정보 전용 채널만 구독한다 — 공유 errorMessage를 쓰면 다른 화면 오류까지 섞인다.
+        pillUseCase.pillDetailNotFound
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] message in
-                // 404(세부정보 없음)는 오류가 아닌 '없음' 상태로 렌더 (NM-309).
-                if message.contains("404") || message.localizedCaseInsensitiveContains("not found") {
-                    self?.stateSubject.send(.notFound)
-                } else {
-                    self?.stateSubject.send(.failure(message: message))
-                }
-            }
+            .sink { [weak self] in self?.stateSubject.send(.notFound) }
+            .store(in: &cancelBag)
+
+        pillUseCase.pillDetailFailure
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] message in self?.stateSubject.send(.failure(message: message)) }
             .store(in: &cancelBag)
     }
 }

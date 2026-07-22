@@ -73,7 +73,9 @@ final class PillLoadingVC: UIViewController {
     private func setUI() {
         view.backgroundColor = DSColor.bgApp
         photoCard.setImage(capturedImage)
-        navBar.onBackTapped = { [weak self] in self?.onBackTapped?() }
+        // 식별 요청이 이미 나간 상태라 중단해도 횟수가 차감된다 — 아예 나갈 수 없게 한다.
+        // 응답이 늦어도 타임아웃 후 ⑦ 분석 실패로 떨어져 영구히 갇히지는 않는다.
+        navBar.setBackButtonHidden(true)
     }
 
     private func setLayout() {

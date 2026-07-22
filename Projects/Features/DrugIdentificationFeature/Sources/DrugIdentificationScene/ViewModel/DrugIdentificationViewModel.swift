@@ -93,10 +93,9 @@ public final class DrugIdentificationViewModel {
     private var pending: (pills: [IdentifiedPill], items: [(pillId: String, segmentation: [[Double]], croppedImage: String)])?
 
     private func makeIdentifiedPills(from detections: [RFDetection]) -> [IdentifiedPill] {
-        detections.enumerated().map { offset, detection in
-            let crop = RFDetrSegmentor
-                .cropDetections(from: image, detections: [detection])
-                .crops.first?.image
+        // 크롭은 원본 정규화 1회로 일괄 생성(detection마다 재렌더하던 것 제거).
+        let crops = RFDetrSegmentor.croppedImages(from: image, detections: detections)
+        return detections.enumerated().map { offset, detection in
             let placeholder = PillAttributeModel(
                 pillId: "\(detection.id)",
                 colors: [], isTransparent: false,
@@ -105,7 +104,7 @@ public final class DrugIdentificationViewModel {
             )
             return IdentifiedPill(
                 index: offset + 1,
-                thumbnail: crop,
+                thumbnail: crops[offset],
                 boundingBox: detection.box,
                 attribute: placeholder
             )
@@ -123,7 +122,8 @@ public final class DrugIdentificationViewModel {
                 [Double(box.maxX), Double(box.maxY)],
                 [Double(box.minX), Double(box.maxY)]
             ]
-            let base64 = pill.thumbnail?.pngData()?.base64EncodedString() ?? ""
+            // 인코딩 임시 버퍼(PNG Data·base64 String)를 즉시 해제.
+            let base64 = autoreleasepool { pill.thumbnail?.pngData()?.base64EncodedString() ?? "" }
             return (pillId: pill.attribute.pillId, segmentation: polygon, croppedImage: base64)
         }
     }
@@ -131,7 +131,7 @@ public final class DrugIdentificationViewModel {
     private func requestAttributes(
         items: [(pillId: String, segmentation: [[Double]], croppedImage: String)]
     ) {
-        let base64 = image.jpegData(compressionQuality: 0.9)?.base64EncodedString() ?? ""
+        let base64 = autoreleasepool { image.jpegData(compressionQuality: 0.9)?.base64EncodedString() ?? "" }
         pillUseCase.fetchPillAttributes(originalImage: base64, items: items)
     }
 

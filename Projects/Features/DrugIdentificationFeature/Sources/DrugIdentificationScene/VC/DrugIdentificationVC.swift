@@ -12,7 +12,8 @@ public final class DrugIdentificationVC: UIViewController {
     var onSelectPill: ((IdentifiedPill) -> Void)?
     var onAddPill: (() -> Void)?
     var onConfirm: (() -> Void)?
-    var onBackTapped: (() -> Void)?
+    /// 식별 중단 → 홈 복귀. 뒤로 탭 시 확인 팝업을 거쳐 호출된다.
+    var onExitToHome: (() -> Void)?
 
     // MARK: - Properties
 
@@ -96,7 +97,8 @@ public final class DrugIdentificationVC: UIViewController {
         view.backgroundColor = DSColor.bgApp
         photoCard.setImage(capturedImage)
         progressLabel.text = "알약을 모두 식별해주세요 · 0/\(pills.count)"
-        navBar.onBackTapped = { [weak self] in self?.onBackTapped?() }
+        // 뒤로가기는 이전 화면이 아니라 '중단하고 홈으로' — 확인 팝업을 먼저 띄운다.
+        navBar.onBackTapped = { [weak self] in self?.showExitConfirm() }
         confirmButton.addTarget(self, action: #selector(confirmTapped), for: .touchUpInside)
     }
 
@@ -206,18 +208,26 @@ public final class DrugIdentificationVC: UIViewController {
     }
 
     private func showDeleteConfirm(pill: IdentifiedPill) {
-        let dim = UIView(frame: view.bounds).then { $0.backgroundColor = DSColor.Neutral._900.withAlphaComponent(0.6) }
-        addDismissTap(to: dim)
-
-        let card = DeleteConfirmCardView()
-        card.onCancel = { dim.removeFromSuperview() }
-        card.onDelete = { [weak self] in
-            dim.removeFromSuperview()
+        let card = ConfirmCardView(
+            title: "이 알약을 삭제할까요?",
+            cancelTitle: "취소",
+            confirmTitle: "삭제",
+            isDestructive: true
+        )
+        presentConfirmCard(card, dismissOnBackgroundTap: true) { [weak self] in
             self?.deletePill(pill)
         }
-        dim.addSubview(card)
-        view.addSubview(dim)
-        card.snp.makeConstraints { $0.center.equalToSuperview() }
+    }
+
+    /// 뒤로 = 식별 중단. 여기서 나가면 지금까지 확인한 내용이 사라지고,
+    /// 이미 차감된 식별 1회도 되돌아오지 않으므로 한 번 확인받는다.
+    private func showExitConfirm() {
+        presentExitConfirm(
+            title: "지금 나가면 식별한 내용이 사라져요",
+            message: "식별 횟수도 다시 사용해야 해요"
+        ) { [weak self] in
+            self?.onExitToHome?()
+        }
     }
 
     // 오버레이 빈 영역 탭으로 닫기 (내부 컨텐츠 터치는 무시)

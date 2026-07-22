@@ -10,6 +10,9 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
     private let cameraPicker: CameraPicker = {
         let picker = CameraPicker()
         picker.squareMode = true
+        // Jetsam 방지: 12MP 원본이 프리뷰·추론·결과 화면에 그대로 상주하지 않도록 진입 시 축소.
+        // 추론 입력은 내부적으로 576px, 썸네일은 작게 표시 → 2048이면 화질 여유 충분.
+        picker.maxOutputDimension = 2048
         return picker
     }()
 
@@ -103,6 +106,7 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
 
             self.startIdentification(image: image)
         }
+        vc.onExitToHome = { [weak self] in self?.exitToHome() }
         // 미리보기에도 남은 횟수를 표시한다 (촬영 화면에는 표시하지 않는다).
         vc.bindUsage(pillUseCase.pillUsage.eraseToAnyPublisher())
         navigationController.pushViewController(vc, animated: true)
@@ -130,16 +134,18 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
         let viewModel = DrugIdentificationViewModel(image: image)
         let loadingVC = PillLoadingVC(image: image, viewModel: viewModel)
 
-        loadingVC.onBackTapped = { [weak self] in
-            self?.navigationController.popViewController(animated: true)
-        }
-        loadingVC.onSuccess = { [weak self] pills, resultImage in
+        // loadingVC 를 강하게 캡처하면 loadingVC → 클로저 → loadingVC 사이클로 안 죽는다.
+        // (죽지 않으면 분석 VM 이 공유 errorMessage 를 계속 구독해 다른 화면 오류까지 받는다.)
+        loadingVC.onSuccess = { [weak self, weak loadingVC] pills, resultImage in
+            guard let loadingVC else { return }
             self?.showResult(pills: pills, image: resultImage, replacing: loadingVC)
         }
-        loadingVC.onEmpty = { [weak self] in
+        loadingVC.onEmpty = { [weak self, weak loadingVC] in
+            guard let loadingVC else { return }
             self?.showNotFound(image: image, replacing: loadingVC)
         }
-        loadingVC.onFailure = { [weak self] message in
+        loadingVC.onFailure = { [weak self, weak loadingVC] message in
+            guard let loadingVC else { return }
             self?.showFailure(replacing: loadingVC)
         }
         // 한도 도달은 실패가 아니다 — 미리보기로 되돌리고 안내 팝업만 띄운다.
@@ -157,9 +163,7 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
     private func showResult(pills: [IdentifiedPill], image: UIImage, replacing loadingVC: UIViewController) {
         let vc = DrugIdentificationVC(pills: pills, image: image)
         resultVC = vc
-        vc.onBackTapped = { [weak self] in
-            self?.navigationController.popViewController(animated: true)
-        }
+        vc.onExitToHome = { [weak self] in self?.exitToHome() }
         vc.onSelectPill = { [weak self] pill in
             self?.showEdit(pill: pill)
         }
@@ -268,9 +272,7 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
 
     private func showNotFound(image: UIImage, replacing loadingVC: UIViewController) {
         let vc = PillNotFoundVC(image: image)
-        vc.onBackTapped = { [weak self] in
-            self?.navigationController.popViewController(animated: true)
-        }
+        vc.onBackTapped = { [weak self] in self?.exitToHome() }
         vc.onRetake = { [weak self] in
             guard let self else { return }
             self.navigationController.popViewController(animated: false)
@@ -287,16 +289,20 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
 
     private func showFailure(replacing loadingVC: UIViewController) {
         let vc = AnalysisFailedVC()
-        vc.onBackTapped = { [weak self] in
-            self?.navigationController.popViewController(animated: true)
-        }
+        // 네비바 뒤로·푸터 '뒤로' 모두 홈으로 — 이 화면엔 돌아갈 이전 단계가 없다.
+        vc.onBackTapped = { [weak self] in self?.exitToHome() }
+        vc.onBack = { [weak self] in self?.exitToHome() }
         vc.onRetry = { [weak self] in
             self?.navigationController.popViewController(animated: true)
         }
-        vc.onBack = { [weak self] in
-            self?.navigationController.popViewController(animated: true)
-        }
         replace(loadingVC, with: vc)
+    }
+
+    /// 식별을 중단하고 홈 탭으로 되돌린다.
+    /// 알약 탭 루트는 빈 화면이라 그대로 두면 갈 곳이 없어, 촬영 취소와 같은 경로를 쓴다.
+    private func exitToHome() {
+        navigationController.popToRootViewController(animated: false)
+        NotificationCenter.default.post(name: .selectHomeTab, object: nil)
     }
 
     // MARK: - ③ 권한 거부

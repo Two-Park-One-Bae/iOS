@@ -42,6 +42,10 @@ public protocol PillUseCase {
     var pillUsage:      CurrentValueSubject<PillUsageModel?, Never> { get }
     // 한도 도달 — UI는 이걸 받아 '한도 안내 팝업'을 띄운다 (429 또는 진입 게이트)
     var limitExceeded:  PassthroughSubject<PillUsageModel?, Never> { get }
+
+    // 세부정보 조회 전용 채널 — 공유 errorMessage로 흘리면 다른 화면(분석 등)까지 새므로 분리 (NM-309)
+    var pillDetailNotFound: PassthroughSubject<Void, Never> { get }
+    var pillDetailFailure:  PassthroughSubject<String, Never> { get }
 }
 
 public final class DefaultPillUseCase: PillUseCase {
@@ -57,6 +61,8 @@ public final class DefaultPillUseCase: PillUseCase {
     public let errorMessage   = PassthroughSubject<String, Never>()
     public let pillUsage      = CurrentValueSubject<PillUsageModel?, Never>(nil)
     public let limitExceeded  = PassthroughSubject<PillUsageModel?, Never>()
+    public let pillDetailNotFound = PassthroughSubject<Void, Never>()
+    public let pillDetailFailure  = PassthroughSubject<String, Never>()
 
     public init(repository: PillRepositoryProtocol) {
         self.repository = repository
@@ -132,8 +138,13 @@ public final class DefaultPillUseCase: PillUseCase {
     public func fetchPillDetail(pillCode: String) {
         repository.fetchPillDetail(pillCode: pillCode)
             .catch { [weak self] error in
-                // 404(세부정보 없음)는 상위 UI에서 '세부정보 없음' 상태로 분기 예정 (NM-309)
-                self?.errorMessage.send(error.localizedDescription)
+                // 세부정보 조회 오류는 전용 채널로만 보낸다 — 공유 errorMessage에 흘리면
+                // 분석 화면 등 다른 구독자에게까지 새어 '분석 실패' 화면이 겹쳐 뜬다.
+                if error is PillDetailNotFoundError {
+                    self?.pillDetailNotFound.send(())      // 404 → '세부정보 없음' (오류 아님)
+                } else {
+                    self?.pillDetailFailure.send(error.localizedDescription)
+                }
                 return Empty<PillDetailModel, Never>()
             }
             .sink { [weak self] detail in

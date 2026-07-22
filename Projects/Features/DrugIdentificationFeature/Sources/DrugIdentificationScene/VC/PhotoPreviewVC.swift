@@ -10,6 +10,8 @@ final class PhotoPreviewVC: UIViewController {
     // MARK: - Callbacks
 
     var onRetake: (() -> Void)?
+    /// 촬영 중단 → 홈 복귀. 뒤로 탭 시 확인 팝업을 거쳐 호출된다.
+    var onExitToHome: (() -> Void)?
     var onUsePhoto: (() -> Void)?
 
     // MARK: - Properties
@@ -18,8 +20,8 @@ final class PhotoPreviewVC: UIViewController {
 
     // MARK: - UI
 
-    // 미리보기는 하단 재촬영/이 사진 사용으로 이동하므로 뒤로 버튼 없는 타이틀바 사용.
-    private let navBar = DSTitleBar(title: "미리보기").then {
+    // 뒤로는 이전 화면이 아니라 '중단하고 홈으로'. 이전 단계로 돌아가는 건 하단 재촬영이 담당한다.
+    private let navBar = DSNavBar(title: "미리보기").then {
         $0.translatesAutoresizingMaskIntoConstraints = false
     }
 
@@ -130,6 +132,11 @@ final class PhotoPreviewVC: UIViewController {
     }
 
     private func setActions() {
+        navBar.onBackTapped = { [weak self] in
+            self?.presentExitConfirm(title: "지금 나가면 촬영한 사진이 사라져요") {
+                self?.onExitToHome?()
+            }
+        }
         retakeButton.addTarget(self, action: #selector(retakeTapped), for: .touchUpInside)
         usePhotoButton.addTarget(self, action: #selector(usePhotoTapped), for: .touchUpInside)
     }

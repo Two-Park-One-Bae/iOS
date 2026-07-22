@@ -93,6 +93,17 @@ public final class PillRepository: PillRepositoryProtocol {
     public func fetchPillDetail(pillCode: String) -> AnyPublisher<PillDetailModel, Error> {
         service.fetchPillDetail(pillCode: pillCode)
             .map { $0.toDomain() }
+            .mapError { Self.mapDetailNotFound($0) }
             .eraseToAnyPublisher()
+    }
+
+    /// 404 `PILL_DETAIL_NOT_FOUND` 만 '세부정보 없음' 타입 에러로 올린다 (NM-309).
+    /// 나머지는 그대로 통과.
+    private static func mapDetailNotFound(_ error: Error) -> Error {
+        guard case APIError.network(let statusCode, let problem) = error else { return error }
+        if statusCode == 404 || problem.code == "PILL_DETAIL_NOT_FOUND" {
+            return PillDetailNotFoundError()
+        }
+        return error
     }
 }
