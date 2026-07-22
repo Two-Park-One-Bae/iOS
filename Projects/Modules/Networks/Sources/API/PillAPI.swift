@@ -60,7 +60,8 @@ extension PillAPI: BaseAPI {
 
         switch self {
         case .pillAttributes, .pillAttributesUsage:
-            headers["X-Device-Id"] = DeviceIdentifier.current
+            // Keychain 불가 시 nil — 식별 진입에서 이미 막으므로(fail-closed) 여기선 헤더만 생략.
+            if let deviceId = DeviceIdentifier.current { headers["X-Device-Id"] = deviceId }
         case .pillCandidates, .pillDetails:
             break
         }
