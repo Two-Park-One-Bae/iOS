@@ -22,19 +22,21 @@ public enum DeviceIdentifier {
 
     private static let lock = NSLock()
 
-    /// 저장된 UUID를 반환한다. 없으면 생성해 저장한다.
+    /// 저장된 device_id. Keychain에 없으면 생성해 저장한다. 디버그·릴리즈 동일하게 실 Keychain id를 쓴다.
     ///
-    /// Keychain 접근에 실패해도 요청 자체는 나가야 하므로(식별을 막지 않는다) 생성한 값을 그대로 쓴다.
-    /// 이 경우 앱 재실행 시 값이 달라져 카운트가 분리되지만, 최종 판정은 서버 429라 치명적이지 않다.
-    public static var current: String {
+    /// **Keychain 저장까지 실패하면 nil을 반환한다(fail-closed).** 매 실행 새 UUID로 폴백하면
+    /// device_id가 실행마다 바뀌어 서버가 같은 id를 못 봐 429에 영영 안 걸림 → 한도가 무력화된다.
+    /// 안정적 식별자를 만들 수 없으면 차라리 식별을 막는다(호출부가 nil을 보고 '잠시 후 다시'로 처리).
+    /// 포그라운드 흐름에서 Keychain 실패 자체가 극히 드물어 정상 유저 영향은 사실상 없다.
+    public static var current: String? {
         lock.lock()
         defer { lock.unlock() }
 
         if let saved = read() { return saved }
 
+        // 첫 실행: 생성 후 저장. 저장 성공해야 유효한 id — 실패하면 nil(fail-closed).
         let generated = UUID().uuidString
-        save(generated)
-        return generated
+        return save(generated) ? generated : nil
     }
 
     // MARK: - Keychain
@@ -58,8 +60,10 @@ public enum DeviceIdentifier {
         return value
     }
 
-    private static func save(_ value: String) {
-        guard let data = value.data(using: .utf8) else { return }
+    /// 저장 성공 여부를 반환한다 — 실패(Keychain 불가)면 current가 nil로 fail-closed.
+    @discardableResult
+    private static func save(_ value: String) -> Bool {
+        guard let data = value.data(using: .utf8) else { return false }
 
         // 재설치 후에도 남아야 하므로 기기 잠금해제 이후 접근 가능.
         // ThisDeviceOnly — 백업·기기 이관으로 식별자가 복제되지 않게.
@@ -72,6 +76,6 @@ public enum DeviceIdentifier {
         ]
 
         SecItemDelete(attributes as CFDictionary)
-        SecItemAdd(attributes as CFDictionary, nil)
+        return SecItemAdd(attributes as CFDictionary, nil) == errSecSuccess
     }
 }

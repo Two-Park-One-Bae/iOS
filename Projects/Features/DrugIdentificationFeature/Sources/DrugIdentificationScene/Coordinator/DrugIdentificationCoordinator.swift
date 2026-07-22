@@ -97,6 +97,16 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
         vc.onUsePhoto = { [weak self] in
             guard let self else { return }
 
+            // fail-closed: 안정적 기기 식별자를 못 만들면(Keychain 불가) 식별을 막는다.
+            // 매 실행 새 id면 카운트가 리셋돼 한도가 무력화되므로 — 차라리 '잠시 후 다시'.
+            guard DeviceIdentifier.current != nil else {
+                DSAlertCardView.presentOverWindow(
+                    title: "일시적 오류",
+                    message: "기기 확인에 실패했어요.\n잠시 후 다시 시도해 주세요."
+                )
+                return
+            }
+
             // 세션 중 소진 방어: 진입 후 마지막 횟수를 쓰고 돌아온 경우, 요청을 보내지 않는다.
             // 값을 모르면 통과 — 최종 판정은 서버 429다 (NM-323).
             if let usage = self.pillUseCase.pillUsage.value, usage.isExhausted {
