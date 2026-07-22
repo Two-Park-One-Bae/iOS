@@ -155,7 +155,22 @@ let project = Project(
             name: "App",
             buildAction: .buildAction(targets: [.target("App")]),
             testAction: .targets([.testableTarget(target: .target("AppTests"))]),
-            runAction: .runAction(executable: .target("App"))
+            runAction: .runAction(
+                executable: .target("App"),
+                // App Check 디버그 토큰을 개발 실행 시 주입한다 (NM-325).
+                // 개발 빌드(시뮬·실기기)는 App Check 디버그 프로바이더를 쓰는데, 토큰이 매번 랜덤 생성돼
+                // Firebase Console 재등록을 반복하게 된다. 이를 막으려 고정 토큰을 env var로 넣는다.
+                // 실제 토큰 값은 gitignore된 XCConfig/Secrets.xcconfig 의 APP_CHECK_DEBUG_TOKEN 에만 두고,
+                // 여기·스킴엔 `$(...)` 참조만 들어가므로 커밋돼도 안전하다.
+                // (Secrets.xcconfig 는 Debug/Release xcconfig 가 #include → App 타깃 빌드세팅으로 확장됨)
+                arguments: .arguments(
+                    environmentVariables: [
+                        "FIRAAppCheckDebugToken": "$(APP_CHECK_DEBUG_TOKEN)"
+                    ]
+                ),
+                // 스킴 env var 의 `$(...)` 를 App 타깃 빌드세팅 기준으로 확장한다.
+                expandVariableFromTarget: .target("App")
+            )
         )
     ]
 )
