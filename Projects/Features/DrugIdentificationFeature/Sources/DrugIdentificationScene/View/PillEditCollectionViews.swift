@@ -49,6 +49,8 @@ final class CandidateCell: UICollectionViewCell {
         $0.font = DSKitFontFamily.Pretendard.regular.font(size: 12)
         $0.textColor = DSColor.textTertiary
     }
+    // 허가 취소·취하(REVOKED) 품목에만 노출. 기본 숨김 — configure에서 결정.
+    private let licenseBadge = LicenseRevokedBadge().then { $0.isHidden = true }
     private let info = UIButton(type: .system)
 
     override init(frame: CGRect) {
@@ -70,11 +72,22 @@ final class CandidateCell: UICollectionViewCell {
 
         thumb.snp.makeConstraints { $0.width.equalTo(72); $0.height.equalTo(38) }
 
-        let texts = UIStackView(arrangedSubviews: [nameLabel, companyLabel]).then {
+        // 이름 옆에 '허가 종료' 배지 — 이름이 길면 이름만 말줄임, 배지는 고정.
+        let nameSpacer = UIView()
+        let nameRow = UIStackView(arrangedSubviews: [nameLabel, licenseBadge, nameSpacer]).then {
+            $0.axis = .horizontal
+            $0.spacing = 6
+            $0.alignment = .center
+        }
+        nameLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        licenseBadge.setContentHuggingPriority(.required, for: .horizontal)
+        licenseBadge.setContentCompressionResistancePriority(.required, for: .horizontal)
+        nameSpacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+
+        let texts = UIStackView(arrangedSubviews: [nameRow, companyLabel]).then {
             $0.axis = .vertical
             $0.spacing = 2
         }
-        nameLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
         info.setImage(DSIcon.info.uiImage, for: .normal)
         info.tintColor = DSColor.Primary._500
@@ -97,6 +110,7 @@ final class CandidateCell: UICollectionViewCell {
         pillCode = candidate.pillCode
         nameLabel.text = candidate.pillName ?? "이름 미상"
         companyLabel.text = candidate.companyName ?? "-"
+        licenseBadge.isHidden = candidate.licenseStatus != .revoked
 
         // 서버 낱알 이미지(pillImageUrl)를 Kingfisher로 로드. 작은 셀이라 표시 크기(72×38)로
         // 다운샘플 → 풀사이즈 디코드 낭비·메모리 절감.
@@ -130,7 +144,34 @@ final class CandidateCell: UICollectionViewCell {
         thumb.image = nil
         onInfoTap = nil
         pillCode = nil
+        licenseBadge.isHidden = true
     }
+}
+
+// MARK: - 허가 종료 배지
+
+/// 허가 취소·취하(REVOKED) 품목 표시 배지 — 품목명 옆 (XGm3Z).
+/// warning-50 배경 / warning-100 테두리 1px / warning-700 텍스트 10pt, radius 4, padding (2,6).
+final class LicenseRevokedBadge: UIView {
+    init() {
+        super.init(frame: .zero)
+        backgroundColor = DSColor.Warning._50
+        layer.cornerRadius = 4
+        layer.borderWidth = 1
+        layer.borderColor = DSColor.Warning._100.cgColor
+
+        let label = UILabel().then {
+            $0.text = "허가 종료"
+            $0.font = DSKitFontFamily.Pretendard.medium.font(size: 10)
+            $0.textColor = DSColor.Warning._700
+        }
+        addSubview(label)
+        label.snp.makeConstraints {
+            $0.top.bottom.equalToSuperview().inset(2)
+            $0.leading.trailing.equalToSuperview().inset(6)
+        }
+    }
+    required init?(coder: NSCoder) { fatalError() }
 }
 
 // MARK: - 속성 카드 호스트 셀
