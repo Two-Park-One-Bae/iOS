@@ -63,20 +63,20 @@ public struct PillCandidateModel: Equatable {
     public let pillCode: String
     public let pillName: String?
     public let companyName: String?
-    public let pillImageUrl: String?
+    public let pillThumbnailUrl: String?   // 목록 대조용 썸네일 (NM-347). 원본은 세부정보에서 조회.
     public let licenseStatus: LicenseStatus
 
     public init(
         pillCode: String,
         pillName: String?,
         companyName: String?,
-        pillImageUrl: String?,
+        pillThumbnailUrl: String?,
         licenseStatus: LicenseStatus
     ) {
         self.pillCode = pillCode
         self.pillName = pillName
         self.companyName = companyName
-        self.pillImageUrl = pillImageUrl
+        self.pillThumbnailUrl = pillThumbnailUrl
         self.licenseStatus = licenseStatus
     }
 }
@@ -105,6 +105,7 @@ public struct PillDetailModel: Equatable {
     public let pillCode: String
     public let name: String
     public let companyName: String
+    public let pillImageUrl: String?   // 낱알 원본 이미지 (세부정보 실물 대조, NM-347)
     public let classification: PillClassificationModel
     public let appearance: String?
     public let ingredients: [IngredientModel]
@@ -117,6 +118,7 @@ public struct PillDetailModel: Equatable {
         pillCode: String,
         name: String,
         companyName: String,
+        pillImageUrl: String?,
         classification: PillClassificationModel,
         appearance: String?,
         ingredients: [IngredientModel],
@@ -128,6 +130,7 @@ public struct PillDetailModel: Equatable {
         self.pillCode = pillCode
         self.name = name
         self.companyName = companyName
+        self.pillImageUrl = pillImageUrl
         self.classification = classification
         self.appearance = appearance
         self.ingredients = ingredients

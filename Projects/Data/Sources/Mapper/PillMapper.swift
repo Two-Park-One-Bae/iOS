@@ -151,7 +151,7 @@ extension PillCandidateEntity {
             pillCode:      pillCode,
             pillName:      pillName,
             companyName:   companyName,
-            pillImageUrl:  pillImageUrl,
+            pillThumbnailUrl: pillThumbnailUrl,
             // 미지의 값·누락은 정상 취급(배지 없음·조회 진행) — 안전측.
             licenseStatus: licenseStatus?.uppercased() == "REVOKED" ? .revoked : .normal
         )
@@ -176,6 +176,7 @@ extension PillDetailEntity {
             pillCode:       pillCode,
             name:           name,
             companyName:    companyName,
+            pillImageUrl:   pillImageUrl,
             classification: classification.toDomain(),
             appearance:     appearance,
             ingredients:    ingredients.map { $0.toDomain() },
