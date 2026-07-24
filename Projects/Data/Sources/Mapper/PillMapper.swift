@@ -176,6 +176,7 @@ extension PillDetailEntity {
             pillCode:       pillCode,
             name:           name,
             companyName:    companyName,
+            pillImageUrl:   pillImageUrl,
             classification: classification.toDomain(),
             appearance:     appearance,
             ingredients:    ingredients.map { $0.toDomain() },

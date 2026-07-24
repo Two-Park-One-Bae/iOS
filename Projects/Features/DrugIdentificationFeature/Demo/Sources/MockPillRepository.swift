@@ -126,6 +126,7 @@ final class MockPillRepository: PillRepositoryProtocol {
             pillCode:       pillCode,
             name:           "타이레놀정500밀리그람(아세트아미노펜)",
             companyName:    "한국얀센",
+            pillImageUrl:   nil,   // 데모: 원본 이미지 없음 — 실제 앱은 서버가 pillCode로 URL 조립.
             classification: .otc,
             appearance:     "흰색의 장방형 필름코팅정, 한쪽 면에 'TYLENOL 500' 각인",
             ingredients:    [IngredientModel(name: "아세트아미노펜", amount: "500", unit: "밀리그램")],

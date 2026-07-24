@@ -13,6 +13,7 @@ public struct PillDetailEntity: Decodable {
     public let pillCode: String
     public let name: String
     public let companyName: String            // 동명이약 구분
+    public let pillImageUrl: String?          // 낱알 원본 이미지 URL (실물 대조, NM-347). 목록 썸네일과 달리 원본.
     public let classification: PillClassification
     public let appearance: String?            // 성상 — 색·모양·제형 서술
     public let ingredients: [IngredientEntity]

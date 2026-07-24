@@ -11,8 +11,8 @@ final class FinalResultVC: UIViewController {
 
     var onComplete: (() -> Void)?
     var onBackTapped: (() -> Void)?
-    // 카드 탭 → 세부정보 진입 (pillCode, 썸네일)
-    var onSelectDetail: ((String, String?, LicenseStatus) -> Void)?
+    // 카드 탭 → 세부정보 진입 (pillCode, 허가상태). 세부 이미지는 상세 조회 응답에서 로드(NM-347).
+    var onSelectDetail: ((String, LicenseStatus) -> Void)?
 
     // MARK: - Properties
 
@@ -222,10 +222,9 @@ final class FinalResultVC: UIViewController {
         // 카드 전체를 탭 영역으로 — 세부정보 진입
         let tapButton = UIButton(type: .system)
         let pillCode = candidate.pillCode
-        let imageUrl = candidate.pillThumbnailUrl
         let licenseStatus = candidate.licenseStatus
         tapButton.addAction(UIAction { [weak self] _ in
-            self?.onSelectDetail?(pillCode, imageUrl, licenseStatus)
+            self?.onSelectDetail?(pillCode, licenseStatus)
         }, for: .touchUpInside)
         card.addSubview(tapButton)
         tapButton.snp.makeConstraints { $0.edges.equalToSuperview() }

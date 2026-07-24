@@ -16,7 +16,6 @@ final class PillDetailVC: UIViewController {
     // MARK: - Dependencies
 
     private let viewModel: PillDetailViewModel
-    private let imageUrl: String?   // 서버 낱알 이미지 URL (헤더에 표시)
 
     private let viewDidLoadSubject = PassthroughSubject<Void, Never>()
     private let retrySubject = PassthroughSubject<Void, Never>()
@@ -36,9 +35,8 @@ final class PillDetailVC: UIViewController {
 
     // MARK: - Init
 
-    init(viewModel: PillDetailViewModel, imageUrl: String?) {
+    init(viewModel: PillDetailViewModel) {
         self.viewModel = viewModel
-        self.imageUrl = imageUrl
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -298,13 +296,14 @@ final class PillDetailVC: UIViewController {
         container.addArrangedSubview(name)
         container.addArrangedSubview(company)
 
-        if let imageUrl, let url = URL(string: imageUrl) {
+        if let imageUrlString = model.pillImageUrl, let url = URL(string: imageUrlString) {
             let imageView = UIImageView()
             imageView.contentMode = .scaleAspectFit
             imageView.backgroundColor = DSColor.Neutral._100
             imageView.layer.cornerRadius = 12
             imageView.clipsToBounds = true
-            // 상세는 초점 이미지라 다운샘플 없이 원본급으로 선명하게(단일 이미지·메모리 부담 적음).
+            // 세부정보는 원본 이미지(pillImageUrl, NM-347)를 다운샘플 없이 로드. 회색 박스 위로 페이드,
+            // 로드 실패(이미지 없는 품목=CDN 404) 시 회색 박스가 폴백 플레이스홀더로 남는다.
             imageView.kf.setImage(with: url, options: [.transition(.fade(0.25))])
             container.setCustomSpacing(12, after: company)
             container.addArrangedSubview(imageView)
