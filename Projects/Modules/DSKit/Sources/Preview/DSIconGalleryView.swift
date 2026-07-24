@@ -8,12 +8,13 @@ import UIKit
 struct DSIconGalleryView: View {
 
     private let icons: [(String, DSIcon)] = [
-        // App & Domain (15)
+        // App & Domain (16)
         ("pill", .pill), ("syringe", .syringe), ("timer", .timer),
         ("clipboardList", .clipboardList), ("history", .history), ("shapes", .shapes),
         ("bellRing", .bellRing), ("stickyNote", .stickyNote), ("square", .square),
         ("heartPulse", .heartPulse), ("batteryFull", .batteryFull), ("flashlight", .flashlight),
-        ("vibrate", .vibrate), ("fileSearch", .fileSearch), ("circlePlay", .circlePlay),
+        ("vibrate", .vibrate), ("fileSearch", .fileSearch), ("fileX", .fileX),
+        ("circlePlay", .circlePlay),
         // System & State (7)
         ("signal", .signal), ("battery", .battery), ("wifiOff", .wifiOff),
         ("cameraOff", .cameraOff), ("searchX", .searchX), ("zap", .zap), ("circle", .circle),
