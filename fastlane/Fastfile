@@ -170,7 +170,7 @@ platform :ios do
         in_house: false
       ),
       distribute_external: true,
-      groups: ["nurse"],
+      groups: ["Nurse"],   # App Store Connect 외부 그룹명과 대소문자까지 정확히 일치해야 함
       changelog: ENV["CHANGELOG"] || "버그 수정 및 개선 사항",
       skip_waiting_for_build_processing: false
     )
