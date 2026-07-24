@@ -302,12 +302,17 @@ final class PillDetailVC: UIViewController {
             imageView.backgroundColor = DSColor.Neutral._100
             imageView.layer.cornerRadius = 12
             imageView.clipsToBounds = true
-            // 세부정보는 원본 이미지(pillImageUrl, NM-347)를 다운샘플 없이 로드. 회색 박스 위로 페이드,
-            // 로드 실패(이미지 없는 품목=CDN 404) 시 회색 박스가 폴백 플레이스홀더로 남는다.
-            imageView.kf.setImage(with: url, options: [.transition(.fade(0.25))])
             container.setCustomSpacing(12, after: company)
             container.addArrangedSubview(imageView)
-            imageView.snp.makeConstraints { $0.height.equalTo(150) }
+            // 낱알 원본은 가로형(식약처 표준 ≈ 1.83:1). 틀을 이미지 실제 비율에 맞춰 좌우 여백·왜곡을 없앤다.
+            // 로드 전엔 표준 비율로 박스를 잡고, 완료 시 실제 비율로 교체. 회색 박스+페이드,
+            // 로드 실패(이미지 없는 품목=CDN 404) 시 회색 박스가 폴백 플레이스홀더로 남는다.
+            imageView.snp.makeConstraints { $0.height.equalTo(imageView.snp.width).multipliedBy(426.0 / 780.0) }
+            imageView.kf.setImage(with: url, options: [.transition(.fade(0.25))]) { [weak imageView] result in
+                guard let imageView, case .success(let value) = result, value.image.size.width > 0 else { return }
+                let ratio = value.image.size.height / value.image.size.width
+                imageView.snp.remakeConstraints { $0.height.equalTo(imageView.snp.width).multipliedBy(ratio) }
+            }
         }
 
         if let appearance = model.appearance, !appearance.isEmpty {
