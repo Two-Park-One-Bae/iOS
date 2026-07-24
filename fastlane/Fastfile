@@ -106,6 +106,76 @@ platform :ios do
     )
   end
 
+  desc "Build and upload to TestFlight (external testers)"
+  lane :beta_external do
+    key = api_key
+
+    match(
+      type: "appstore",
+      api_key: key,
+      readonly: true
+    )
+
+    build_number = latest_testflight_build_number(
+      api_key: key,
+      app_identifier: "app.nursemate.app",
+      initial_build_number: 1
+    ) + 1
+
+    increment_build_number(
+      build_number: build_number,
+      xcodeproj: "Projects/App/App.xcodeproj"
+    )
+
+    # App + 임베드되는 익스텐션(워치앱·위젯·컴플리케이션) 각각을 해당 match 프로파일로 수동 서명.
+    signing = {
+      "App"               => "app.nursemate.app",
+      "WatchApp"          => "app.nursemate.app.watchapp",
+      "TimerWidget"       => "app.nursemate.app.timerwidget",
+      "WatchComplication" => "app.nursemate.app.watchapp.presetcomplication",
+    }
+    signing.each do |target, bundle_id|
+      update_code_signing_settings(
+        use_automatic_signing: false,
+        path: "Projects/App/App.xcodeproj",
+        targets: [target],
+        code_sign_identity: "iPhone Distribution",
+        profile_name: "match AppStore #{bundle_id}"
+      )
+    end
+
+    build_app(
+      workspace: "Application.xcworkspace",
+      scheme: "App",
+      configuration: "Release",
+      export_method: "app-store",
+      output_directory: "build",
+      # beta_internal 과 동일한 수동 서명 정책(프레임워크 자동 서명 충돌 방지).
+      xcargs: "DEVELOPMENT_TEAM=#{ENV.fetch('DEVELOPMENT_TEAM', '')} CODE_SIGN_IDENTITY='Apple Distribution' CODE_SIGN_STYLE=Manual",
+      export_options: {
+        method: "app-store",
+        signingStyle: "manual",
+        provisioningProfiles: signing.each_with_object({}) { |(_, bundle_id), h| h[bundle_id] = "match AppStore #{bundle_id}" }
+      }
+    )
+
+    # 외부 테스터 그룹에 배포. 내부와 달리 distribute_external·groups·changelog 가 필수이고,
+    # 빌드 처리 완료를 기다려야 한다(skip_waiting=false). 첫 외부 빌드는 애플 Beta App Review 통과 후 노출.
+    # groups 는 App Store Connect 에 생성한 외부 그룹명과 정확히 일치해야 한다.
+    upload_to_testflight(
+      api_key: app_store_connect_api_key(
+        key_id: ENV["APP_STORE_CONNECT_API_KEY_ID"],
+        issuer_id: ENV["APP_STORE_CONNECT_API_KEY_ISSUER_ID"],
+        key_filepath: API_KEY_RAW_PATH,
+        in_house: false
+      ),
+      distribute_external: true,
+      groups: ["nurse"],
+      changelog: ENV["CHANGELOG"] || "버그 수정 및 개선 사항",
+      skip_waiting_for_build_processing: false
+    )
+  end
+
   desc "Build and submit to App Store"
   lane :release do
     key = api_key
