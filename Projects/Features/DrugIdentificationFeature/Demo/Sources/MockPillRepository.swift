@@ -102,6 +102,14 @@ final class MockPillRepository: PillRepositoryProtocol {
                     pillImageUrl:  nil,
                     licenseStatus: .revoked
                 ),
+                // 세부정보 404 데모 — 이 후보의 ⓘ를 누르면 '데이터 없음' 화면(⑩-e)이 뜬다.
+                PillCandidateModel(
+                    pillCode:      "A11A9999",
+                    pillName:      "세부정보없는약(데모)",
+                    companyName:   "데모제약",
+                    pillImageUrl:  nil,
+                    licenseStatus: .normal
+                ),
             ],
             nextCursor: nil,
             hasNext:    false
@@ -112,6 +120,12 @@ final class MockPillRepository: PillRepositoryProtocol {
     }
 
     func fetchPillDetail(pillCode: String) -> AnyPublisher<PillDetailModel, Error> {
+        // 데모: A11A9999는 404(PillDetailNotFoundError)를 반환해 '데이터 없음' 화면(⑩-e)을 확인시킨다.
+        if pillCode == "A11A9999" {
+            return Fail(error: PillDetailNotFoundError())
+                .eraseToAnyPublisher()
+        }
+
         // 데모: 타이레놀정500mg 세부정보. 모든 블록 타입(HEADING/PARAGRAPH/TABLE/IMAGE)·표 병합·첨자를 포함.
         func span(_ text: String, _ style: SpanStyleModel? = nil) -> SpanModel {
             SpanModel(text: text, style: style)

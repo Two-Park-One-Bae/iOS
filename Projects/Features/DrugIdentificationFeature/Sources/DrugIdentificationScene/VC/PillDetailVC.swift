@@ -186,8 +186,8 @@ final class PillDetailVC: UIViewController {
         iconBg.layer.cornerRadius = 48
         iconBg.snp.makeConstraints { $0.width.height.equalTo(96) }
 
-        // 디자인 아이콘은 lucide file-x — DSIcon엔 없어 가장 가까운 fileSearch 사용.
-        let iconView = UIImageView(image: DSIcon.fileSearch.uiImage)
+        // 디자인 아이콘 lucide file-x (ClL1Q).
+        let iconView = UIImageView(image: DSIcon.fileX.uiImage)
         iconView.tintColor = DSColor.Warning._600
         iconView.contentMode = .scaleAspectFit
         iconBg.addSubview(iconView)

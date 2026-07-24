@@ -91,6 +91,7 @@ public enum DSIcon: String {
 
     case file = "Icons/ic_file"
     case fileText = "Icons/ic_file_text"
+    case fileX = "Icons/ic_file_x"
     case folder = "Icons/ic_folder"
     case folderOpen = "Icons/ic_folder_open"
     case paperclip = "Icons/ic_paperclip"
