@@ -519,7 +519,7 @@ extension PillEditVC: UICollectionViewDataSource {
                 let candidate = candidates[indexPath.item]
                 cell.configure(candidate: candidate, selected: candidate.pillCode == selectedPillCode)
                 cell.onInfoTap = { [weak self] in
-                    self?.onSelectDetail?(candidate.pillCode, candidate.pillImageUrl, candidate.licenseStatus)
+                    self?.onSelectDetail?(candidate.pillCode, candidate.pillThumbnailUrl, candidate.licenseStatus)
                 }
                 return cell
             }

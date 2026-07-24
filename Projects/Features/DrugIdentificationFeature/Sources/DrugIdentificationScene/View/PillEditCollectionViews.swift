@@ -112,11 +112,11 @@ final class CandidateCell: UICollectionViewCell {
         companyLabel.text = candidate.companyName ?? "-"
         licenseBadge.isHidden = candidate.licenseStatus != .revoked
 
-        // 서버 낱알 이미지(pillImageUrl)를 Kingfisher로 로드. 작은 셀이라 표시 크기(72×38)로
-        // 다운샘플 → 풀사이즈 디코드 낭비·메모리 절감.
+        // 서버 썸네일(pillThumbnailUrl, 장변 256px)을 Kingfisher로 로드. 셀 표시 크기(72×38)로
+        // 다운샘플 → 디코드·메모리 절감.
         thumb.kf.cancelDownloadTask()
         thumb.image = nil
-        if let urlString = candidate.pillImageUrl, let url = URL(string: urlString) {
+        if let urlString = candidate.pillThumbnailUrl, let url = URL(string: urlString) {
             thumb.kf.setImage(
                 with: url,
                 options: [

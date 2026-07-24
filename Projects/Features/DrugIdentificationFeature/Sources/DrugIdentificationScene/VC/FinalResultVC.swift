@@ -222,7 +222,7 @@ final class FinalResultVC: UIViewController {
         // 카드 전체를 탭 영역으로 — 세부정보 진입
         let tapButton = UIButton(type: .system)
         let pillCode = candidate.pillCode
-        let imageUrl = candidate.pillImageUrl
+        let imageUrl = candidate.pillThumbnailUrl
         let licenseStatus = candidate.licenseStatus
         tapButton.addAction(UIAction { [weak self] _ in
             self?.onSelectDetail?(pillCode, imageUrl, licenseStatus)

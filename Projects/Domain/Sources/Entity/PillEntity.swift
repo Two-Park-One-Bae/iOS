@@ -63,20 +63,20 @@ public struct PillCandidateModel: Equatable {
     public let pillCode: String
     public let pillName: String?
     public let companyName: String?
-    public let pillImageUrl: String?
+    public let pillThumbnailUrl: String?   // 목록 대조용 썸네일 (NM-347). 원본은 세부정보에서 조회.
     public let licenseStatus: LicenseStatus
 
     public init(
         pillCode: String,
         pillName: String?,
         companyName: String?,
-        pillImageUrl: String?,
+        pillThumbnailUrl: String?,
         licenseStatus: LicenseStatus
     ) {
         self.pillCode = pillCode
         self.pillName = pillName
         self.companyName = companyName
-        self.pillImageUrl = pillImageUrl
+        self.pillThumbnailUrl = pillThumbnailUrl
         self.licenseStatus = licenseStatus
     }
 }
