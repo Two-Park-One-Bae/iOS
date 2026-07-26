@@ -18,39 +18,24 @@ public struct PillImageRequest: Encodable {
     }
 }
 
-// OpenAPI `Segmentation` 스키마 — 폴리곤은 배열이 아니라 { type, points } 객체.
-public struct SegmentationRequest: Encodable {
-    public let type: String        // BBOX | POLYGON
-    public let points: [[Double]]  // 원본 좌표. POLYGON=꼭짓점, BBOX=[[x,y,w,h]]
-
-    public init(type: String, points: [[Double]]) {
-        self.type = type
-        self.points = points
-    }
-}
-
-// POST /api/v0/pill-attributes 요청 바디
+// POST /api/v0/pill-attributes 요청 바디 — 크롭만 전달한다.
+// 원본은 /api/v0/pill-images/upload-url로 S3에 직접 업로드하며 식별 요청과 분리된다 (NM-348).
 public struct PillAttributeRequest: Encodable {
-    // 원본 이미지(인프라 구축 전 임시 직접 전송. 이후 S3 key 방식으로 교체 예정)
-    public let originalImage: PillImageRequest
     public let items: [PillAttributeItemRequest]
 
-    public init(originalImage: PillImageRequest, items: [PillAttributeItemRequest]) {
-        self.originalImage = originalImage
+    public init(items: [PillAttributeItemRequest]) {
         self.items = items
     }
 }
 
-// 검출된 알약 1개 (polygon + 온디바이스 크롭)
+// 검출된 알약 1개 (온디바이스 크롭)
 public struct PillAttributeItemRequest: Encodable {
     // 세션 내 로컬 식별자. 응답의 pillId와 매핑 키로 사용
     public let pillId: String
-    public let segmentation: SegmentationRequest  // 폴리곤 객체
     public let croppedImage: PillImageRequest      // 크롭 이미지 객체
 
-    public init(pillId: String, segmentation: SegmentationRequest, croppedImage: PillImageRequest) {
+    public init(pillId: String, croppedImage: PillImageRequest) {
         self.pillId = pillId
-        self.segmentation = segmentation
         self.croppedImage = croppedImage
     }
 }

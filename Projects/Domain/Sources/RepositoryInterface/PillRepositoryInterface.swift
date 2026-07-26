@@ -9,11 +9,10 @@ import Combine
 import Foundation
 
 public protocol PillRepositoryProtocol {
-    // 크롭 이미지 → 색·모양·제형 추출
+    // 크롭 이미지 → 색·모양·제형 추출 (원본은 별도 S3 업로드, NM-348)
     // 한도 도달 시 PillLimitExceededError로 실패한다 (429 LIMIT_EXCEEDED · 미차감)
     func fetchPillAttributes(
-        originalImage: String,
-        items: [(pillId: String, segmentation: [[Double]], croppedImage: String)]
+        items: [(pillId: String, croppedImage: String)]
     ) -> AnyPublisher<PillAttributeResultModel, Error>
 
     // 수정 속성 → 후보 알약 조회

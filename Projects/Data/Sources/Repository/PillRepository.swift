@@ -19,22 +19,17 @@ public final class PillRepository: PillRepositoryProtocol {
     }
 
     public func fetchPillAttributes(
-        originalImage: String,
-        items: [(pillId: String, segmentation: [[Double]], croppedImage: String)]
+        items: [(pillId: String, croppedImage: String)]
     ) -> AnyPublisher<PillAttributeResultModel, Error> {
-        // OpenAPI 스키마에 맞춰 감싼다: 이미지 → {mimeType, data}, 폴리곤 → {type, points}.
-        // 원본은 jpeg, 크롭 썸네일은 png 로 인코딩됨(ViewModel 기준).
+        // OpenAPI 스키마에 맞춰 이미지를 {mimeType, data}로 감싼다. 크롭 썸네일은 png(ViewModel 기준).
+        // 원본은 이 요청에 싣지 않는다 — pill-images/upload-url로 S3 직접 업로드(NM-348).
         let requestItems = items.map {
             PillAttributeItemRequest(
                 pillId: $0.pillId,
-                segmentation: SegmentationRequest(type: "POLYGON", points: $0.segmentation),
                 croppedImage: PillImageRequest(mimeType: "image/png", data: $0.croppedImage)
             )
         }
-        let request = PillAttributeRequest(
-            originalImage: PillImageRequest(mimeType: "image/jpeg", data: originalImage),
-            items: requestItems
-        )
+        let request = PillAttributeRequest(items: requestItems)
 
         return service.fetchPillAttributes(request: request)
             .map { $0.toDomain() }

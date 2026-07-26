@@ -90,7 +90,7 @@ public final class DrugIdentificationViewModel {
     }
 
     // 세그멘테이션으로 얻은 크롭 결과를 임시 보관 (속성 응답과 결합)
-    private var pending: (pills: [IdentifiedPill], items: [(pillId: String, segmentation: [[Double]], croppedImage: String)])?
+    private var pending: (pills: [IdentifiedPill], items: [(pillId: String, croppedImage: String)])?
 
     private func makeIdentifiedPills(from detections: [RFDetection]) -> [IdentifiedPill] {
         // 크롭은 원본 정규화 1회로 일괄 생성(detection마다 재렌더하던 것 제거).
@@ -113,26 +113,18 @@ public final class DrugIdentificationViewModel {
 
     private func buildItems(
         from pills: [IdentifiedPill]
-    ) -> [(pillId: String, segmentation: [[Double]], croppedImage: String)] {
+    ) -> [(pillId: String, croppedImage: String)] {
         pills.map { pill in
-            let box = pill.boundingBox
-            let polygon: [[Double]] = [
-                [Double(box.minX), Double(box.minY)],
-                [Double(box.maxX), Double(box.minY)],
-                [Double(box.maxX), Double(box.maxY)],
-                [Double(box.minX), Double(box.maxY)]
-            ]
             // 인코딩 임시 버퍼(PNG Data·base64 String)를 즉시 해제.
             let base64 = autoreleasepool { pill.thumbnail?.pngData()?.base64EncodedString() ?? "" }
-            return (pillId: pill.attribute.pillId, segmentation: polygon, croppedImage: base64)
+            return (pillId: pill.attribute.pillId, croppedImage: base64)
         }
     }
 
     private func requestAttributes(
-        items: [(pillId: String, segmentation: [[Double]], croppedImage: String)]
+        items: [(pillId: String, croppedImage: String)]
     ) {
-        let base64 = autoreleasepool { image.jpegData(compressionQuality: 0.9)?.base64EncodedString() ?? "" }
-        pillUseCase.fetchPillAttributes(originalImage: base64, items: items)
+        pillUseCase.fetchPillAttributes(items: items)
     }
 
     private func bindUseCase() {

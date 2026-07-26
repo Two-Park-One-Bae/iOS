@@ -33,8 +33,7 @@ final class MockPillUseCase: PillUseCase {
     }
 
     func fetchPillAttributes(
-        originalImage: String,
-        items: [(pillId: String, segmentation: [[Double]], croppedImage: String)]
+        items: [(pillId: String, croppedImage: String)]
     ) {}
 
     func fetchPillCandidates(

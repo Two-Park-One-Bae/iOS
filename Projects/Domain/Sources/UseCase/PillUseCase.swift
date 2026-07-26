@@ -9,10 +9,9 @@ import Combine
 import Foundation
 
 public protocol PillUseCase {
-    // 촬영 → 속성 추출. 성공 시 pillAttributes 방출
+    // 촬영 → 속성 추출. 성공 시 pillAttributes 방출 (원본은 별도 S3 업로드, NM-348)
     func fetchPillAttributes(
-        originalImage: String,
-        items: [(pillId: String, segmentation: [[Double]], croppedImage: String)]
+        items: [(pillId: String, croppedImage: String)]
     )
 
     // 속성 수정 → 후보 조회. 실시간 재호출용
@@ -69,10 +68,9 @@ public final class DefaultPillUseCase: PillUseCase {
     }
 
     public func fetchPillAttributes(
-        originalImage: String,
-        items: [(pillId: String, segmentation: [[Double]], croppedImage: String)]
+        items: [(pillId: String, croppedImage: String)]
     ) {
-        repository.fetchPillAttributes(originalImage: originalImage, items: items)
+        repository.fetchPillAttributes(items: items)
             .catch { [weak self] error in
                 // 429는 일반 오류(분석 실패 화면)가 아니라 한도 안내 팝업으로 분기한다
                 if let limit = error as? PillLimitExceededError {

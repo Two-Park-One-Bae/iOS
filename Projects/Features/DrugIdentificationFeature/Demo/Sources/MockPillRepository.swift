@@ -13,8 +13,7 @@ import Domain
 final class MockPillRepository: PillRepositoryProtocol {
 
     func fetchPillAttributes(
-        originalImage: String,
-        items: [(pillId: String, segmentation: [[Double]], croppedImage: String)]
+        items: [(pillId: String, croppedImage: String)]
     ) -> AnyPublisher<PillAttributeResultModel, Error> {
         let stub = items.enumerated().map { index, item -> PillAttributeModel in
             // 두 번째 알약은 색·모양·제형·각인 인식 실패 카드로 반환
