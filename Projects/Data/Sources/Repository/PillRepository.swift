@@ -37,6 +37,31 @@ public final class PillRepository: PillRepositoryProtocol {
             .eraseToAnyPublisher()
     }
 
+    public func uploadOriginalImage(_ jpegData: Data) -> AnyPublisher<Void, Error> {
+        // presigned URL 발급 → 그 URL로 S3에 원본 JPEG을 직접 PUT. (NM-348)
+        // API 베이스가 아닌 임의 presigned URL이라 Moya가 아닌 URLSession으로 올린다(App Check 불필요).
+        service.issuePillImageUploadURL()
+            .flatMap { issued -> AnyPublisher<Void, Error> in
+                guard let url = URL(string: issued.uploadUrl) else {
+                    return Fail(error: URLError(.badURL)).eraseToAnyPublisher()
+                }
+                var request = URLRequest(url: url)
+                request.httpMethod = "PUT"
+                request.setValue("image/jpeg", forHTTPHeaderField: "Content-Type")
+                request.httpBody = jpegData
+                return URLSession.shared.dataTaskPublisher(for: request)
+                    .tryMap { output in
+                        guard let http = output.response as? HTTPURLResponse,
+                              (200..<300).contains(http.statusCode) else {
+                            throw URLError(.badServerResponse)
+                        }
+                        return ()
+                    }
+                    .eraseToAnyPublisher()
+            }
+            .eraseToAnyPublisher()
+    }
+
     public func fetchPillUsage() -> AnyPublisher<PillUsageModel, Error> {
         service.fetchPillUsage()
             .map { $0.toDomain() }

@@ -47,6 +47,13 @@ final class MockPillRepository: PillRepositoryProtocol {
             .eraseToAnyPublisher()
     }
 
+    func uploadOriginalImage(_ jpegData: Data) -> AnyPublisher<Void, Error> {
+        // 데모: 실제 업로드 없이 성공 처리(베스트 에포트).
+        Just(())
+            .setFailureType(to: Error.self)
+            .eraseToAnyPublisher()
+    }
+
     func fetchPillUsage() -> AnyPublisher<PillUsageModel, Error> {
         Just(Self.stubUsage(remaining: 12))
             .setFailureType(to: Error.self)

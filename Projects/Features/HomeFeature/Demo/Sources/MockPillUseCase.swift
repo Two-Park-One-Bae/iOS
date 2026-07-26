@@ -36,6 +36,8 @@ final class MockPillUseCase: PillUseCase {
         items: [(pillId: String, croppedImage: String)]
     ) {}
 
+    func uploadOriginalImage(_ jpegData: Data) {}
+
     func fetchPillCandidates(
         colors: [PillColorModel]?,
         isTransparent: Bool?,

@@ -26,6 +26,9 @@ public protocol PillUseCase {
         size: Int
     )
 
+    // 원본 이미지 S3 업로드 (NM-348). 식별과 분리된 베스트 에포트 — 실패해도 무시, 방출 없음.
+    func uploadOriginalImage(_ jpegData: Data)
+
     // 후보 선택 확정(pillCode) → 세부정보 조회 (NM-312)
     func fetchPillDetail(pillCode: String)
 
@@ -88,6 +91,13 @@ public final class DefaultPillUseCase: PillUseCase {
                 }
                 self?.pillAttributes.send(result.items)
             }
+            .store(in: &cancellables)
+    }
+
+    public func uploadOriginalImage(_ jpegData: Data) {
+        // 베스트 에포트 — 성공·실패 모두 무시하고 방출하지 않는다. 식별 플로우와 완전 분리 (NM-348).
+        repository.uploadOriginalImage(jpegData)
+            .sink(receiveCompletion: { _ in }, receiveValue: { _ in })
             .store(in: &cancellables)
     }
 

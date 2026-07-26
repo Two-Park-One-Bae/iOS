@@ -27,6 +27,10 @@ public protocol PillRepositoryProtocol {
         size: Int
     ) -> AnyPublisher<PillCandidatePageModel, Error>
 
+    // 학습데이터용 원본 이미지를 S3에 직접 업로드 (NM-348). 식별과 분리된 베스트 에포트 —
+    // 실패해도 식별 플로우에 영향 없다. presigned URL 발급 → S3 PUT까지 수행한다.
+    func uploadOriginalImage(_ jpegData: Data) -> AnyPublisher<Void, Error>
+
     // pillCode → 알약 세부정보 조회 (NM-312)
     func fetchPillDetail(pillCode: String) -> AnyPublisher<PillDetailModel, Error>
 
