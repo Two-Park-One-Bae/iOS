@@ -13,8 +13,7 @@ import Domain
 final class MockPillRepository: PillRepositoryProtocol {
 
     func fetchPillAttributes(
-        originalImage: String,
-        items: [(pillId: String, segmentation: [[Double]], croppedImage: String)]
+        items: [(pillId: String, croppedImage: String)]
     ) -> AnyPublisher<PillAttributeResultModel, Error> {
         let stub = items.enumerated().map { index, item -> PillAttributeModel in
             // 두 번째 알약은 색·모양·제형·각인 인식 실패 카드로 반환
@@ -44,6 +43,13 @@ final class MockPillRepository: PillRepositoryProtocol {
         // 데모는 한도를 소진하지 않는다 — 잔여를 넉넉히 준다. 한도 UI는 fetchPillUsage 스텁으로 확인.
         let result = PillAttributeResultModel(items: stub, usage: Self.stubUsage(remaining: 12))
         return Just(result)
+            .setFailureType(to: Error.self)
+            .eraseToAnyPublisher()
+    }
+
+    func uploadOriginalImage(_ jpegData: Data) -> AnyPublisher<Void, Error> {
+        // 데모: 실제 업로드 없이 성공 처리(베스트 에포트).
+        Just(())
             .setFailureType(to: Error.self)
             .eraseToAnyPublisher()
     }

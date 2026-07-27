@@ -19,26 +19,46 @@ public final class PillRepository: PillRepositoryProtocol {
     }
 
     public func fetchPillAttributes(
-        originalImage: String,
-        items: [(pillId: String, segmentation: [[Double]], croppedImage: String)]
+        items: [(pillId: String, croppedImage: String)]
     ) -> AnyPublisher<PillAttributeResultModel, Error> {
-        // OpenAPI 스키마에 맞춰 감싼다: 이미지 → {mimeType, data}, 폴리곤 → {type, points}.
-        // 원본은 jpeg, 크롭 썸네일은 png 로 인코딩됨(ViewModel 기준).
+        // OpenAPI 스키마에 맞춰 이미지를 {mimeType, data}로 감싼다. 크롭 썸네일은 png(ViewModel 기준).
+        // 원본은 이 요청에 싣지 않는다 — pill-images/upload-url로 S3 직접 업로드(NM-348).
         let requestItems = items.map {
             PillAttributeItemRequest(
                 pillId: $0.pillId,
-                segmentation: SegmentationRequest(type: "POLYGON", points: $0.segmentation),
                 croppedImage: PillImageRequest(mimeType: "image/png", data: $0.croppedImage)
             )
         }
-        let request = PillAttributeRequest(
-            originalImage: PillImageRequest(mimeType: "image/jpeg", data: originalImage),
-            items: requestItems
-        )
+        let request = PillAttributeRequest(items: requestItems)
 
         return service.fetchPillAttributes(request: request)
             .map { $0.toDomain() }
             .mapError { Self.mapLimitExceeded($0) }
+            .eraseToAnyPublisher()
+    }
+
+    public func uploadOriginalImage(_ jpegData: Data) -> AnyPublisher<Void, Error> {
+        // presigned URL 발급 → 그 URL로 S3에 원본 JPEG을 직접 PUT. (NM-348)
+        // API 베이스가 아닌 임의 presigned URL이라 Moya가 아닌 URLSession으로 올린다(App Check 불필요).
+        service.issuePillImageUploadURL()
+            .flatMap { issued -> AnyPublisher<Void, Error> in
+                guard let url = URL(string: issued.uploadUrl) else {
+                    return Fail(error: URLError(.badURL)).eraseToAnyPublisher()
+                }
+                var request = URLRequest(url: url)
+                request.httpMethod = "PUT"
+                request.setValue("image/jpeg", forHTTPHeaderField: "Content-Type")
+                request.httpBody = jpegData
+                return URLSession.shared.dataTaskPublisher(for: request)
+                    .tryMap { output in
+                        guard let http = output.response as? HTTPURLResponse,
+                              (200..<300).contains(http.statusCode) else {
+                            throw URLError(.badServerResponse)
+                        }
+                        return ()
+                    }
+                    .eraseToAnyPublisher()
+            }
             .eraseToAnyPublisher()
     }
 

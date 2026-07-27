@@ -18,6 +18,9 @@ public enum PillAPI {
     case pillDetails(pillCode: String)
     // GET /api/v0/pill-attributes/usage — 잔여 식별 횟수 조회 (NM-331). 조회 전용 · 카운트 미증가
     case pillAttributesUsage
+    // POST /api/v0/pill-images/upload-url — 원본 이미지 S3 업로드용 presigned URL 발급 (NM-348).
+    // 본문 없음 · App Check만 · usage 무관. 식별과 분리된 베스트 에포트.
+    case pillImagesUploadUrl
 }
 
 extension PillAPI: BaseAPI {
@@ -31,13 +34,14 @@ extension PillAPI: BaseAPI {
             let encoded = pillCode.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? pillCode
             return "/pill-details/\(encoded)"
         case .pillAttributesUsage: return "/pill-attributes/usage"
+        case .pillImagesUploadUrl: return "/pill-images/upload-url"
         }
     }
 
     public var method: Moya.Method {
         switch self {
-        case .pillAttributes, .pillCandidates:      return .post
-        case .pillDetails, .pillAttributesUsage:    return .get
+        case .pillAttributes, .pillCandidates, .pillImagesUploadUrl: return .post
+        case .pillDetails, .pillAttributesUsage:                     return .get
         }
     }
 
@@ -47,7 +51,7 @@ extension PillAPI: BaseAPI {
             return .requestJSONEncodable(request)
         case .pillCandidates(let request):
             return .requestJSONEncodable(request)
-        case .pillDetails, .pillAttributesUsage:
+        case .pillDetails, .pillAttributesUsage, .pillImagesUploadUrl:
             return .requestPlain
         }
     }
@@ -62,7 +66,8 @@ extension PillAPI: BaseAPI {
         case .pillAttributes, .pillAttributesUsage:
             // Keychain 불가 시 nil — 식별 진입에서 이미 막으므로(fail-closed) 여기선 헤더만 생략.
             if let deviceId = DeviceIdentifier.current { headers["X-Device-Id"] = deviceId }
-        case .pillCandidates, .pillDetails:
+        case .pillCandidates, .pillDetails, .pillImagesUploadUrl:
+            // upload-url은 App Check(인터셉터)만 필요 — usage와 무관해 X-Device-Id를 붙이지 않는다 (NM-348).
             break
         }
 
