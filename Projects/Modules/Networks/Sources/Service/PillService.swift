@@ -17,6 +17,8 @@ public protocol PillService {
     func fetchPillCandidates(request: PillCandidateRequest) -> AnyPublisher<PillCandidatePageEntity, Error>
     func fetchPillDetail(pillCode: String) -> AnyPublisher<PillDetailEntity, Error>
     func fetchPillUsage() -> AnyPublisher<PillUsageEntity, Error>
+    // 원본 이미지 S3 업로드용 presigned URL 발급 (NM-348). 식별과 분리된 베스트 에포트.
+    func issuePillImageUploadURL() -> AnyPublisher<PillImageUploadURLEntity, Error>
 }
 
 extension DefaultPillService: PillService {
@@ -32,6 +34,11 @@ extension DefaultPillService: PillService {
 
     public func fetchPillCandidates(request: PillCandidateRequest) -> AnyPublisher<PillCandidatePageEntity, Error> {
         requestObjectInCombine(.pillCandidates(request: request))
+    }
+
+    // 발급 실패(401·500)는 베스트 에포트라 상위에서 무시된다 — 일반 요청 헬퍼로 충분.
+    public func issuePillImageUploadURL() -> AnyPublisher<PillImageUploadURLEntity, Error> {
+        requestObjectInCombine(.pillImagesUploadUrl)
     }
 
     public func fetchPillDetail(pillCode: String) -> AnyPublisher<PillDetailEntity, Error> {
