@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- 광고 목적 크로스-앱 추적(IDFA/ATT) 미사용 → false. AdSupport·ASIdentifierManager 없음(2026-07 감사). -->
+    <key>NSPrivacyTracking</key>
+    <false/>
+    <key>NSPrivacyTrackingDomains</key>
+    <array/>
+
+    <!-- 앱이 수집하는 데이터 유형. App Store Connect '개인정보 영양성분표'와 일치시켜야 함.
+         Amplitude(제품 상호작용)·Crashlytics(크래시)·기기 UUID(분석 userID) 기준. 실제 수집 관행에 맞춰 검증 필요. -->
+    <key>NSPrivacyCollectedDataTypes</key>
+    <array>
+        <!-- Amplitude 이벤트 = 제품 상호작용(분석) -->
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypeProductInteraction</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
+            </array>
+        </dict>
+        <!-- Crashlytics = 크래시 데이터(앱 기능) -->
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypeCrashData</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+            </array>
+        </dict>
+        <!-- 기기 UUID(Keychain) = 기기 식별자. 서버 식별 카운트(앱 기능) + 분석 userID -->
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypeDeviceID</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+                <string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
+            </array>
+        </dict>
+    </array>
+
+    <!-- 앱 자체 코드가 호출하는 필수 사유(Required Reason) API. SDK는 각자 매니페스트로 선언. -->
+    <key>NSPrivacyAccessedAPITypes</key>
+    <array>
+        <!-- UserDefaults: 앱·앱그룹(group.app.nursemate.timer) 공유 저장. 위젯·워치·AlarmKit 인텐트가 같은 suite 공유. -->
+        <dict>
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <string>CA92.1</string>
+            </array>
+        </dict>
+    </array>
+</dict>
+</plist>
