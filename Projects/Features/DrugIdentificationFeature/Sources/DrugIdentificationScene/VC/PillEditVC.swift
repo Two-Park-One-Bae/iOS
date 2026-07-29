@@ -554,6 +554,15 @@ extension PillEditVC: UICollectionViewDataSource {
 
 extension PillEditVC: UICollectionViewDelegate {
 
+    // 후보 목록 끝(마지막 3개 이내)에 다다르면 다음 페이지를 미리 요청(커서 페이지네이션).
+    // 중복 호출·마지막 페이지 가드는 viewModel.loadMore 내부에서 처리한다.
+    func collectionView(_ collectionView: UICollectionView, willDisplay cell: UICollectionViewCell, forItemAt indexPath: IndexPath) {
+        guard Section(rawValue: indexPath.section) == .candidates,
+              case .results(let candidates) = listState,
+              indexPath.item >= candidates.count - 3 else { return }
+        viewModel.loadMore()
+    }
+
     func collectionView(_ collectionView: UICollectionView, shouldSelectItemAt indexPath: IndexPath) -> Bool {
         guard Section(rawValue: indexPath.section) == .candidates else { return false }
         if case .results = listState { return true }
