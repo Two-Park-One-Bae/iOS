@@ -18,6 +18,8 @@ public final class DSNavBar: UIView {
         let button = UIButton(type: .system)
         button.setImage(DSIcon.chevronLeft.uiImage, for: .normal)
         button.tintColor = DSColor.textPrimary
+        // chevron은 좌측에 붙이고 넓힌 터치 영역은 오른쪽으로만 — 좌측 여백이 커지지 않게.
+        button.contentHorizontalAlignment = .leading
         button.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
             button.widthAnchor.constraint(equalToConstant: 56),
