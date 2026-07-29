@@ -113,7 +113,7 @@ final class MockPillRepository: PillRepositoryProtocol {
                     pillCode:      "A11A9999",
                     pillName:      "세부정보없는약(데모)",
                     companyName:   "데모제약",
-                    pillImageUrl:  nil,
+                    pillThumbnailUrl: nil,
                     licenseStatus: .normal
                 ),
             ],
