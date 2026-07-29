@@ -131,7 +131,11 @@ final class PillEditVC: UIViewController {
         formulationPanel.setSelected(viewModel.formulation)
         transparencyRow.setOn(viewModel.isTransparent)
         imprintSummary.update(front: viewModel.front, back: viewModel.back)
-        [colorPanel, colorDivider, transparencyRow, shapePanel, formulationPanel, imprintPanel].forEach { $0.isHidden = true }
+        // 각인 수정은 화면 진입 시 기본으로 펼쳐 둔다(나머지 패널은 접힘). 이후 토글은 togglePanel이 처리.
+        openPanel = .imprint
+        [colorPanel, colorDivider, transparencyRow, shapePanel, formulationPanel].forEach { $0.isHidden = true }
+        imprintPanel.isHidden = false
+        imprintChevron.transform = CGAffineTransform(rotationAngle: .pi)
         footer.isHidden = true
     }
 
