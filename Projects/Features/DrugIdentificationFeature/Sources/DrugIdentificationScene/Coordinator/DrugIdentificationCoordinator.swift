@@ -319,9 +319,8 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
 
     private func showPermissionDenied() {
         let vc = PermissionDeniedVC()
-        vc.onBackTapped = { [weak self] in
-            self?.navigationController.popViewController(animated: true)
-        }
+        // 뒤로가기 → 홈으로. 단순 pop이면 알약탭 스택에 빈 화면만 남으므로 popToRoot + 홈탭 전환.
+        vc.onBackTapped = { [weak self] in self?.exitToHome() }
         vc.onOpenSettings = {
             guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
             UIApplication.shared.open(url)
