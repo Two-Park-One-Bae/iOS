@@ -19,6 +19,8 @@ final class PillEditVC: UIViewController {
     var onBackTapped: (() -> Void)?
     // 후보 ⓘ 탭 → 세부정보 진입 (pillCode, 허가상태). 세부 이미지는 상세 조회 응답에서 로드(NM-347).
     var onSelectDetail: ((String, LicenseStatus) -> Void)?
+    // 후보 썸네일 탭 → 이미지 비교 뷰어 (NM-354). (candidate, 촬영 크롭, 소스 프레임(윈도우 좌표), 소스 이미지)
+    var onSelectCompare: ((PillCandidateModel, UIImage?, CGRect, UIImage?) -> Void)?
 
     // MARK: - Sections / State
 
@@ -524,6 +526,13 @@ extension PillEditVC: UICollectionViewDataSource {
                 cell.configure(candidate: candidate, selected: candidate.pillCode == selectedPillCode)
                 cell.onInfoTap = { [weak self] in
                     self?.onSelectDetail?(candidate.pillCode, candidate.licenseStatus)
+                }
+                cell.onThumbnailTap = { [weak self, weak cell] in
+                    guard let self, let cell else { return }
+                    let iv = cell.thumbnailView
+                    // 윈도우 좌표계 프레임 — 확대 트랜지션 소스.
+                    let sourceFrame = iv.convert(iv.bounds, to: nil)
+                    self.onSelectCompare?(candidate, self.viewModel.thumbnail, sourceFrame, iv.image)
                 }
                 return cell
             }

@@ -18,6 +18,11 @@ final class CandidateCell: UICollectionViewCell {
 
     private(set) var pillCode: String?
     var onInfoTap: (() -> Void)?
+    // 썸네일 탭 → 후보 이미지 비교 뷰어(NM-354).
+    var onThumbnailTap: (() -> Void)?
+
+    // 확대 트랜지션이 소스 프레임·이미지를 재려면 썸네일 뷰가 필요하다.
+    var thumbnailView: UIImageView { thumb }
 
     private let card = UIView().then {
         $0.backgroundColor = DSColor.Neutral._0
@@ -71,6 +76,8 @@ final class CandidateCell: UICollectionViewCell {
         dot.snp.makeConstraints { $0.center.equalToSuperview(); $0.width.height.equalTo(10) }
 
         thumb.snp.makeConstraints { $0.width.equalTo(72); $0.height.equalTo(38) }
+        thumb.isUserInteractionEnabled = true
+        thumb.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(thumbTapped)))
 
         // 이름 옆에 '허가 종료' 배지 — 이름이 길면 이름만 말줄임, 배지는 고정.
         let nameSpacer = UIView()
@@ -105,6 +112,8 @@ final class CandidateCell: UICollectionViewCell {
             $0.leading.trailing.equalToSuperview().inset(12)
         }
     }
+
+    @objc private func thumbTapped() { onThumbnailTap?() }
 
     func configure(candidate: PillCandidateModel, selected: Bool) {
         pillCode = candidate.pillCode
@@ -143,6 +152,7 @@ final class CandidateCell: UICollectionViewCell {
         thumb.kf.cancelDownloadTask()
         thumb.image = nil
         onInfoTap = nil
+        onThumbnailTap = nil
         pillCode = nil
         licenseBadge.isHidden = true
     }

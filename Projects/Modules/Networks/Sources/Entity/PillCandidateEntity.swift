@@ -13,6 +13,7 @@ public struct PillCandidateEntity: Decodable {
     public let pillName: String?
     public let companyName: String?   // 동명이약 구분
     public let pillThumbnailUrl: String? // 낱알 썸네일 URL (목록 대조용 다운사이징본, NM-347). 원본은 세부정보 pillImageUrl
+    public let pillImageUrl: String? // 낱알 원본 이미지 URL (썸네일 탭 시 원본 대조 뷰어용, NM-356). 없으면 CDN 404 → 폴백
     public let licenseStatus: String? // 허가상태 "NORMAL"|"REVOKED" (NM-337). 배지·후순위·세부정보 분기 기준
 }
 
