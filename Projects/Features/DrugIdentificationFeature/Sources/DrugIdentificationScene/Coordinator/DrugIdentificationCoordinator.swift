@@ -251,6 +251,10 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
         vc.onSelectDetail = { [weak self] pillCode, licenseStatus in
             self?.showPillDetail(pillCode: pillCode, licenseStatus: licenseStatus)
         }
+        // ⑧ 후보 썸네일 탭 → 이미지 비교 뷰어 (NM-354)
+        vc.onSelectCompare = { [weak self] candidate, crop, sourceFrame, sourceImage in
+            self?.showImageComparison(candidate: candidate, croppedImage: crop, sourceFrame: sourceFrame, sourceImage: sourceImage)
+        }
         navigationController.pushViewController(vc, animated: true)
     }
 
@@ -275,7 +279,28 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
         vc.onSelectDetail = { [weak self] pillCode, licenseStatus in
             self?.showPillDetail(pillCode: pillCode, licenseStatus: licenseStatus)
         }
+        vc.onSelectCompare = { [weak self] candidate, crop, sourceFrame, sourceImage in
+            self?.showImageComparison(candidate: candidate, croppedImage: crop, sourceFrame: sourceFrame, sourceImage: sourceImage)
+        }
         navigationController.pushViewController(vc, animated: true)
+    }
+
+    // MARK: - ⑧ 후보 이미지 비교 (NM-354)
+
+    private func showImageComparison(
+        candidate: PillCandidateModel,
+        croppedImage: UIImage?,
+        sourceFrame: CGRect,
+        sourceImage: UIImage?
+    ) {
+        let url = candidate.pillImageUrl.flatMap { URL(string: $0) }
+        let vc = PillImageComparisonVC(
+            candidateImageURL: url,
+            croppedImage: croppedImage,
+            sourceFrame: sourceFrame,
+            sourceImage: sourceImage
+        )
+        navigationController.present(vc, animated: true)
     }
 
     // MARK: - ⑥ 결과 없음

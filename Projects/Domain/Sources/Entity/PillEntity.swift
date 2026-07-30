@@ -64,6 +64,7 @@ public struct PillCandidateModel: Equatable {
     public let pillName: String?
     public let companyName: String?
     public let pillThumbnailUrl: String?   // 목록 대조용 썸네일 (NM-347). 원본은 세부정보에서 조회.
+    public let pillImageUrl: String?       // 낱알 원본 이미지 (썸네일 탭 시 원본 대조 뷰어용, NM-356). 없으면 폴백.
     public let licenseStatus: LicenseStatus
 
     public init(
@@ -71,12 +72,14 @@ public struct PillCandidateModel: Equatable {
         pillName: String?,
         companyName: String?,
         pillThumbnailUrl: String?,
+        pillImageUrl: String? = nil,
         licenseStatus: LicenseStatus
     ) {
         self.pillCode = pillCode
         self.pillName = pillName
         self.companyName = companyName
         self.pillThumbnailUrl = pillThumbnailUrl
+        self.pillImageUrl = pillImageUrl
         self.licenseStatus = licenseStatus
     }
 }
