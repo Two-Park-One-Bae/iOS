@@ -59,6 +59,20 @@ platform :ios do
       Dir.glob("**/firebase-ios-sdk/Crashlytics/upload-symbols").first
   end
 
+  # 외부 테스터에게 보일 '테스트 사항'(업데이트 설명) 소스. 우선순위:
+  #   1) 워크플로 수동 실행 입력(CHANGELOG env)  2) fastlane/changelog_external.txt  3) 기본 문구
+  # → 릴리스마다 파일만 고치면 push 자동 배포에도 업데이트 설명이 실린다(비우면 기본 문구).
+  def beta_changelog
+    from_input = ENV["CHANGELOG"].to_s.strip
+    return from_input unless from_input.empty?
+    path = File.expand_path("../changelog_external.txt", __FILE__)
+    if File.exist?(path)
+      text = File.read(path).strip
+      return text unless text.empty?
+    end
+    "버그 수정 및 개선 사항"
+  end
+
   desc "Run unit tests"
   lane :test do
     run_tests(
@@ -209,7 +223,7 @@ platform :ios do
       # 베타 앱 설명·피드백 이메일·심사 연락처는 App Store Connect(TestFlight 테스트 정보)를 단일 소스로 둔다.
       # (한 번 설정하면 유지됨. 레인에서 beta_app_description을 넣으면 로케일 불일치로 심사 제출이
       #  "Beta App Description is missing"로 반려될 수 있어 제외 — NM-217.)
-      changelog: ENV["CHANGELOG"] || "버그 수정 및 개선 사항",
+      changelog: beta_changelog,
       skip_waiting_for_build_processing: false
     )
   end
