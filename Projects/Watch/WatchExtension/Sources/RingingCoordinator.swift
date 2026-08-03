@@ -49,6 +49,9 @@ final class RingingCoordinator: NSObject, ObservableObject, WKExtendedRuntimeSes
             return
         }
         guard ringing == nil else { return }
+        // 폰 AlarmKit(26.1+)이 울림을 담당하면 워치는 인앱 울림 화면·반복 햅틱을 띄우지 않는다 —
+        // AlarmKit 알람과 겹쳐 '중복 알림'이 되기 때문. (세션뿐 아니라 표시·햅틱도 게이트)
+        guard !alarmKitActive else { return }
         let now = Date()
         if let fired = timers.first(where: {
             $0.state == .ringing || ($0.state == .running && $0.endAt <= now)
@@ -60,6 +63,7 @@ final class RingingCoordinator: NSObject, ObservableObject, WKExtendedRuntimeSes
     private func restartTicker() {
         ticker?.cancel()
         ticker = nil
+        guard !alarmKitActive else { return }   // 26.1+ : 인앱 울림 화면을 안 띄우므로 만료 감시 틱 불필요
         guard ringing == nil, timers.contains(where: { $0.state == .running }) else { return }
         ticker = Task { @MainActor [weak self] in
             while !Task.isCancelled {
