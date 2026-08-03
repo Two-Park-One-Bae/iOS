@@ -193,11 +193,17 @@ public final class TimerListVC: UIViewController {
         render(viewModel.currentTimers)
     }
 
-    // 만료(RINGING) 카드가 맨 위 (spec)
+    // 표시 순서 (NM-361): 만료(RINGING) 맨 위 → 진행 중(RUNNING) 만료 임박 순(endAt 오름차순) → 일시정지(PAUSED) 맨 아래.
+    // PAUSED는 카운트다운이 멈춰 '임박'이 아니고(오래 정지하면 endAt이 과거가 됨) 상태로 먼저 가른다.
     private func sortedForDisplay(_ timers: [TreatmentTimerModel]) -> [TreatmentTimerModel] {
-        let ringing = timers.filter { $0.state == .ringing }
-        let others = timers.filter { $0.state != .ringing }
-        return ringing + others
+        func rank(_ timer: TreatmentTimerModel) -> Int {
+            if timer.state == .ringing { return 0 }
+            if timer.state == .running { return 1 }
+            return 2   // paused
+        }
+        return timers.sorted { a, b in
+            rank(a) != rank(b) ? rank(a) < rank(b) : a.endAt < b.endAt
+        }
     }
 
     private func updateCountLabel(_ timers: [TreatmentTimerModel]) {
