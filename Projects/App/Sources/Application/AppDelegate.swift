@@ -67,18 +67,31 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         // App Check 팩토리는 반드시 FirebaseApp.configure() 이전에 설정해야 적용된다.
         AppCheckService.configure()
         FirebaseService.configure()
-        ClarityService.configure()
-        // 분석 유저 식별자 = 서버가 기기 식별에 쓰는 Keychain UUID(X-Device-Id, NM-322).
-        // Amplitude·Crashlytics·Clarity를 같은 device_id로 묶어 서버 로그와 교차 대조 가능하게 한다.
-        // 각 SDK configure/initialize 이후에 지정. Keychain 불가로 nil이면 건너뛴다(익명 유지).
-        if let deviceID = DeviceIdentifier.current {
-            AmplitudeService.setUserID(deviceID)
+
+        // 내부 빌드(개발자 테스트)는 Analytics SaaS(Amplitude·Clarity·Firebase Analytics)에 잡히면 안 된다.
+        // → Amplitude·Clarity는 초기화·전송 자체를 스킵, Firebase Analytics는 자동수집 OFF.
+        //   Crashlytics(크래시)·App Check·Remote Config는 내부에서도 유지(SaaS 지표와 무관).
+        let isInternal = AppEnvironment.isInternal
+        FirebaseService.setAnalyticsCollectionEnabled(!isInternal)
+
+        // Crashlytics userID(= 기기 식별자)는 내부에서도 붙인다(크래시 리포트 식별).
+        let deviceID = DeviceIdentifier.current
+        if let deviceID {
             FirebaseService.setUserID(deviceID)
-            ClarityService.setUserID(deviceID)
+        }
+
+        if !isInternal {
+            // 외부 TestFlight·프로덕션에서만 SaaS 분석 수집.
+            // Amplitude·Crashlytics·Clarity를 같은 device_id로 묶어 서버 로그와 교차 대조 가능하게 한다.
+            ClarityService.configure()
+            if let deviceID {
+                AmplitudeService.setUserID(deviceID)
+                ClarityService.setUserID(deviceID)
+            }
+            AmplitudeService.track(AppLaunchEvent())
         }
         // Remote Config fetch + 게이팅(강제 업데이트·점검)은 window 를 소유한 SceneDelegate 가
         // sceneDidBecomeActive 에서 담당한다(포그라운드 복귀 시에도 최신값 반영).
-        AmplitudeService.track(AppLaunchEvent())
         if #available(iOS 26.1, *) {
             // iOS 26: AlarmKit이 시스템 알람 + 카운트다운 위젯을 단독 담당.
             // (커스텀 LA / 포그라운드 풀스크린 / UN 알림 / 백그라운드 오디오 모두 비활성)

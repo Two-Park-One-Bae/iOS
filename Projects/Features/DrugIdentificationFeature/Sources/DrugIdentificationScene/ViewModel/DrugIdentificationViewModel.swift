@@ -125,7 +125,9 @@ public final class DrugIdentificationViewModel {
         items: [(pillId: String, croppedImage: String)]
     ) {
         // 원본은 학습데이터용으로 S3에 별도 업로드(베스트 에포트, NM-348) — 식별과 분리·병렬, 실패 무시.
-        if let jpeg = autoreleasepool(invoking: { image.jpegData(compressionQuality: 0.9) }) {
+        // 내부 빌드(개발자 테스트)는 학습 데이터셋 오염 방지를 위해 업로드하지 않는다.
+        if !AppEnvironment.isInternal,
+           let jpeg = autoreleasepool(invoking: { image.jpegData(compressionQuality: 0.9) }) {
             pillUseCase.uploadOriginalImage(jpeg)
         }
         pillUseCase.fetchPillAttributes(items: items)

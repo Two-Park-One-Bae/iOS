@@ -132,7 +132,10 @@ platform :ios do
       # 아카이브 전체를 수동 서명(Manual) + 배포 인증서로 통일 — 프레임워크는 프로파일 없이
       # 인증서만으로 서명되고, 앱·익스텐션은 export_options 의 프로파일을 그대로 사용한다.
       # (Manual 없이 identity 만 강제하면 자동 서명 프레임워크와 "conflicting settings" 충돌)
-      xcargs: "DEVELOPMENT_TEAM=#{ENV.fetch('DEVELOPMENT_TEAM', '')} CODE_SIGN_IDENTITY='Apple Distribution' CODE_SIGN_STYLE=Manual",
+      # 내부 TestFlight 빌드에만 INTERNAL 컴파일 조건 주입 → AppEnvironment.isInternal=true
+      # → Amplitude·Clarity·Firebase Analytics·S3 원본업로드 OFF(내부 테스트로 지표·데이터셋 오염 방지).
+      # external/release 레인은 주입 안 함 → 외부 테스터·프로덕션은 정상 수집.
+      xcargs: "DEVELOPMENT_TEAM=#{ENV.fetch('DEVELOPMENT_TEAM', '')} CODE_SIGN_IDENTITY='Apple Distribution' CODE_SIGN_STYLE=Manual SWIFT_ACTIVE_COMPILATION_CONDITIONS='$(inherited) INTERNAL'",
       export_options: {
         method: "app-store",
         signingStyle: "manual",
