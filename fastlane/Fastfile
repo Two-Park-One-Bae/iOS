@@ -44,19 +44,39 @@ platform :ios do
     end
     upload_symbols_to_crashlytics(
       dsym_path: dsym,
-      gsp_path: "Projects/App/Resources/GoogleService-Info.plist",
+      gsp_path: "#{repo_root}/Projects/App/Resources/GoogleService-Info.plist",
       binary_path: binary
     )
   end
 
+  # fastlane 실행 CWD 와 무관하게 레포 루트를 앵커한다.
+  # FastlaneFolder.path(=<root>/fastlane) 를 우선 쓰고, 없으면 __dir__(Fastfile 위치)로 폴백.
+  # (CI에서 CWD가 fastlane/ 로 바뀌면 상대경로가 깨지므로 절대 앵커가 필요하다)
+  def repo_root
+    base = (defined?(FastlaneCore::FastlaneFolder) && FastlaneCore::FastlaneFolder.path) || __dir__
+    File.expand_path("..", base)
+  end
+
   # SPM(Tuist)로 받은 firebase-ios-sdk 안 upload-symbols 위치 탐색 — 환경별 경로차를 흡수.
+  # 주의: Tuist/.build 는 숨김 디렉터리라 광역 glob 에 FNM_DOTMATCH 를 줘야 뒤진다.
   def crashlytics_upload_symbols_binary
+    root = repo_root
+    # 1) 정확 경로 우선 (File.exist? 는 숨김 디렉터리도 문제없음)
     [
-      "Tuist/.build/checkouts/firebase-ios-sdk/Crashlytics/upload-symbols",
-      ".build/checkouts/firebase-ios-sdk/Crashlytics/upload-symbols",
+      "#{root}/Tuist/.build/checkouts/firebase-ios-sdk/Crashlytics/upload-symbols",
+      "#{root}/.build/checkouts/firebase-ios-sdk/Crashlytics/upload-symbols",
     ].each { |p| return p if File.exist?(p) }
-    Dir.glob(File.expand_path("~/Library/Developer/Xcode/DerivedData/**/SourcePackages/checkouts/firebase-ios-sdk/Crashlytics/upload-symbols")).first ||
-      Dir.glob("**/firebase-ios-sdk/Crashlytics/upload-symbols").first
+    # 2) 광역 탐색 — Tuist/.build(숨김)·커스텀 derivedDataPath·기본 DerivedData 모두 커버
+    [
+      "#{root}/Tuist/.build/**/firebase-ios-sdk/Crashlytics/upload-symbols",
+      "#{root}/**/SourcePackages/checkouts/firebase-ios-sdk/Crashlytics/upload-symbols",
+      File.expand_path("~/Library/Developer/Xcode/DerivedData/**/SourcePackages/checkouts/firebase-ios-sdk/Crashlytics/upload-symbols"),
+      "#{root}/**/firebase-ios-sdk/Crashlytics/upload-symbols",
+    ].each do |pattern|
+      hit = Dir.glob(pattern, File::FNM_DOTMATCH).first
+      return hit if hit
+    end
+    nil
   end
 
   # 외부 테스터에게 보일 '테스트 사항'(업데이트 설명) 소스. 우선순위:
