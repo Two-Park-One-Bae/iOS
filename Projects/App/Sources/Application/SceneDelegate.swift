@@ -246,6 +246,10 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         // App Intent(AlarmKit)가 App Group 저장소를 직접 바꿨을 수 있음 — 먼저 재동기화.
         useCase.reload() // 1. 디스크 → 메모리 다시 읽기
         useCase.refresh()  // 2. 현재 시각 기준으로 상태 재계산
+        // 3. 알람 권한 캐시 갱신(NM-360) — 위젯 무음-시작 라우팅과 워치 시작 게이트가 읽는
+        //    alarmAuthorized 플래그를 실제 권한으로 최신화하고 워치에 즉시 재동기화한다.
+        //    이게 없으면 플래그가 미기록(nil)으로 남아 워치가 권한 없이도 시작을 허용한다.
+        useCase.fetchAlarmPermission()
 
         // Remote Config 최신값 fetch 후 강제 업데이트/점검 게이트 갱신(포그라운드 복귀 포함).
         Task { @MainActor in
