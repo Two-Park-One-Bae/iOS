@@ -57,12 +57,15 @@ struct TimerListView: View {
         .toolbar(.hidden, for: .navigationBar)
     }
 
-    // 만료(ringing) 카드가 맨 위, 그다음 만료 임박 순(endAt 오름차순).
+    // 만료(RINGING) 맨 위 → 진행 중(RUNNING) 만료 임박 순(endAt) → 일시정지(PAUSED) 맨 아래. (NM-361, 폰과 동일)
+    // PAUSED는 카운트다운이 멈춰 '임박'이 아니므로(오래 정지 시 endAt이 과거가 됨) 상태로 먼저 가른다.
+    private static func rank(_ timer: TreatmentTimerModel) -> Int {
+        if timer.state == .ringing { return 0 }
+        if timer.state == .running { return 1 }
+        return 2   // paused
+    }
     private static func order(_ a: TreatmentTimerModel, _ b: TreatmentTimerModel) -> Bool {
-        if (a.state == .ringing) != (b.state == .ringing) {
-            return a.state == .ringing
-        }
-        return a.endAt < b.endAt
+        rank(a) != rank(b) ? rank(a) < rank(b) : a.endAt < b.endAt
     }
 }
 
