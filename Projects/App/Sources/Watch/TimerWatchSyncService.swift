@@ -22,14 +22,15 @@ final class TimerWatchSyncService: NSObject, TimerWatchSyncing {
         WCSession.default.activate()
     }
 
-    func sync(timers: [TreatmentTimerModel], presets: [TimerPresetModel]) {
+    func sync(timers: [TreatmentTimerModel], presets: [TimerPresetModel], alarmAuthorized: Bool?) {
         guard WCSession.isSupported() else { return }
         // iOS 26.1+ 는 AlarmKit이 워치까지 알람을 울리므로 워치는 자체 세션 알람을 끈다(중복 방지).
         // 미만이면 false → 워치가 자기 세션 알람으로 확실히 울린다.
         let alarmKitActive: Bool
         if #available(iOS 26.1, *) { alarmKitActive = true } else { alarmKitActive = false }
         let snapshot = TimerSyncSnapshot(
-            snapshotAt: Date(), timers: timers, presets: presets, alarmKitActive: alarmKitActive
+            snapshotAt: Date(), timers: timers, presets: presets,
+            alarmKitActive: alarmKitActive, alarmAuthorized: alarmAuthorized
         )
         guard let payload = try? snapshot.wcPayload() else { return }
         lastPayload = payload

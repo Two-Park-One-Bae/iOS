@@ -39,8 +39,9 @@ final class TimerQuickStartPickerViewController: UITableViewController {
     }
 
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        // 닫기는 호출측(SceneDelegate)이 처리한다 — 알람 권한 시트를 이어서 띄우므로
+        // 여기서 self를 dismiss하면 표시 충돌이 난다 (NM-360).
         onStart(presets[indexPath.row])
-        dismiss(animated: true)
     }
 
     private func durationText(_ seconds: Int) -> String {

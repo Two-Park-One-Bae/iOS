@@ -1,4 +1,5 @@
 import UIKit
+import Combine
 import BaseFeatureDependency
 import Core
 import Domain
@@ -29,6 +30,8 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     private var pendingURL: URL?
     /// Remote Config 기반 차단 화면(강제 업데이트·점검). windowScene이 있어야 띄울 수 있다.
     private var appGate: AppGate?
+    /// 위젯에서 온 프리셋 시작의 알람 권한 게이트 구독 보관함 (NM-360).
+    private var permissionBag = Set<AnyCancellable>()
     
     /*
      ┌─────────────────────────────────┬───────────────────────────────────────┐
@@ -116,7 +119,7 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
               let id = UUID(uuidString: raw) else { return }
         let useCase = DIContainer.shared.resolve(TimerUseCase.self)
         guard let preset = useCase.presets.value.first(where: { $0.id == id }) else { return }
-        useCase.start(preset: preset)
+        startWithAlarmGate(preset: preset, useCase: useCase)
     }
 
     private func presentWidgetOnboarding() {
@@ -129,10 +132,88 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
      */
     private func presentQuickStart() {
         let useCase = DIContainer.shared.resolve(TimerUseCase.self)
-        let picker = TimerQuickStartPickerViewController(presets: useCase.presets.value) { preset in
-            useCase.start(preset: preset)
+        let picker = TimerQuickStartPickerViewController(presets: useCase.presets.value) { [weak self] preset in
+            // 피커를 먼저 닫고(권한 시트와의 표시 충돌 방지) 알람 권한 게이트를 태운다.
+            self?.topMostViewController()?.dismiss(animated: true) {
+                self?.startWithAlarmGate(preset: preset, useCase: useCase)
+            }
         }
         present(picker)
+    }
+
+    // MARK: - 알람 권한 게이트 (NM-360)
+
+    /*
+     위젯에서 온 프리셋 시작(딥링크 /start · 퀵스타트)의 공통 진입점.
+     인앱 시작(TimerCoordinator)과 동일하게, 알람 권한을 먼저 확인하고 승인 상태에서만 실제로 시작한다.
+     권한 없이 시작하면 타이머만 뜨고 알람이 울리지 않는 문제(ISS-05)를 막는다.
+
+       authorized   → 즉시 시작
+       notDetermined→ 안내 시트 → [허용] 시 시스템 권한 요청 → 승인되면 시작
+       denied       → 거부 안내 시트(설정 유도), 시작하지 않음
+     */
+    private func startWithAlarmGate(preset: TimerPresetModel, useCase: TimerUseCase) {
+        permissionBag.removeAll()
+        useCase.alarmPermission
+            .receive(on: DispatchQueue.main)
+            .first()
+            .sink { [weak self] status in
+                switch status {
+                case .authorized:
+                    useCase.start(preset: preset)
+                case .notDetermined:
+                    self?.presentAlarmPrompt(preset: preset, useCase: useCase)
+                case .denied:
+                    self?.presentAlarmDenied()
+                }
+            }
+            .store(in: &permissionBag)
+        useCase.fetchAlarmPermission()
+    }
+
+    private func presentAlarmPrompt(preset: TimerPresetModel, useCase: TimerUseCase) {
+        let vc = TimerPermissionVC(mode: .prompt)
+        vc.onAllow = { [weak self, weak vc] in
+            vc?.dismiss(animated: true) { self?.requestAlarmThenStart(preset: preset, useCase: useCase) }
+        }
+        vc.onLater = { [weak vc] in vc?.dismiss(animated: true) }
+        presentAsSheet(vc)
+    }
+
+    private func requestAlarmThenStart(preset: TimerPresetModel, useCase: TimerUseCase) {
+        permissionBag.removeAll()
+        useCase.alarmPermission
+            .receive(on: DispatchQueue.main)
+            .first()
+            .sink { status in
+                // 시스템 다이얼로그에서 거부하면 시작하지 않는다.
+                if status == .authorized { useCase.start(preset: preset) }
+            }
+            .store(in: &permissionBag)
+        useCase.requestAlarmPermission()
+    }
+
+    private func presentAlarmDenied() {
+        let vc = TimerPermissionVC(mode: .denied)
+        vc.onOpenSettings = { [weak vc] in
+            vc?.dismiss(animated: true) {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+            }
+        }
+        vc.onBack = { [weak vc] in vc?.dismiss(animated: true) }
+        presentAsSheet(vc)
+    }
+
+    /// 인앱 권한 시트(TimerCoordinator)와 동일한 바텀시트(높이 325)로 최상단 위에 띄운다.
+    private func presentAsSheet(_ viewController: UIViewController, height: CGFloat = 325) {
+        guard let top = topMostViewController() else { return }
+        if let sheet = viewController.sheetPresentationController {
+            sheet.detents = [.custom { _ in height }]
+            sheet.prefersGrabberVisible = true
+        }
+        top.present(viewController, animated: true)
     }
 
     /// 현재 최상단 화면 위에 모달로 띄운다. 이미 다른 모달이 떠 있어도 가려지지 않도록 topMost를 찾는다.
@@ -165,6 +246,10 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         // App Intent(AlarmKit)가 App Group 저장소를 직접 바꿨을 수 있음 — 먼저 재동기화.
         useCase.reload() // 1. 디스크 → 메모리 다시 읽기
         useCase.refresh()  // 2. 현재 시각 기준으로 상태 재계산
+        // 3. 알람 권한 캐시 갱신(NM-360) — 위젯 무음-시작 라우팅과 워치 시작 게이트가 읽는
+        //    alarmAuthorized 플래그를 실제 권한으로 최신화하고 워치에 즉시 재동기화한다.
+        //    이게 없으면 플래그가 미기록(nil)으로 남아 워치가 권한 없이도 시작을 허용한다.
+        useCase.fetchAlarmPermission()
 
         // Remote Config 최신값 fetch 후 강제 업데이트/점검 게이트 갱신(포그라운드 복귀 포함).
         Task { @MainActor in

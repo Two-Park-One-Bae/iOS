@@ -55,14 +55,14 @@ struct RectangularView: View {
 
     var body: some View {
         if let preset {
-            if #available(iOS 26.1, *) {
-                // 26.1+ : 무음 시작(AlarmKit)
+            if #available(iOS 26.1, *), TimerPresetStore.alarmAuthorized {
+                // 26.1+ & 알람 승인됨 : 무음 시작(AlarmKit)
                 Button(intent: StartPresetTimerIntent(presetId: preset.id)) {
                     content(preset: preset)
                 }
                 .buttonStyle(.plain)
             } else {
-                // 26.1 미만 : 앱을 열어 정식 시작(Live Activity + 알림). widgetURL 이 확실히 앱을 연다.
+                // 미승인 또는 26.1 미만 : 앱을 열어 권한 게이트를 태우고 정식 시작(NM-360). widgetURL 이 확실히 앱을 연다.
                 content(preset: preset)
                     .widgetURL(TimerWidgetDeepLink.startPreset(id: preset.id))
             }
@@ -104,10 +104,11 @@ struct CircularView: View {
 
     var body: some View {
         if let preset {
-            if #available(iOS 26.1, *) {
+            if #available(iOS 26.1, *), TimerPresetStore.alarmAuthorized {
                 Button(intent: StartPresetTimerIntent(presetId: preset.id)) { filled(preset) }
                     .buttonStyle(.plain)
             } else {
+                // 미승인 또는 26.1 미만 : 앱을 열어 권한 게이트 경유(NM-360).
                 filled(preset).widgetURL(TimerWidgetDeepLink.startPreset(id: preset.id))
             }
         } else {

@@ -4,16 +4,17 @@ import Then
 import DSKit
 
 // A3 알람 권한 — 안내(RG87P) / 거부(EgsrR) 바텀시트
-final class TimerPermissionVC: UIViewController {
+// 인앱(TimerCoordinator)뿐 아니라 위젯 딥링크 시작(SceneDelegate)에서도 재사용하므로 public (NM-360).
+public final class TimerPermissionVC: UIViewController {
 
-    enum Mode { case prompt, denied }
+    public enum Mode { case prompt, denied }
 
     // MARK: - Callbacks
 
-    var onAllow: (() -> Void)?         // prompt: 허용하고 시작하기
-    var onLater: (() -> Void)?         // prompt: 나중에 할게요
-    var onOpenSettings: (() -> Void)?  // denied: 설정에서 켜기
-    var onBack: (() -> Void)?          // denied: 닫기
+    public var onAllow: (() -> Void)?         // prompt: 허용하고 시작하기
+    public var onLater: (() -> Void)?         // prompt: 나중에 할게요
+    public var onOpenSettings: (() -> Void)?  // denied: 설정에서 켜기
+    public var onBack: (() -> Void)?          // denied: 닫기
 
     // MARK: - Properties
 
@@ -21,16 +22,16 @@ final class TimerPermissionVC: UIViewController {
 
     // MARK: - Init
 
-    init(mode: Mode) {
+    public init(mode: Mode) {
         self.mode = mode
         super.init(nibName: nil, bundle: nil)
     }
 
-    required init?(coder: NSCoder) { fatalError() }
+    public required init?(coder: NSCoder) { fatalError() }
 
     // MARK: - Lifecycle
 
-    override func viewDidLoad() {
+    public override func viewDidLoad() {
         super.viewDidLoad()
         setLayout()
     }

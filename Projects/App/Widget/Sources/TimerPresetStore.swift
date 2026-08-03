@@ -4,6 +4,9 @@ import UserNotifications
 #if canImport(WidgetKit)
 import WidgetKit
 #endif
+#if canImport(AlarmKit)
+import AlarmKit
+#endif
 
 // 위젯 전용 App Group 접근 (NM-302) — 앱(Data/TimerRepository)과 "같은 suite·같은 키"를 읽고 쓴다.
 // 위젯 익스텐션은 Data/TimerFeature 를 링크하지 않으므로(경량 유지) 최소 저장소를 자체 정의한다.
@@ -16,10 +19,32 @@ enum TimerPresetStore {
         static let presets = "care.timer.presets"     // [TimerPresetModel]
         static let timers = "care.timer.timers"       // [TreatmentTimerModel]
         static let snapshotAt = "care.timer.snapshotAt"
+        static let alarmAuthorized = "care.timer.alarmAuthorized"  // NM-360 앱이 캐시하는 알람 권한 승인 여부
     }
 
     private static var store: UserDefaults {
         UserDefaults(suiteName: appGroup) ?? .standard
+    }
+
+    // MARK: - 알람 권한 게이트 (NM-360)
+
+    /// 앱이 App Group 에 캐시한 알람 권한 승인 여부. 위젯 원탭 버튼 라우팅에 사용:
+    /// true → AppIntent 로 조용히 시작 / false·미설정 → 딥링크로 앱을 열어 앱 게이트가 권한을 처리.
+    /// (앱을 한 번도 안 연 신규 설치는 false 로 시작해 안전하게 앱을 경유한다.)
+    static var alarmAuthorized: Bool {
+        store.bool(forKey: Keys.alarmAuthorized)
+    }
+
+    /// 실시작 직전 최종 확인용 — 위젯 프로세스에서 시스템 권한 상태를 직접 읽는다.
+    /// 캐시 플래그가 stale(승인으로 굳어졌지만 실제로는 해제됨)해도 죽는 타이머를 만들지 않는다.
+    private static var isAlarmGranted: Bool {
+        #if canImport(AlarmKit)
+        if #available(iOS 26.1, *) {
+            return AlarmManager.shared.authorizationState == .authorized
+        }
+        #endif
+        // 26.1 미만은 위젯 버튼이 애초에 딥링크로만 라우팅되어 이 경로로 오지 않음 — 방어적으로 캐시 신뢰.
+        return alarmAuthorized
     }
 
     // MARK: - 프리셋 조회 (위젯 설정 선택지 · 렌더용)
@@ -41,6 +66,10 @@ enum TimerPresetStore {
     /// 앱은 다음 활성화 때 `TimerUseCase.reload()`(SceneDelegate)로 이 타이머를 흡수한다.
     /// 버전별: iOS 26.1+ → AlarmKit(앱과 동일), 미만 → 로컬 알림.
     static func startTimer(preset: TimerPresetModel) async {
+        // 안전망(NM-360): 알람 미승인이면 조용히 죽는 타이머를 만들지 않는다.
+        // 위젯 버튼은 승인 시에만 AppIntent 로 라우팅하지만, 캐시 플래그가 stale 일 수 있어 실시작 직전 재확인.
+        guard isAlarmGranted else { return }
+
         let endAt = Date().addingTimeInterval(TimeInterval(preset.duration))
         let timer = TreatmentTimerModel(
             label: preset.label,

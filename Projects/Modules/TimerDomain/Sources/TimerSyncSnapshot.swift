@@ -19,17 +19,23 @@ public struct TimerSyncSnapshot: Codable, Equatable, Sendable {
     /// nil/false(구형 폰)면 워치가 자기 세션 알람을 켜서 확실히 울린다.
     /// (옵셔널 — 구버전 스냅샷과 하위호환)
     public let alarmKitActive: Bool?
+    /// 폰(앱)의 알람 권한 승인 여부 (NM-360). false면 폰이 알람을 못 울리므로 워치는
+    /// 프리셋 시작을 막고 "앱에서 알림 권한을 켜세요"를 안내한다 — 권한 없이 시작해
+    /// 알람이 안 울리는 죽은 타이머 방지. nil(구형 폰·최초 동기화 전)이면 막지 않는다.
+    public let alarmAuthorized: Bool?
 
     public init(
         snapshotAt: Date,
         timers: [TreatmentTimerModel],
         presets: [TimerPresetModel],
-        alarmKitActive: Bool? = nil
+        alarmKitActive: Bool? = nil,
+        alarmAuthorized: Bool? = nil
     ) {
         self.snapshotAt = snapshotAt
         self.timers = timers
         self.presets = presets
         self.alarmKitActive = alarmKitActive
+        self.alarmAuthorized = alarmAuthorized
     }
 }
 
