@@ -48,6 +48,9 @@ public final class DefaultTimerUseCase: TimerUseCase {
     private let alarmScheduler: TimerAlarmScheduling
     private let watchSync: TimerWatchSyncing?
     private var cancellables = Set<AnyCancellable>()
+    /// 폰의 알람 권한 승인 여부 캐시(NM-360) — 워치 스냅샷에 실어 시작 게이트에 쓴다.
+    /// init 에서 영속 플래그로 시드하고, 권한 확인/요청 때 갱신한다. nil=아직 물어본 적 없음.
+    private var alarmAuthorizedCache: Bool?
 
     public let timers = CurrentValueSubject<[TreatmentTimerModel], Never>([])
     public let presets = CurrentValueSubject<[TimerPresetModel], Never>([])
@@ -61,6 +64,7 @@ public final class DefaultTimerUseCase: TimerUseCase {
         self.repository = repository
         self.alarmScheduler = alarmScheduler
         self.watchSync = watchSync
+        self.alarmAuthorizedCache = repository.alarmAuthorizedFlag()  // 지난 세션에 기록된 승인 여부로 시드
         timers.send(repository.loadTimers())
         presets.send(repository.loadPresets())
 
@@ -68,8 +72,8 @@ public final class DefaultTimerUseCase: TimerUseCase {
         // 앱 시작 직후에도 최신 상태를 한 번 보낸다(updateApplicationContext는 병합됨).
         if let watchSync {
             Publishers.CombineLatest(timers, presets)
-                .sink { timers, presets in
-                    watchSync.sync(timers: timers, presets: presets)
+                .sink { [weak self] timers, presets in
+                    watchSync.sync(timers: timers, presets: presets, alarmAuthorized: self?.alarmAuthorizedCache)
                 }
                 .store(in: &cancellables)
         }
@@ -204,7 +208,7 @@ public final class DefaultTimerUseCase: TimerUseCase {
         alarmScheduler.requestAuthorization()
             .map { $0 ? TimerAlarmAuthorizationStatus.authorized : .denied }
             .sink { [weak self] status in
-                self?.repository.setAlarmAuthorized(status == .authorized)  // NM-360 위젯 게이트 캐시
+                self?.updateAlarmAuthorized(status == .authorized)
                 self?.alarmPermission.send(status)
             }
             .store(in: &cancellables)
@@ -213,10 +217,18 @@ public final class DefaultTimerUseCase: TimerUseCase {
     public func fetchAlarmPermission() {
         alarmScheduler.authorizationStatus()
             .sink { [weak self] status in
-                self?.repository.setAlarmAuthorized(status == .authorized)  // NM-360 위젯 게이트 캐시
+                self?.updateAlarmAuthorized(status == .authorized)
                 self?.alarmPermission.send(status)
             }
             .store(in: &cancellables)
+    }
+
+    // 승인 여부를 App Group(위젯용)·캐시(워치용)에 반영하고, 워치에 즉시 재동기화(NM-360).
+    // 타이머 변경이 없어도 권한만 바뀌면 워치가 알아야 시작 게이트가 최신이 된다.
+    private func updateAlarmAuthorized(_ authorized: Bool) {
+        repository.setAlarmAuthorized(authorized)
+        alarmAuthorizedCache = authorized
+        watchSync?.sync(timers: timers.value, presets: presets.value, alarmAuthorized: authorized)
     }
 
     // MARK: - Private

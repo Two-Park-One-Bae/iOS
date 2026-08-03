@@ -64,6 +64,11 @@ public final class TimerRepository: TimerRepositoryProtocol {
         store.set(authorized, forKey: Keys.alarmAuthorized)
     }
 
+    public func alarmAuthorizedFlag() -> Bool? {
+        // object(forKey:) 로 "미기록(nil)"과 "false"를 구분 — 워치가 미상(nil)일 땐 차단하지 않는다.
+        store.object(forKey: Keys.alarmAuthorized) as? Bool
+    }
+
     // 기본 프리셋 6종 (spec/feature/care-timer/README.md)
     private static let defaultPresets: [TimerPresetModel] = [
         TimerPresetModel(label: "AST", category: .examination, duration: 15 * 60, isDefault: true),

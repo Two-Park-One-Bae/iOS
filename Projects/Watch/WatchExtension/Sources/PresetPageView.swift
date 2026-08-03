@@ -9,6 +9,8 @@ struct PresetPageView: View {
     /// 프리셋 시작 직후 호출 — 활성 페이지로 전환(ContentView가 소유).
     let onStarted: () -> Void
 
+    @State private var showAlarmAlert = false   // 폰 알람 권한 미승인 안내 (NM-360)
+
     private var presets: [TimerPresetModel] {
         connectivity.snapshot?.presets ?? []
     }
@@ -40,6 +42,11 @@ struct PresetPageView: View {
 
                         ForEach(presets) { preset in
                             Button {
+                                // 폰 알람 권한이 명시적으로 거부(false)면 시작 대신 안내 — nil(미상)은 폰에 위임.
+                                guard connectivity.snapshot?.alarmAuthorized != false else {
+                                    showAlarmAlert = true
+                                    return
+                                }
                                 connectivity.send(command: .start(presetId: preset.id))
                                 onStarted()
                             } label: {
@@ -54,6 +61,11 @@ struct PresetPageView: View {
             }
         }
         .toolbar(.hidden, for: .navigationBar)
+        .alert("알람 권한이 필요해요", isPresented: $showAlarmAlert) {
+            Button("확인", role: .cancel) {}
+        } message: {
+            Text("아이폰 널스메이트 앱에서 알림 권한을 켜야 타이머 알람이 울려요.")
+        }
     }
 }
 
