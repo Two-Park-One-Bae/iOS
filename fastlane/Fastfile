@@ -135,7 +135,7 @@ platform :ios do
       # 내부 TestFlight 빌드에만 INTERNAL 컴파일 조건 주입 → AppEnvironment.isInternal=true
       # → Amplitude·Clarity·Firebase Analytics·S3 원본업로드 OFF(내부 테스트로 지표·데이터셋 오염 방지).
       # external/release 레인은 주입 안 함 → 외부 테스터·프로덕션은 정상 수집.
-      xcargs: "DEVELOPMENT_TEAM=#{ENV.fetch('DEVELOPMENT_TEAM', '')} CODE_SIGN_IDENTITY='Apple Distribution' CODE_SIGN_STYLE=Manual SWIFT_ACTIVE_COMPILATION_CONDITIONS='$(inherited) INTERNAL'",
+      xcargs: "DEVELOPMENT_TEAM=#{ENV.fetch('DEVELOPMENT_TEAM', '')} CODE_SIGN_IDENTITY='Apple Distribution' CODE_SIGN_STYLE=Manual SWIFT_ACTIVE_COMPILATION_CONDITIONS='$(inherited) INTERNAL' FIREBASE_ANALYTICS_ENABLED=NO",
       export_options: {
         method: "app-store",
         signingStyle: "manual",

@@ -69,7 +69,10 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         FirebaseService.configure()
 
         // 내부 빌드(개발자 테스트)는 Analytics SaaS(Amplitude·Clarity·Firebase Analytics)에 잡히면 안 된다.
-        // → Amplitude·Clarity는 초기화·전송 자체를 스킵, Firebase Analytics는 자동수집 OFF.
+        // → Amplitude·Clarity는 초기화·전송 자체를 스킵.
+        //   Firebase Analytics는 Info.plist FIREBASE_ANALYTICS_COLLECTION_ENABLED(구성별)로 init 전부터 끈다(주 통제
+        //   — 런타임 disable만으론 first_open 등이 새는 게 확인됨, firebase-ios-sdk#5837).
+        //   아래 런타임 호출은 보강 — 값이 저장·우선되므로 상태를 isInternal에 맞춰 고정한다.
         //   Crashlytics(크래시)·App Check·Remote Config는 내부에서도 유지(SaaS 지표와 무관).
         let isInternal = AppEnvironment.isInternal
         FirebaseService.setAnalyticsCollectionEnabled(!isInternal)
