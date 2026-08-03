@@ -203,13 +203,19 @@ public final class DefaultTimerUseCase: TimerUseCase {
     public func requestAlarmPermission() {
         alarmScheduler.requestAuthorization()
             .map { $0 ? TimerAlarmAuthorizationStatus.authorized : .denied }
-            .sink { [weak self] status in self?.alarmPermission.send(status) }
+            .sink { [weak self] status in
+                self?.repository.setAlarmAuthorized(status == .authorized)  // NM-360 위젯 게이트 캐시
+                self?.alarmPermission.send(status)
+            }
             .store(in: &cancellables)
     }
 
     public func fetchAlarmPermission() {
         alarmScheduler.authorizationStatus()
-            .sink { [weak self] status in self?.alarmPermission.send(status) }
+            .sink { [weak self] status in
+                self?.repository.setAlarmAuthorized(status == .authorized)  // NM-360 위젯 게이트 캐시
+                self?.alarmPermission.send(status)
+            }
             .store(in: &cancellables)
     }
 

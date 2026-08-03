@@ -15,6 +15,9 @@ public protocol TimerRepositoryProtocol {
     func saveTimers(_ timers: [TreatmentTimerModel])
     func loadPresets() -> [TimerPresetModel]
     func savePresets(_ presets: [TimerPresetModel])
+    /// 알람 권한 승인 여부를 App Group 에 캐시 (NM-360) — 위젯이 원탭 시작 버튼 라우팅에 읽는다.
+    /// 앱만 쓰고, 위젯은 읽기 전용(위젯 프로세스는 실시작 직전 AlarmManager 로 최종 확인).
+    func setAlarmAuthorized(_ authorized: Bool)
 }
 
 // 폰→워치 동기화 추상화. 구현체(WCSession)는 App 타깃에 둔다 — Domain은 전송 수단을 모른다.

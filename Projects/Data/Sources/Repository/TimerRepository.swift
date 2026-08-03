@@ -20,6 +20,7 @@ public final class TimerRepository: TimerRepositoryProtocol {
         static let presets = "care.timer.presets"
         static let snapshotAt = "care.timer.snapshotAt"
         static let presetsSeeded = "care.timer.presets.seeded"
+        static let alarmAuthorized = "care.timer.alarmAuthorized"  // NM-360 위젯 시작 게이트
     }
 
     private let store: UserDefaults
@@ -57,6 +58,10 @@ public final class TimerRepository: TimerRepositoryProtocol {
     public func savePresets(_ presets: [TimerPresetModel]) {
         save(presets, forKey: Keys.presets)
         touchSnapshot()
+    }
+
+    public func setAlarmAuthorized(_ authorized: Bool) {
+        store.set(authorized, forKey: Keys.alarmAuthorized)
     }
 
     // 기본 프리셋 6종 (spec/feature/care-timer/README.md)
