@@ -28,8 +28,31 @@ final class AppCoordinator: BaseCoordinator {
 
     /// SceneDelegate가 window를 세팅한 직후 호출하는 진입점.
     override func start() {
-        showTabBar()
-        observeTabSwitching()
+        showSplash()
+    }
+
+    /*
+     콜드런치 브랜드 스플래시 (NM-359).
+
+     첫 화면으로 스플래시를 띄우고, 표시가 끝나면(onFinish) 탭바로 크로스디졸브 전환한다.
+     스플래시는 다음 화면을 모르고(탭바 구성은 AppCoordinator 책임), 전환 시점만 콜백으로 알린다.
+     */
+    private func showSplash() {
+        let splash = SplashViewController()
+        splash.onFinish = { [weak self] in
+            guard let self else { return }
+            UIView.transition(
+                with: self.navigationController.view,
+                duration: 0.3,
+                options: .transitionCrossDissolve
+            ) {
+                self.showTabBar()
+            } completion: { _ in
+                self.observeTabSwitching()
+            }
+        }
+        navigationController.setViewControllers([splash], animated: false)
+        navigationController.setNavigationBarHidden(true, animated: false)
     }
 
     /*
