@@ -7,7 +7,7 @@ import Foundation
 ///  - **INTERNAL**: 내부 TestFlight 빌드 — fastlane `beta_internal` 레인이
 ///    `SWIFT_ACTIVE_COMPILATION_CONDITIONS`에 `INTERNAL`을 넣어 컴파일 조건으로 주입한다.
 ///
-/// 이 값이 `true`면 **Analytics SaaS 전송(Amplitude·Clarity·Firebase Analytics)** 과
+/// 이 값이 `true`면 **Analytics SaaS 전송(Amplitude·Firebase Analytics)** 과
 /// **학습용 S3 원본 이미지 업로드**를 하지 않는다 — 내부 테스트 데이터로 지표·데이터셋이 오염되는 걸 막는다.
 /// (외부 TestFlight·App Store 프로덕션은 `false` → 정상 수집)
 ///

@@ -68,8 +68,8 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         AppCheckService.configure()
         FirebaseService.configure()
 
-        // 내부 빌드(개발자 테스트)는 Analytics SaaS(Amplitude·Clarity·Firebase Analytics)에 잡히면 안 된다.
-        // → Amplitude·Clarity는 초기화·전송 자체를 스킵.
+        // 내부 빌드(개발자 테스트)는 Analytics SaaS(Amplitude·Firebase Analytics)에 잡히면 안 된다.
+        // → Amplitude는 초기화·전송 자체를 스킵.
         //   Firebase Analytics는 Info.plist FIREBASE_ANALYTICS_COLLECTION_ENABLED(구성별)로 init 전부터 끈다(주 통제
         //   — 런타임 disable만으론 first_open 등이 새는 게 확인됨, firebase-ios-sdk#5837).
         //   아래 런타임 호출은 보강 — 값이 저장·우선되므로 상태를 isInternal에 맞춰 고정한다.
@@ -85,11 +85,9 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
 
         if !isInternal {
             // 외부 TestFlight·프로덕션에서만 SaaS 분석 수집.
-            // Amplitude·Crashlytics·Clarity를 같은 device_id로 묶어 서버 로그와 교차 대조 가능하게 한다.
-            ClarityService.configure()
+            // Amplitude·Crashlytics를 같은 device_id로 묶어 서버 로그와 교차 대조 가능하게 한다.
             if let deviceID {
                 AmplitudeService.setUserID(deviceID)
-                ClarityService.setUserID(deviceID)
             }
             AmplitudeService.track(AppLaunchEvent())
         }
