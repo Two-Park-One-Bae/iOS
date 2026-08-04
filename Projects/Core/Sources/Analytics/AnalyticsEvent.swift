@@ -1,0 +1,72 @@
+import Foundation
+
+/*
+ 앱 분석 이벤트 택소노미 (Firebase Analytics 단독).
+
+ - 이름은 snake_case·40자 이내, 문자열 파라미터 값은 100자 이내(GA4 제약)로 맞춘다.
+ - 리포트에서 파라미터를 보려면 GA4 콘솔에서 "커스텀 측정기준"으로 등록해야 한다(이벤트범위 최대 50개).
+ - 내부 빌드에선 FirebaseService.setAnalyticsCollectionEnabled(false)로 수집이 꺼져 있어 track()이 no-op이 된다(NM-364).
+ */
+public enum AnalyticsEvent {
+
+    // MARK: 공통
+    /// 각종 버튼 탭 — target 에 버튼 종류(share/back/edit …), screen 에 화면명.
+    case buttonTap(target: String, screen: String)
+    /// 공유 완료 (UIActivityViewController).
+    case share(method: String, contentType: String)
+
+    // MARK: 알약 인식
+    /// 분석 시작(카메라/앨범) — 실사용 DAU·퍼널 상단.
+    case pillIdentifyStart(source: String, pillCount: Int)
+    /// 속성 수정 1회.
+    case pillAttrEdit(attribute: String, pillIndex: Int)
+    /// 최종 확정 — 몇 번째 후보·수정 횟수·확정까지 체류시간.
+    case pillConfirm(candidateIndex: Int, editCount: Int, editedAttrs: String, dwellMs: Int, pillCount: Int)
+    /// 확정 없이 이탈 — 어떤 크롭 알약·어떤 속성 입력 중이었나.
+    case pillFlowExit(stage: String, pillIndex: Int, editingAttribute: String, enteredValues: String, editCount: Int)
+
+    // MARK: 타이머
+    /// 타이머 시작 — source(iphone/watch)·프리셋.
+    case timerStart(source: String, presetLabel: String, category: String, durationSec: Int)
+
+    var name: String {
+        switch self {
+        case .buttonTap:        return "button_tap"
+        case .share:            return "share"
+        case .pillIdentifyStart: return "pill_identify_start"
+        case .pillAttrEdit:     return "pill_attr_edit"
+        case .pillConfirm:      return "pill_confirm"
+        case .pillFlowExit:     return "pill_flow_exit"
+        case .timerStart:       return "timer_start"
+        }
+    }
+
+    var parameters: [String: Any] {
+        switch self {
+        case let .buttonTap(target, screen):
+            return ["target": target, "screen": screen]
+        case let .share(method, contentType):
+            return ["method": method, "content_type": contentType]
+        case let .pillIdentifyStart(source, pillCount):
+            return ["source": source, "pill_count": pillCount]
+        case let .pillAttrEdit(attribute, pillIndex):
+            return ["attribute": attribute, "pill_index": pillIndex]
+        case let .pillConfirm(candidateIndex, editCount, editedAttrs, dwellMs, pillCount):
+            return ["candidate_index": candidateIndex, "edit_count": editCount,
+                    "edited_attrs": editedAttrs, "dwell_ms": dwellMs, "pill_count": pillCount]
+        case let .pillFlowExit(stage, pillIndex, editingAttribute, enteredValues, editCount):
+            return ["stage": stage, "pill_index": pillIndex, "editing_attribute": editingAttribute,
+                    "entered_values": enteredValues, "edit_count": editCount]
+        case let .timerStart(source, presetLabel, category, durationSec):
+            return ["source": source, "preset_label": presetLabel,
+                    "category": category, "duration_sec": durationSec]
+        }
+    }
+}
+
+/// 분석 전송 파사드 — 현재는 Firebase 단독. (필요 시 여기서 Amplitude 등 다중 라우팅 추가)
+public enum AppAnalytics {
+    public static func track(_ event: AnalyticsEvent) {
+        FirebaseService.log(event: event.name, event.parameters)
+    }
+}
