@@ -17,6 +17,7 @@ let project = Project(
             infoPlist: .extendingDefault(with: [
                 // 홈 화면 표시 이름 — 로케일 무관 영어 단일값.
                 "CFBundleDisplayName": "NurseMate",
+                "CFBundleShortVersionString": "1.0.2",
                 "ITSAppUsesNonExemptEncryption": false,
                 "AMPLITUDE_API_KEY": "$(AMPLITUDE_API_KEY)",
                 "BASE_URL": "$(BASE_URL)",
@@ -77,6 +78,7 @@ let project = Project(
                 "WKApplication": true,
                 "WKCompanionAppBundleIdentifier": "\(Environment.bundlePrefix).app",
                 "CFBundleDisplayName": "NurseMate",
+                "CFBundleShortVersionString": "1.0.2",
                 // 폰 < iOS 26.1(AlarmKit 없음)일 때, 워치가 만료 시각에 WKExtendedRuntimeSession(alarm)을
                 // 예약해 자체적으로 확실히 울리기 위한 백그라운드 모드. 26.1+ 폰이면 워치는 세션을 안 켠다.
                 "WKBackgroundModes": ["alarm"],
@@ -109,6 +111,7 @@ let project = Project(
             deploymentTargets: .watchOS("10.0"),
             infoPlist: .extendingDefault(with: [
                 "CFBundleDisplayName": "NurseMate",
+                "CFBundleShortVersionString": "1.0.2",
                 "NSExtension": [
                     "NSExtensionPointIdentifier": "com.apple.widgetkit-extension",
                 ],
@@ -125,6 +128,7 @@ let project = Project(
             deploymentTargets: Environment.deploymentTarget,
             infoPlist: .extendingDefault(with: [
                 "CFBundleDisplayName": "NurseMate",
+                "CFBundleShortVersionString": "1.0.2",
                 "NSSupportsLiveActivities": true,
                 // 위젯에서 시작한 타이머의 AlarmKit 예약(iOS 26.1+)에 필요 (NM-302)
                 "NSAlarmKitUsageDescription": "치료 타이머 종료 알람을 예약·알림하기 위해 필요합니다.",
