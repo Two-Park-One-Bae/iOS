@@ -16,14 +16,14 @@ public enum AnalyticsEvent {
     case share(method: String, contentType: String)
 
     // MARK: 알약 인식
-    /// 분석 시작(카메라/앨범) — 실사용 DAU·퍼널 상단.
-    case pillIdentifyStart(source: String, pillCount: Int)
+    /// 분석 완료(검출된 알약 수) — 실사용 DAU·퍼널 상단. (source=카메라/앨범은 후속)
+    case pillIdentifyStart(pillCount: Int)
     /// 속성 수정 1회.
     case pillAttrEdit(attribute: String, pillIndex: Int)
-    /// 최종 확정 — 몇 번째 후보·수정 횟수·확정까지 체류시간.
-    case pillConfirm(candidateIndex: Int, editCount: Int, editedAttrs: String, dwellMs: Int, pillCount: Int)
-    /// 확정 없이 이탈 — 어떤 크롭 알약·어떤 속성 입력 중이었나.
-    case pillFlowExit(stage: String, pillIndex: Int, editingAttribute: String, enteredValues: String, editCount: Int)
+    /// 알약 1개 확정(후보 선택) — 몇 번째 후보·수정 횟수·수정한 속성·확정까지 체류시간.
+    case pillConfirm(pillIndex: Int, candidateIndex: Int, editCount: Int, editedAttrs: String, dwellMs: Int)
+    /// 확정 없이 알약 수정 화면을 이탈 — 어떤 알약·어떤 속성 입력 중이었나.
+    case pillFlowExit(pillIndex: Int, editingAttribute: String, enteredValues: String, editCount: Int)
 
     // MARK: 타이머
     /// 타이머 시작 — source(iphone/watch)·프리셋.
@@ -47,15 +47,15 @@ public enum AnalyticsEvent {
             return ["target": target, "screen": screen]
         case let .share(method, contentType):
             return ["method": method, "content_type": contentType]
-        case let .pillIdentifyStart(source, pillCount):
-            return ["source": source, "pill_count": pillCount]
+        case let .pillIdentifyStart(pillCount):
+            return ["pill_count": pillCount]
         case let .pillAttrEdit(attribute, pillIndex):
             return ["attribute": attribute, "pill_index": pillIndex]
-        case let .pillConfirm(candidateIndex, editCount, editedAttrs, dwellMs, pillCount):
-            return ["candidate_index": candidateIndex, "edit_count": editCount,
-                    "edited_attrs": editedAttrs, "dwell_ms": dwellMs, "pill_count": pillCount]
-        case let .pillFlowExit(stage, pillIndex, editingAttribute, enteredValues, editCount):
-            return ["stage": stage, "pill_index": pillIndex, "editing_attribute": editingAttribute,
+        case let .pillConfirm(pillIndex, candidateIndex, editCount, editedAttrs, dwellMs):
+            return ["pill_index": pillIndex, "candidate_index": candidateIndex,
+                    "edit_count": editCount, "edited_attrs": editedAttrs, "dwell_ms": dwellMs]
+        case let .pillFlowExit(pillIndex, editingAttribute, enteredValues, editCount):
+            return ["pill_index": pillIndex, "editing_attribute": editingAttribute,
                     "entered_values": enteredValues, "edit_count": editCount]
         case let .timerStart(source, presetLabel, category, durationSec):
             return ["source": source, "preset_label": presetLabel,

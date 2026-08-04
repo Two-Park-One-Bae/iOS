@@ -4,6 +4,7 @@ import SnapKit
 import Then
 import DSKit
 import Domain
+import Core
 
 // ⑧ 알약 수정 — 속성 편집(색상/모양/제형/각인 인라인 펼침) + 실시간 후보 + 선택/확인
 //
@@ -39,6 +40,8 @@ final class PillEditVC: UIViewController {
 
     private enum Panel { case none, color, shape, formulation, imprint }
     private var openPanel: Panel = .none
+    /// 체류시간(pill_confirm.dwell_ms) 기준 시각.
+    private var appearedAt: Date?
 
     // MARK: - UI
 
@@ -114,6 +117,7 @@ final class PillEditVC: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        appearedAt = Date()
         navigationController?.setNavigationBarHidden(true, animated: false)
         setUI()
         setLayout()
@@ -126,7 +130,10 @@ final class PillEditVC: UIViewController {
 
     private func setUI() {
         view.backgroundColor = DSColor.bgApp
-        navBar.onBackTapped = { [weak self] in self?.onBackTapped?() }
+        navBar.onBackTapped = { [weak self] in
+            self?.trackFlowExit()      // 확정 없이 이탈 — 어떤 알약·어떤 속성 입력 중이었나 (NM 분석)
+            self?.onBackTapped?()
+        }
         refreshChips()
         colorPanel.setSelected(viewModel.colors)
         shapePanel.setSelected(viewModel.shape)
@@ -351,7 +358,41 @@ final class PillEditVC: UIViewController {
     @objc private func cancelTapped() { onCancel?() }
     @objc private func confirmTapped() {
         guard let selected = currentResults.first(where: { $0.pillCode == selectedPillCode }) else { return }
+        // pill_confirm — 알약 1개 확정: 몇 번째 후보·수정 횟수·수정 속성·확정까지 체류시간.
+        AppAnalytics.track(.pillConfirm(
+            pillIndex: viewModel.pillIndex,
+            candidateIndex: currentResults.firstIndex(where: { $0.pillCode == selectedPillCode }) ?? -1,
+            editCount: viewModel.editCount,
+            editedAttrs: viewModel.editedAttrsJoined,
+            dwellMs: dwellMs()
+        ))
         onConfirm?(selected)
+    }
+
+    // MARK: - Analytics helpers
+
+    private func trackFlowExit() {
+        AppAnalytics.track(.pillFlowExit(
+            pillIndex: viewModel.pillIndex,
+            editingAttribute: editingAttributeName,
+            enteredValues: viewModel.enteredValuesSummary,
+            editCount: viewModel.editCount
+        ))
+    }
+
+    private var editingAttributeName: String {
+        switch openPanel {
+        case .none:        return "none"
+        case .color:       return "color"
+        case .shape:       return "shape"
+        case .formulation: return "formulation"
+        case .imprint:     return "imprint"
+        }
+    }
+
+    private func dwellMs() -> Int {
+        guard let appearedAt else { return 0 }
+        return Int(Date().timeIntervalSince(appearedAt) * 1000)
     }
 
     // MARK: - Bind

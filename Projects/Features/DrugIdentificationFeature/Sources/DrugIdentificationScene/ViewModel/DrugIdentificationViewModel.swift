@@ -79,6 +79,7 @@ public final class DrugIdentificationViewModel {
                     self.emit(.empty)
                     return
                 }
+                AppAnalytics.track(.pillIdentifyStart(pillCount: detections.count))
 
                 let pills = self.makeIdentifiedPills(from: detections)
                 self.pending = (pills, self.buildItems(from: pills))
