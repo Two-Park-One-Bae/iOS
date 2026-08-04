@@ -45,7 +45,18 @@ enum RegisterDependencies {
             // 워치 명령 → 폰 UseCase 실행(알람 예약 포함) → 스냅샷 재브로드캐스트.
             // resolve 캐싱(싱글톤)이라 UI와 같은 인스턴스가 명령을 처리한다.
             sync.commandHandler = { [weak useCase] command in
-                useCase?.handleWatchCommand(command)
+                guard let useCase else { return }
+                // 워치에서 시작한 프리셋 분석 (timer_start, source=watch) — 아이폰/워치 DAU 구분용.
+                if case let .start(presetId) = command,
+                   let preset = useCase.presets.value.first(where: { $0.id == presetId }) {
+                    AppAnalytics.track(.timerStart(
+                        source: "watch",
+                        presetLabel: preset.label,
+                        category: preset.category.displayName,
+                        durationSec: preset.duration
+                    ))
+                }
+                useCase.handleWatchCommand(command)
             }
             return useCase
         }

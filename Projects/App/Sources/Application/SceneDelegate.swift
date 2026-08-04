@@ -161,6 +161,8 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
                 switch status {
                 case .authorized:
                     useCase.start(preset: preset)
+                    AppAnalytics.track(.timerStart(source: "widget", presetLabel: preset.label,
+                                                   category: preset.category.displayName, durationSec: preset.duration))
                 case .notDetermined:
                     self?.presentAlarmPrompt(preset: preset, useCase: useCase)
                 case .denied:
@@ -187,7 +189,11 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
             .first()
             .sink { status in
                 // 시스템 다이얼로그에서 거부하면 시작하지 않는다.
-                if status == .authorized { useCase.start(preset: preset) }
+                if status == .authorized {
+                    useCase.start(preset: preset)
+                    AppAnalytics.track(.timerStart(source: "widget", presetLabel: preset.label,
+                                                   category: preset.category.displayName, durationSec: preset.duration))
+                }
             }
             .store(in: &permissionBag)
         useCase.requestAlarmPermission()
