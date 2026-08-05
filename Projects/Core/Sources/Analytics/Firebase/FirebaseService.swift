@@ -17,6 +17,11 @@ public enum FirebaseService {
         Crashlytics.crashlytics().setUserID(userID)
     }
 
+    /// GA4 커스텀 이벤트 전송. 내부 빌드는 setAnalyticsCollectionEnabled(false)라 실제 전송이 no-op이 된다.
+    public static func log(event name: String, _ params: [String: Any]? = nil) {
+        Analytics.logEvent(name, parameters: params)
+    }
+
     public static func log(_ message: String) {
         Crashlytics.crashlytics().log(message)
     }
