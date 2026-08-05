@@ -161,6 +161,8 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
                 switch status {
                 case .authorized:
                     useCase.start(preset: preset)
+                    AppAnalytics.track(.timerStart(source: "widget", presetLabel: preset.label,
+                                                   category: preset.category.displayName, durationSec: preset.duration))
                 case .notDetermined:
                     self?.presentAlarmPrompt(preset: preset, useCase: useCase)
                 case .denied:
@@ -187,7 +189,11 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
             .first()
             .sink { status in
                 // 시스템 다이얼로그에서 거부하면 시작하지 않는다.
-                if status == .authorized { useCase.start(preset: preset) }
+                if status == .authorized {
+                    useCase.start(preset: preset)
+                    AppAnalytics.track(.timerStart(source: "widget", presetLabel: preset.label,
+                                                   category: preset.category.displayName, durationSec: preset.duration))
+                }
             }
             .store(in: &permissionBag)
         useCase.requestAlarmPermission()
@@ -250,6 +256,25 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         //    alarmAuthorized 플래그를 실제 권한으로 최신화하고 워치에 즉시 재동기화한다.
         //    이게 없으면 플래그가 미기록(nil)으로 남아 워치가 권한 없이도 시작을 허용한다.
         useCase.fetchAlarmPermission()
+
+        // 위젯이 앱 밖(백그라운드 AppIntent, iOS 26.1+ 승인)에서 시작한 타이머 지연 집계.
+        // 위젯 프로세스는 Firebase 를 링크하지 않아 timer_start 를 직접 못 보낸다(§위젯 지연로깅).
+        for pending in WidgetAnalyticsQueue.drainTimerStarts() {
+            AppAnalytics.track(.timerStart(
+                source: "widget",
+                presetLabel: pending.presetLabel,
+                category: pending.category,
+                durationSec: pending.durationSec
+            ))
+        }
+        // 앱 밖 AlarmKit [완료](iOS 26.1+ stop 인텐트)로 완료된 타이머 지연 집계.
+        // 26.1+ 완료는 useCase.remove 를 안 타므로 여기서만 잡힌다(중복 없음).
+        for pending in WidgetAnalyticsQueue.drainTimerCompletes() {
+            AppAnalytics.track(.timerComplete(
+                category: pending.category,
+                durationSec: pending.durationSec
+            ))
+        }
 
         // Remote Config 최신값 fetch 후 강제 업데이트/점검 게이트 갱신(포그라운드 복귀 포함).
         Task { @MainActor in
