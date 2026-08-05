@@ -79,7 +79,6 @@ public final class DrugIdentificationViewModel {
                     self.emit(.empty)
                     return
                 }
-                AppAnalytics.track(.pillIdentifyStart(pillCount: detections.count))
 
                 let pills = self.makeIdentifiedPills(from: detections)
                 self.pending = (pills, self.buildItems(from: pills))
@@ -135,6 +134,23 @@ public final class DrugIdentificationViewModel {
     }
 
     private func bindUseCase() {
+        // pill_identify_result — 시도당 최종 결과 1회 집계(식별 성공률의 분모).
+        // 종료 상태가 여러 지점(세그멘테이션 실패/빈검출/속성병합/에러/한도)에서 방출되므로,
+        // stateSubject 를 한 곳에서 구독해 '첫' 종료만 발사한다. loading 은 통과,
+        // limitExceeded 는 제외(별도 pill_limit_reached).
+        stateSubject
+            .compactMap { state -> AnalyticsEvent? in
+                switch state {
+                case let .success(pills, _): return .pillIdentifyResult(outcome: "success", pillCount: pills.count)
+                case .empty:                 return .pillIdentifyResult(outcome: "empty", pillCount: 0)
+                case .failure:               return .pillIdentifyResult(outcome: "failure", pillCount: 0)
+                case .loading, .limitExceeded: return nil
+                }
+            }
+            .first()
+            .sink { AppAnalytics.track($0) }
+            .store(in: &cancelBag)
+
         pillUseCase.pillAttributes
             .receive(on: DispatchQueue.main)
             .sink { [weak self] attributes in

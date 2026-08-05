@@ -16,8 +16,9 @@ public enum AnalyticsEvent {
     case share(method: String, contentType: String)
 
     // MARK: 알약 인식
-    /// 분석 완료(검출된 알약 수) — 실사용 DAU·퍼널 상단. (source=카메라/앨범은 후속)
-    case pillIdentifyStart(pillCount: Int)
+    /// 분석 시도의 최종 결과 — 식별 성공률(분모)·퍼널 상단. outcome: success/empty/failure.
+    /// (한도초과는 여기 안 들어감 — 별도 pill_limit_reached)
+    case pillIdentifyResult(outcome: String, pillCount: Int)
     /// 속성 수정 1회.
     case pillAttrEdit(attribute: String, pillIndex: Int)
     /// 알약 1개 확정(후보 선택) — 몇 번째 후보·수정 횟수·수정한 속성·확정까지 체류시간.
@@ -33,7 +34,7 @@ public enum AnalyticsEvent {
         switch self {
         case .buttonTap:        return "button_tap"
         case .share:            return "share"
-        case .pillIdentifyStart: return "pill_identify_start"
+        case .pillIdentifyResult: return "pill_identify_result"
         case .pillAttrEdit:     return "pill_attr_edit"
         case .pillConfirm:      return "pill_confirm"
         case .pillFlowExit:     return "pill_flow_exit"
@@ -47,8 +48,8 @@ public enum AnalyticsEvent {
             return ["target": target, "screen": screen]
         case let .share(method, contentType):
             return ["method": method, "content_type": contentType]
-        case let .pillIdentifyStart(pillCount):
-            return ["pill_count": pillCount]
+        case let .pillIdentifyResult(outcome, pillCount):
+            return ["outcome": outcome, "pill_count": pillCount]
         case let .pillAttrEdit(attribute, pillIndex):
             return ["attribute": attribute, "pill_index": pillIndex]
         case let .pillConfirm(pillIndex, candidateIndex, editCount, editedAttrs, dwellMs):
