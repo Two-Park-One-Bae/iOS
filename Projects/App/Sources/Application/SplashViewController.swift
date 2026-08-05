@@ -32,7 +32,7 @@ final class SplashViewController: UIViewController {
         NSLayoutConstraint.activate([
             logoView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             logoView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-            logoView.widthAnchor.constraint(equalToConstant: 120)
+            logoView.widthAnchor.constraint(equalToConstant: 140)   // 디자인 기준 (DESIGN.pen · mLokq)
         ])
 
         logoView.alpha = 0   // 등장 전

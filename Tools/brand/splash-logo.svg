@@ -1,0 +1,16 @@
+<!--
+  스플래시 로고 (투명 배경)
+  출처: spec/design/DESIGN.pen → node mLokq "스플래시 · hand (NM-358)" 의 Logo Mark(mi4T0)
+  디자인상 표시 크기: 140 x 124.44 pt (흰 배경 화면 정중앙)
+  이 파일이 원본(source of truth). PNG는 이 SVG에서 배율별로 렌더한다 (알파 유지):
+    rsvg-convert -w 140 splash-logo.svg -o splashlogo.png      # 280 @2x, 420 @3x
+
+  글리프 출처 / 라이선스:
+    "Hand Holding Medical" (hand-holding-medical, Solid) by Font Awesome
+    Font Awesome Free — https://fontawesome.com
+    Licensed under CC BY 4.0 — https://creativecommons.org/licenses/by/4.0/
+    변경 사항: 색상을 #0EA5E9 로 변경함.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="576" height="512" viewBox="0 0 576 512">
+  <path fill="#0EA5E9" fill-rule="nonzero" d="M224 24l0 56-56 0c-13.3 0-24 10.7-24 24l0 48c0 13.3 10.7 24 24 24l56 0 0 56c0 13.3 10.7 24 24 24l48 0c13.3 0 24-10.7 24-24l0-56 56 0c13.3 0 24-10.7 24-24l0-48c0-13.3-10.7-24-24-24l-56 0 0-56c0-13.3-10.7-24-24-24l-48 0c-13.3 0-24 10.7-24 24z m335.7 368.2c17.8-13.1 21.6-38.1 8.5-55.9s-38.1-21.6-55.9-8.5l-119.7 88.2-120.6 0c-8.8 0-16-7.2-16-16s7.2-16 16-16l16 0 64 0c17.7 0 32-14.3 32-32s-14.3-32-32-32l-64 0-16 0-78.3 0c-29.1 0-57.3 9.9-80 28l-44.9 36-36.8 0c-17.7 0-32 14.3-32 32l0 64c0 17.7 14.3 32 32 32l160 0 160.5 0c29 0 57.3-9.3 80.7-26.5l126.6-93.3z m-367-8.2l0.9 0c0 0 0 0 0 0-0.3 0-0.6 0-0.9 0z"/>
+</svg>
