@@ -91,7 +91,12 @@ public final class CameraPicker: NSObject {
         case .authorized:
             completion(true)
         case .notDetermined:
-            AVCaptureDevice.requestAccess(for: .video, completionHandler: completion)
+            AVCaptureDevice.requestAccess(for: .video) { granted in
+                // 최초 프롬프트 응답만 집계(권한 마찰). 이미 authorized/denied 는 프롬프트가 아님.
+                AppAnalytics.track(.permissionResult(
+                    permission: "camera", result: granted ? "granted" : "denied", gate: "pill"))
+                completion(granted)
+            }
         default:
             completion(false)
         }

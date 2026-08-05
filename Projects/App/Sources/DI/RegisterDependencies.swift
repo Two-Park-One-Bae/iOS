@@ -82,6 +82,13 @@ enum RegisterDependencies {
                     }
                 }
                 .store(in: &Self.analyticsBag)
+            // 알람 권한 프롬프트 응답 → permission_result(alarm) 번역.
+            useCase.alarmPermissionPrompted
+                .sink { granted in
+                    AppAnalytics.track(.permissionResult(
+                        permission: "alarm", result: granted ? "granted" : "denied", gate: "timer"))
+                }
+                .store(in: &Self.analyticsBag)
             return useCase
         }
 

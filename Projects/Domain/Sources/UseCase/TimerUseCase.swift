@@ -70,6 +70,8 @@ public final class DefaultTimerUseCase: TimerUseCase {
     /// 타이머 종료(완료/취소) 신호 — Core(분석) 의존 없이 순수 도메인 이벤트만 방출.
     /// 조립 계층(RegisterDependencies)이 구독해 timer_complete/timer_cancel 로 번역한다.
     public let timerEnded = PassthroughSubject<TimerEndInfo, Never>()
+    /// 알람 권한 프롬프트 응답(true=granted) — 조립 계층이 permission_result 로 번역.
+    public let alarmPermissionPrompted = PassthroughSubject<Bool, Never>()
 
     public init(
         repository: TimerRepositoryProtocol,
@@ -236,6 +238,7 @@ public final class DefaultTimerUseCase: TimerUseCase {
             .map { $0 ? TimerAlarmAuthorizationStatus.authorized : .denied }
             .sink { [weak self] status in
                 self?.updateAlarmAuthorized(status == .authorized)
+                self?.alarmPermissionPrompted.send(status == .authorized)  // 프롬프트 응답만
                 self?.alarmPermission.send(status)
             }
             .store(in: &cancellables)

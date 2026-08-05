@@ -14,6 +14,8 @@ public enum AnalyticsEvent {
     case buttonTap(target: String, screen: String)
     /// 공유 완료 (UIActivityViewController).
     case share(method: String, contentType: String)
+    /// 권한 프롬프트 응답 — permission: camera/alarm · result: granted/denied · gate: 진입 기능.
+    case permissionResult(permission: String, result: String, gate: String)
 
     // MARK: 알약 인식
     /// 분석 시도의 최종 결과 — 식별 성공률(분모)·퍼널 상단. outcome: success/empty/failure.
@@ -44,6 +46,7 @@ public enum AnalyticsEvent {
         switch self {
         case .buttonTap:        return "button_tap"
         case .share:            return "share"
+        case .permissionResult: return "permission_result"
         case .pillIdentifyResult: return "pill_identify_result"
         case .pillAttrEdit:     return "pill_attr_edit"
         case .pillConfirm:      return "pill_confirm"
@@ -63,6 +66,8 @@ public enum AnalyticsEvent {
             return ["target": target, "screen": screen]
         case let .share(method, contentType):
             return ["method": method, "content_type": contentType]
+        case let .permissionResult(permission, result, gate):
+            return ["permission": permission, "result": result, "gate": gate]
         case let .pillIdentifyResult(outcome, pillCount):
             return ["outcome": outcome, "pill_count": pillCount]
         case let .pillAttrEdit(attribute, pillIndex):
