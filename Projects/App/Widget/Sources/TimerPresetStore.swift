@@ -83,6 +83,17 @@ enum TimerPresetStore {
         timers.append(timer)
         saveTimers(timers)
 
+        // 위젯 백그라운드 시작은 앱 밖이라 timer_start(Firebase)가 유실됨 → 지연 큐에 기록.
+        // 앱이 다음 활성화 때 SceneDelegate 에서 drain 해 발사한다.
+        WidgetAnalyticsQueue.appendTimerStart(
+            PendingWidgetTimerStart(
+                presetLabel: preset.label,
+                category: preset.category.displayName,
+                durationSec: preset.duration,
+                startedAt: Date()
+            )
+        )
+
         await scheduleAlarm(
             id: timer.id,
             label: timer.label,
