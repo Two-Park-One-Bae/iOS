@@ -58,6 +58,7 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
             self?.cameraPicker.takePicture()
         }
         overlay.onGallery = { [weak self] in
+            self?.trackButton("gallery", screen: "camera")
             self?.cameraPicker.openGallery()
         }
         overlay.onFlash = { [weak self] in
@@ -91,6 +92,7 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
         let vc = PhotoPreviewVC(image: image)
         vc.onRetake = { [weak self] in
             guard let self else { return }
+            self.trackButton("retake", screen: "photo_preview")
             self.navigationController.popViewController(animated: false)
             self.cameraPicker.present(from: self.navigationController, source: .camera)
         }
@@ -110,7 +112,7 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
             // 세션 중 소진 방어: 진입 후 마지막 횟수를 쓰고 돌아온 경우, 요청을 보내지 않는다.
             // 값을 모르면 통과 — 최종 판정은 서버 429다 (NM-323).
             if let usage = self.pillUseCase.pillUsage.value, usage.isExhausted {
-                self.exitToHomeWithLimitAlert(usage: usage)
+                self.exitToHomeWithLimitAlert(usage: usage, source: "gate")
                 return
             }
 
@@ -127,7 +129,9 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
     /// 미리보기에 남겨두면 재촬영·이 사진 사용 둘 다 다시 막혀 막다른 길이 된다.
     /// 요청 전에 막힌 경우(게이트)와 서버가 거절한 경우(429)를 사용자는 구분할 수 없으므로
     /// 두 경로의 동작을 통일한다.
-    private func exitToHomeWithLimitAlert(usage: PillUsageModel?) {
+    private func exitToHomeWithLimitAlert(usage: PillUsageModel?, source: String) {
+        // source: gate(요청 전 세션 게이트) / server(요청 후 429) — 어디서 막혔는지 구분.
+        AppAnalytics.track(.pillLimitReached(source: source))
         navigationController.popToRootViewController(animated: false)
         NotificationCenter.default.post(name: .selectHomeTab, object: nil)
 
@@ -160,7 +164,7 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
         }
         // 한도 도달은 실패가 아니다 — 미리보기로 되돌리고 안내 팝업만 띄운다.
         loadingVC.onLimitExceeded = { [weak self] usage in
-            self?.exitToHomeWithLimitAlert(usage: usage)
+            self?.exitToHomeWithLimitAlert(usage: usage, source: "server")
         }
 
         navigationController.pushViewController(loadingVC, animated: true)
@@ -173,11 +177,21 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
     private func showResult(pills: [IdentifiedPill], image: UIImage, replacing loadingVC: UIViewController) {
         let vc = DrugIdentificationVC(pills: pills, image: image)
         resultVC = vc
-        vc.onExitToHome = { [weak self] in self?.exitToHome() }
+        vc.onExitToHome = { [weak self, weak vc] in
+            // 확정 없이 ⑤ 이탈 — 미확정 개수·경과시간 등 세션 요약 집계.
+            if let s = vc?.identificationSummary() {
+                AppAnalytics.track(.pillIdentifySessionExit(
+                    detectedCount: s.detectedCount, confirmedCount: s.confirmedCount,
+                    unconfirmedCount: s.unconfirmedCount, deletedCount: s.deletedCount,
+                    manualAddedCount: s.manualAddedCount, elapsedSec: s.elapsedSec))
+            }
+            self?.exitToHome()
+        }
         vc.onSelectPill = { [weak self] pill in
             self?.showEdit(pill: pill)
         }
         vc.onAddPill = { [weak self] in
+            self?.trackButton("add_pill", screen: "identify_result")
             self?.showManualAdd()
         }
         vc.onConfirm = { [weak self] in
@@ -204,11 +218,18 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
         // 완료 → 알약 탭 스택을 루트(빈 화면)로 정리하고 홈 탭으로 복귀.
         // 촬영 취소 흐름과 동일. 다음에 알약 탭을 다시 선택하면 카메라가 새로 뜬다.
         vc.onComplete = { [weak self] in
+            // 완주(완료 버튼) — ⑤ 전원 확정 상태라 미확정=0.
+            if let s = self?.resultVC?.identificationSummary() {
+                AppAnalytics.track(.pillIdentifyComplete(
+                    detectedCount: s.detectedCount, confirmedCount: s.confirmedCount,
+                    deletedCount: s.deletedCount, manualAddedCount: s.manualAddedCount))
+            }
             self?.navigationController.popToRootViewController(animated: false)
             NotificationCenter.default.post(name: .selectHomeTab, object: nil)
         }
         // ⑨ 카드 탭 → ⑩ 세부정보 진입 (NM-317)
         vc.onSelectDetail = { [weak self] pillCode, licenseStatus in
+            self?.trackButton("pill_detail", screen: "final_result")
             self?.showPillDetail(pillCode: pillCode, licenseStatus: licenseStatus)
         }
         navigationController.pushViewController(vc, animated: true)
@@ -249,10 +270,12 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
         }
         // ⑧ 후보 ⓘ → ⑩ 세부정보 진입 (NM-317)
         vc.onSelectDetail = { [weak self] pillCode, licenseStatus in
+            self?.trackButton("pill_detail", screen: "pill_edit")
             self?.showPillDetail(pillCode: pillCode, licenseStatus: licenseStatus)
         }
         // ⑧ 후보 썸네일 탭 → 이미지 비교 뷰어 (NM-354)
         vc.onSelectCompare = { [weak self] candidate, crop, sourceFrame, sourceImage in
+            self?.trackButton("compare", screen: "pill_edit")
             self?.showImageComparison(candidate: candidate, croppedImage: crop, sourceFrame: sourceFrame, sourceImage: sourceImage)
         }
         navigationController.pushViewController(vc, animated: true)
@@ -267,7 +290,7 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
             pillId: "manual-\(index)", colors: [], isTransparent: false,
             shape: nil, formulation: nil, front: nil, back: nil, error: nil
         )
-        let viewModel = PillEditViewModel(pillIndex: index, attribute: empty, thumbnail: nil)
+        let viewModel = PillEditViewModel(pillIndex: index, attribute: empty, thumbnail: nil, isManual: true)
         let vc = PillEditVC(viewModel: viewModel)
         vc.onBackTapped = { [weak self] in self?.navigationController.popViewController(animated: true) }
         vc.onCancel = { [weak self] in self?.navigationController.popViewController(animated: true) }
@@ -310,11 +333,13 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
         vc.onBackTapped = { [weak self] in self?.exitToHome() }
         vc.onRetake = { [weak self] in
             guard let self else { return }
+            self.trackButton("retake", screen: "not_found")
             self.navigationController.popViewController(animated: false)
             self.cameraPicker.present(from: self.navigationController, source: .camera)
         }
         vc.onSelectFromGallery = { [weak self] in
             guard let self else { return }
+            self.trackButton("gallery", screen: "not_found")
             self.cameraPicker.present(from: self.navigationController, source: .photoLibrary)
         }
         replace(loadingVC, with: vc)
@@ -352,12 +377,17 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
         }
         vc.onSelectFromGallery = { [weak self] in
             guard let self else { return }
+            self.trackButton("gallery", screen: "permission_denied")
             self.cameraPicker.present(from: self.navigationController, source: .photoLibrary)
         }
         navigationController.pushViewController(vc, animated: true)
     }
 
     // MARK: - Helper
+
+    private func trackButton(_ target: String, screen: String) {
+        AppAnalytics.track(.buttonTap(target: target, screen: screen))
+    }
 
     // 로딩 VC를 결과/실패 VC로 교체 (뒤로가기 시 로딩으로 돌아가지 않도록)
     private func replace(_ loadingVC: UIViewController, with vc: UIViewController) {
