@@ -1,3 +1,4 @@
+import Combine
 import Core
 import Domain
 import Data
@@ -8,6 +9,9 @@ import TimerFeatureInterface
 import TimerFeature
 
 enum RegisterDependencies {
+    /// 타이머 완료/취소 분석 구독 보관 — 앱 수명 동안 유지(UseCase 싱글톤과 함께).
+    private static var analyticsBag = Set<AnyCancellable>()
+
     static func register() {
         let container = DIContainer.shared
 
@@ -58,6 +62,26 @@ enum RegisterDependencies {
                 }
                 useCase.handleWatchCommand(command)
             }
+            // 타이머 완료/취소 → 분석 이벤트 번역 (Domain 은 순수 신호만 방출).
+            // 인앱 경로(카드 [완료]/정지·풀스크린 알람·알림 액션·워치 remove)가 전부
+            // remove(id:) 로 모여 여기서 한 번에 집계된다. (앱 밖 AlarmKit [완료]는 후속)
+            useCase.timerEnded
+                .sink { info in
+                    switch info.reason {
+                    case .completed:
+                        AppAnalytics.track(.timerComplete(
+                            category: info.category.displayName,
+                            durationSec: info.durationSec
+                        ))
+                    case .cancelled:
+                        AppAnalytics.track(.timerCancel(
+                            category: info.category.displayName,
+                            elapsedSec: info.elapsedSec,
+                            remainingSec: info.remainingSec
+                        ))
+                    }
+                }
+                .store(in: &Self.analyticsBag)
             return useCase
         }
 

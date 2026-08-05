@@ -31,6 +31,10 @@ public enum AnalyticsEvent {
     // MARK: 타이머
     /// 타이머 시작 — source(iphone/watch)·프리셋.
     case timerStart(source: String, presetLabel: String, category: String, durationSec: Int)
+    /// 타이머 완료 — 끝까지 울린 뒤 [완료]. (완료율 = complete / start)
+    case timerComplete(category: String, durationSec: Int)
+    /// 타이머 중도 취소 — 울리기 전 정지. elapsed/remaining 로 언제 껐는지.
+    case timerCancel(category: String, elapsedSec: Int, remainingSec: Int)
 
     var name: String {
         switch self {
@@ -42,6 +46,8 @@ public enum AnalyticsEvent {
         case .pillFlowExit:     return "pill_flow_exit"
         case .pillLimitReached: return "pill_limit_reached"
         case .timerStart:       return "timer_start"
+        case .timerComplete:    return "timer_complete"
+        case .timerCancel:      return "timer_cancel"
         }
     }
 
@@ -66,6 +72,10 @@ public enum AnalyticsEvent {
         case let .timerStart(source, presetLabel, category, durationSec):
             return ["source": source, "preset_label": presetLabel,
                     "category": category, "duration_sec": durationSec]
+        case let .timerComplete(category, durationSec):
+            return ["category": category, "duration_sec": durationSec]
+        case let .timerCancel(category, elapsedSec, remainingSec):
+            return ["category": category, "elapsed_sec": elapsedSec, "remaining_sec": remainingSec]
         }
     }
 }
