@@ -58,6 +58,7 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
             self?.cameraPicker.takePicture()
         }
         overlay.onGallery = { [weak self] in
+            self?.trackButton("gallery", screen: "camera")
             self?.cameraPicker.openGallery()
         }
         overlay.onFlash = { [weak self] in
@@ -91,6 +92,7 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
         let vc = PhotoPreviewVC(image: image)
         vc.onRetake = { [weak self] in
             guard let self else { return }
+            self.trackButton("retake", screen: "photo_preview")
             self.navigationController.popViewController(animated: false)
             self.cameraPicker.present(from: self.navigationController, source: .camera)
         }
@@ -189,6 +191,7 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
             self?.showEdit(pill: pill)
         }
         vc.onAddPill = { [weak self] in
+            self?.trackButton("add_pill", screen: "identify_result")
             self?.showManualAdd()
         }
         vc.onConfirm = { [weak self] in
@@ -226,6 +229,7 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
         }
         // ⑨ 카드 탭 → ⑩ 세부정보 진입 (NM-317)
         vc.onSelectDetail = { [weak self] pillCode, licenseStatus in
+            self?.trackButton("pill_detail", screen: "final_result")
             self?.showPillDetail(pillCode: pillCode, licenseStatus: licenseStatus)
         }
         navigationController.pushViewController(vc, animated: true)
@@ -266,10 +270,12 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
         }
         // ⑧ 후보 ⓘ → ⑩ 세부정보 진입 (NM-317)
         vc.onSelectDetail = { [weak self] pillCode, licenseStatus in
+            self?.trackButton("pill_detail", screen: "pill_edit")
             self?.showPillDetail(pillCode: pillCode, licenseStatus: licenseStatus)
         }
         // ⑧ 후보 썸네일 탭 → 이미지 비교 뷰어 (NM-354)
         vc.onSelectCompare = { [weak self] candidate, crop, sourceFrame, sourceImage in
+            self?.trackButton("compare", screen: "pill_edit")
             self?.showImageComparison(candidate: candidate, croppedImage: crop, sourceFrame: sourceFrame, sourceImage: sourceImage)
         }
         navigationController.pushViewController(vc, animated: true)
@@ -327,11 +333,13 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
         vc.onBackTapped = { [weak self] in self?.exitToHome() }
         vc.onRetake = { [weak self] in
             guard let self else { return }
+            self.trackButton("retake", screen: "not_found")
             self.navigationController.popViewController(animated: false)
             self.cameraPicker.present(from: self.navigationController, source: .camera)
         }
         vc.onSelectFromGallery = { [weak self] in
             guard let self else { return }
+            self.trackButton("gallery", screen: "not_found")
             self.cameraPicker.present(from: self.navigationController, source: .photoLibrary)
         }
         replace(loadingVC, with: vc)
@@ -369,12 +377,17 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
         }
         vc.onSelectFromGallery = { [weak self] in
             guard let self else { return }
+            self.trackButton("gallery", screen: "permission_denied")
             self.cameraPicker.present(from: self.navigationController, source: .photoLibrary)
         }
         navigationController.pushViewController(vc, animated: true)
     }
 
     // MARK: - Helper
+
+    private func trackButton(_ target: String, screen: String) {
+        AppAnalytics.track(.buttonTap(target: target, screen: screen))
+    }
 
     // 로딩 VC를 결과/실패 VC로 교체 (뒤로가기 시 로딩으로 돌아가지 않도록)
     private func replace(_ loadingVC: UIViewController, with vc: UIViewController) {
