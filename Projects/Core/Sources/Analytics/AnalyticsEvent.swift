@@ -88,14 +88,16 @@ public enum AnalyticsEvent {
             return ["pill_index": pillIndex, "editing_attribute": editingAttribute,
                     "entered_values": enteredValues, "edit_count": editCount]
         case let .pillLimitReached(source):
-            return ["source": source]
+            // timer_start.source(iphone/watch/widget)와 겹치지 않게 별도 키 사용.
+            return ["limit_source": source]
         case let .pillIdentifyComplete(detectedCount, confirmedCount, deletedCount, manualAddedCount):
             return ["detected_count": detectedCount, "confirmed_count": confirmedCount,
                     "deleted_count": deletedCount, "manual_added_count": manualAddedCount]
         case let .pillIdentifySessionExit(detectedCount, confirmedCount, unconfirmedCount, deletedCount, manualAddedCount, elapsedSec):
+            // timer_cancel.elapsed_sec(타이머 경과)와 겹치지 않게 별도 키 사용.
             return ["detected_count": detectedCount, "confirmed_count": confirmedCount,
                     "unconfirmed_count": unconfirmedCount, "deleted_count": deletedCount,
-                    "manual_added_count": manualAddedCount, "elapsed_sec": elapsedSec]
+                    "manual_added_count": manualAddedCount, "session_elapsed_sec": elapsedSec]
         case let .timerStart(source, presetLabel, category, durationSec):
             return ["source": source, "preset_label": presetLabel,
                     "category": category, "duration_sec": durationSec]
