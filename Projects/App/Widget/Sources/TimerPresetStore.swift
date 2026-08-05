@@ -107,6 +107,13 @@ enum TimerPresetStore {
     /// [완료] 등으로 타이머 제거 (위젯 stop 인텐트가 호출).
     static func removeTimer(id: UUID) {
         var timers = loadTimers()
+        // 앱 밖 AlarmKit [완료] → timer_complete 지연 기록(위젯은 Firebase 미링크).
+        // 앱이 다음 활성화 때 SceneDelegate 에서 drain 해 발사한다.
+        if let t = timers.first(where: { $0.id == id }) {
+            WidgetAnalyticsQueue.appendTimerComplete(
+                PendingWidgetTimerComplete(
+                    category: t.category.displayName, durationSec: t.duration, completedAt: Date()))
+        }
         timers.removeAll { $0.id == id }
         saveTimers(timers)
     }

@@ -267,6 +267,14 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
                 durationSec: pending.durationSec
             ))
         }
+        // 앱 밖 AlarmKit [완료](iOS 26.1+ stop 인텐트)로 완료된 타이머 지연 집계.
+        // 26.1+ 완료는 useCase.remove 를 안 타므로 여기서만 잡힌다(중복 없음).
+        for pending in WidgetAnalyticsQueue.drainTimerCompletes() {
+            AppAnalytics.track(.timerComplete(
+                category: pending.category,
+                durationSec: pending.durationSec
+            ))
+        }
 
         // Remote Config 최신값 fetch 후 강제 업데이트/점검 게이트 갱신(포그라운드 복귀 포함).
         Task { @MainActor in
