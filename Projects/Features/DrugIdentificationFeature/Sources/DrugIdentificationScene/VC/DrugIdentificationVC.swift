@@ -4,6 +4,16 @@ import Then
 import DSKit
 import Domain
 
+/// ⑤ 인식 결과 세션의 카운트 요약 (완주/이탈 분석용).
+struct PillIdentificationSummary {
+    let detectedCount: Int
+    let confirmedCount: Int
+    let unconfirmedCount: Int
+    let deletedCount: Int
+    let manualAddedCount: Int
+    let elapsedSec: Int
+}
+
 // ⑤ 인식 결과 — 촬영 사진(bbox 오버레이) + 알약 목록 + 결과 확인 푸터
 public final class DrugIdentificationVC: UIViewController {
 
@@ -26,6 +36,8 @@ public final class DrugIdentificationVC: UIViewController {
     private var deletedIndices = Set<Int>()
     private var selectedCandidates: [Int: PillCandidateModel] = [:]
     private var manualPills: [IdentifiedPill] = []
+    /// ⑤ 결과 화면 진입 시각 — 완주/이탈까지 경과시간(elapsed_sec) 기준.
+    private let appearedAt = Date()
 
     // MARK: - UI
 
@@ -296,6 +308,23 @@ public final class DrugIdentificationVC: UIViewController {
         let manual = manualPills
             .compactMap { pill in selectedCandidates[pill.index].map { (pill, $0) } }
         return base + manual
+    }
+
+    /// 완주/이탈 분석용 카운트 요약.
+    func identificationSummary() -> PillIdentificationSummary {
+        let detected = pills.count
+        let deleted = deletedIndices.count
+        let manual = manualPills.count
+        let confirmed = identifiedIndices.count   // 삭제 반영된 '현재 확정' 수
+        let total = detected - deleted + manual
+        return PillIdentificationSummary(
+            detectedCount: detected,
+            confirmedCount: confirmed,
+            unconfirmedCount: max(0, total - confirmed),
+            deletedCount: deleted,
+            manualAddedCount: manual,
+            elapsedSec: Int(Date().timeIntervalSince(appearedAt))
+        )
     }
 
     private func updateProgress() {

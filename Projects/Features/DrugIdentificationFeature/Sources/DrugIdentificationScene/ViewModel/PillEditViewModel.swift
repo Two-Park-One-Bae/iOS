@@ -26,6 +26,9 @@ final class PillEditViewModel {
 
     let pillIndex: Int
     let thumbnail: UIImage?
+    /// 수동 추가(NM-187) 알약 여부. true면 편집·확정·이탈 이벤트를 집계에서 제외한다.
+    /// (검출 모델과 무관 — pill_attr_edit/pill_confirm/pill_flow_exit 정확도 지표 오염 방지)
+    let isManual: Bool
 
     // MARK: - Editable Attribute State
 
@@ -53,9 +56,10 @@ final class PillEditViewModel {
 
     // MARK: - Init
 
-    init(pillIndex: Int, attribute: PillAttributeModel, thumbnail: UIImage?) {
+    init(pillIndex: Int, attribute: PillAttributeModel, thumbnail: UIImage?, isManual: Bool = false) {
         self.pillIndex = pillIndex
         self.thumbnail = thumbnail
+        self.isManual = isManual
         self.colors = attribute.colors
         self.isTransparent = attribute.isTransparent
         self.shape = attribute.shape
@@ -109,31 +113,60 @@ final class PillEditViewModel {
         )
     }
 
+    // MARK: - Analytics (속성 편집 추적)
+
+    private(set) var editCount = 0
+    private var editedAttrs: Set<String> = []
+    /// 확정까지 수정한 속성 종류 (pill_confirm.edited_attrs).
+    var editedAttrsJoined: String { editedAttrs.sorted().joined(separator: ",") }
+    /// 이탈 시 지금까지 입력된 속성 요약 (pill_flow_exit.entered_values, ≤100자).
+    var enteredValuesSummary: String {
+        var parts: [String] = []
+        if shape != nil { parts.append("shape") }
+        if !colors.isEmpty { parts.append("color") }
+        if isTransparent { parts.append("transparent") }
+        if formulation != nil { parts.append("formulation") }
+        if front != nil || back != nil { parts.append("imprint") }
+        return String((parts.isEmpty ? "none" : parts.joined(separator: ",")).prefix(100))
+    }
+
+    private func recordEdit(_ attribute: String) {
+        editCount += 1
+        editedAttrs.insert(attribute)
+        guard !isManual else { return }   // 수동 추가 알약은 집계 제외(모델 정확도 지표 오염 방지)
+        AppAnalytics.track(.pillAttrEdit(attribute: attribute, pillIndex: pillIndex))
+    }
+
     // MARK: - Edits (변경 시 실시간 재조회)
 
     func updateColors(_ colors: [PillColorModel]) {
         self.colors = colors
+        recordEdit("color")
         editTrigger.send(())
     }
 
     func setTransparent(_ isTransparent: Bool) {
         self.isTransparent = isTransparent
+        recordEdit("transparent")
         editTrigger.send(())
     }
 
     func updateShape(_ shape: PillShapeModel?) {
         self.shape = shape
+        recordEdit("shape")
         editTrigger.send(())
     }
 
     func updateFormulation(_ formulation: PillFormulationModel?) {
         self.formulation = formulation
+        recordEdit("formulation")
         editTrigger.send(())
     }
 
     func updateImprint(front: PillFaceModel?, back: PillFaceModel?) {
         self.front = front
         self.back = back
+        recordEdit("imprint")
         editTrigger.send(())
     }
 
