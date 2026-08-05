@@ -27,6 +27,10 @@ public enum AnalyticsEvent {
     case pillFlowExit(pillIndex: Int, editingAttribute: String, enteredValues: String, editCount: Int)
     /// 사용 한도 도달 — source: gate(요청 전 게이트) / server(429).
     case pillLimitReached(source: String)
+    /// 알약 식별 완주 — ⑨ 완료 버튼. (완료 수 / 시작 수). 완주 시 미확정=0.
+    case pillIdentifyComplete(detectedCount: Int, confirmedCount: Int, deletedCount: Int, manualAddedCount: Int)
+    /// 알약 식별 중도이탈 — ⑤ 인식결과에서 확정 없이 나감. 미확정 개수·경과시간 포함.
+    case pillIdentifySessionExit(detectedCount: Int, confirmedCount: Int, unconfirmedCount: Int, deletedCount: Int, manualAddedCount: Int, elapsedSec: Int)
 
     // MARK: 타이머
     /// 타이머 시작 — source(iphone/watch)·프리셋.
@@ -45,6 +49,8 @@ public enum AnalyticsEvent {
         case .pillConfirm:      return "pill_confirm"
         case .pillFlowExit:     return "pill_flow_exit"
         case .pillLimitReached: return "pill_limit_reached"
+        case .pillIdentifyComplete:    return "pill_identify_complete"
+        case .pillIdentifySessionExit: return "pill_identify_session_exit"
         case .timerStart:       return "timer_start"
         case .timerComplete:    return "timer_complete"
         case .timerCancel:      return "timer_cancel"
@@ -69,6 +75,13 @@ public enum AnalyticsEvent {
                     "entered_values": enteredValues, "edit_count": editCount]
         case let .pillLimitReached(source):
             return ["source": source]
+        case let .pillIdentifyComplete(detectedCount, confirmedCount, deletedCount, manualAddedCount):
+            return ["detected_count": detectedCount, "confirmed_count": confirmedCount,
+                    "deleted_count": deletedCount, "manual_added_count": manualAddedCount]
+        case let .pillIdentifySessionExit(detectedCount, confirmedCount, unconfirmedCount, deletedCount, manualAddedCount, elapsedSec):
+            return ["detected_count": detectedCount, "confirmed_count": confirmedCount,
+                    "unconfirmed_count": unconfirmedCount, "deleted_count": deletedCount,
+                    "manual_added_count": manualAddedCount, "elapsed_sec": elapsedSec]
         case let .timerStart(source, presetLabel, category, durationSec):
             return ["source": source, "preset_label": presetLabel,
                     "category": category, "duration_sec": durationSec]

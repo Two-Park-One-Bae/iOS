@@ -175,7 +175,16 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
     private func showResult(pills: [IdentifiedPill], image: UIImage, replacing loadingVC: UIViewController) {
         let vc = DrugIdentificationVC(pills: pills, image: image)
         resultVC = vc
-        vc.onExitToHome = { [weak self] in self?.exitToHome() }
+        vc.onExitToHome = { [weak self, weak vc] in
+            // 확정 없이 ⑤ 이탈 — 미확정 개수·경과시간 등 세션 요약 집계.
+            if let s = vc?.identificationSummary() {
+                AppAnalytics.track(.pillIdentifySessionExit(
+                    detectedCount: s.detectedCount, confirmedCount: s.confirmedCount,
+                    unconfirmedCount: s.unconfirmedCount, deletedCount: s.deletedCount,
+                    manualAddedCount: s.manualAddedCount, elapsedSec: s.elapsedSec))
+            }
+            self?.exitToHome()
+        }
         vc.onSelectPill = { [weak self] pill in
             self?.showEdit(pill: pill)
         }
@@ -206,6 +215,12 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
         // 완료 → 알약 탭 스택을 루트(빈 화면)로 정리하고 홈 탭으로 복귀.
         // 촬영 취소 흐름과 동일. 다음에 알약 탭을 다시 선택하면 카메라가 새로 뜬다.
         vc.onComplete = { [weak self] in
+            // 완주(완료 버튼) — ⑤ 전원 확정 상태라 미확정=0.
+            if let s = self?.resultVC?.identificationSummary() {
+                AppAnalytics.track(.pillIdentifyComplete(
+                    detectedCount: s.detectedCount, confirmedCount: s.confirmedCount,
+                    deletedCount: s.deletedCount, manualAddedCount: s.manualAddedCount))
+            }
             self?.navigationController.popToRootViewController(animated: false)
             NotificationCenter.default.post(name: .selectHomeTab, object: nil)
         }
