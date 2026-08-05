@@ -81,12 +81,24 @@ public final class TimerCoordinator: BaseCoordinator {
     // 첫 타이머 시작이면 울림 방식 시트를 먼저 띄우고, 확인 시 시작. 이후부턴 바로 시작.
     private func startPreset(_ preset: TimerPresetModel) {
         guard !RingModeStore.shared.hasChosen else {
-            viewModel?.start(preset: preset)
+            startTimer(preset)
             return
         }
         let ringSheet = RingModeSheetViewController()
-        ringSheet.onConfirm = { [weak self] _ in self?.viewModel?.start(preset: preset) }
+        ringSheet.onConfirm = { [weak self] _ in self?.startTimer(preset) }
         navigationController.present(ringSheet, animated: true)
+    }
+
+    // 인앱 프리셋 원탭 시작 + 분석 이벤트(timer_start, source=iphone).
+    // (위젯 딥링크·워치 시작은 각 진입점에서 별도 계측 — 후속)
+    private func startTimer(_ preset: TimerPresetModel) {
+        viewModel?.start(preset: preset)
+        AppAnalytics.track(.timerStart(
+            source: "iphone",
+            presetLabel: preset.label,
+            category: preset.category.displayName,
+            durationSec: preset.duration
+        ))
     }
 
     // MARK: - C3 프리셋 시트
@@ -126,8 +138,10 @@ public final class TimerCoordinator: BaseCoordinator {
                 updated.category = category
                 updated.duration = duration
                 self.viewModel?.updatePreset(updated)
+                AppAnalytics.track(.presetEdit(label: label, category: category.displayName, durationSec: duration))
             } else {
                 self.viewModel?.addPreset(label: label, category: category, duration: duration)
+                AppAnalytics.track(.presetCreate(label: label, category: category.displayName, durationSec: duration))
             }
             vc?.dismiss(animated: true)
         }
@@ -151,6 +165,7 @@ public final class TimerCoordinator: BaseCoordinator {
         card.onDelete = { [weak self] in
             dim.removeFromSuperview()
             self?.viewModel?.deletePreset(id: preset.id)
+            AppAnalytics.track(.presetDelete(label: preset.label, category: preset.category.displayName, durationSec: preset.duration))
         }
         dim.addSubview(card)
         presenter.view.addSubview(dim)

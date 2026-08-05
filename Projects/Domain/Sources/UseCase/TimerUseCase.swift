@@ -11,6 +11,18 @@
 import Combine
 import Foundation
 
+/// 타이머 종료 사유 — 완료(끝까지 울림) vs 취소(울리기 전 정지).
+public enum TimerEndReason: Sendable { case completed, cancelled }
+
+/// 타이머 종료 1건의 도메인 신호 (분석 의존 없음 — 조립 계층이 이벤트로 번역).
+public struct TimerEndInfo: Sendable {
+    public let reason: TimerEndReason
+    public let category: TimerCategory
+    public let durationSec: Int
+    public let elapsedSec: Int
+    public let remainingSec: Int
+}
+
 public protocol TimerUseCase {
     // 타이머 — 생성은 프리셋 원탭뿐 (키워드 직접 입력 생성 없음)
     func start(preset: TimerPresetModel)
@@ -55,6 +67,11 @@ public final class DefaultTimerUseCase: TimerUseCase {
     public let timers = CurrentValueSubject<[TreatmentTimerModel], Never>([])
     public let presets = CurrentValueSubject<[TimerPresetModel], Never>([])
     public let alarmPermission = PassthroughSubject<TimerAlarmAuthorizationStatus, Never>()
+    /// 타이머 종료(완료/취소) 신호 — Core(분석) 의존 없이 순수 도메인 이벤트만 방출.
+    /// 조립 계층(RegisterDependencies)이 구독해 timer_complete/timer_cancel 로 번역한다.
+    public let timerEnded = PassthroughSubject<TimerEndInfo, Never>()
+    /// 알람 권한 프롬프트 응답(true=granted) — 조립 계층이 permission_result 로 번역.
+    public let alarmPermissionPrompted = PassthroughSubject<Bool, Never>()
 
     public init(
         repository: TimerRepositoryProtocol,
@@ -139,6 +156,18 @@ public final class DefaultTimerUseCase: TimerUseCase {
     }
 
     public func remove(id: UUID) {
+        // 완료/취소 신호 방출 — 삭제 전 상태로 구분(.ringing 또는 endAt 경과 = 완료).
+        if let t = timers.value.first(where: { $0.id == id }) {
+            let remaining = max(0, t.remainingSeconds())
+            let completed = t.state == .ringing || remaining == 0
+            timerEnded.send(TimerEndInfo(
+                reason: completed ? .completed : .cancelled,
+                category: t.category,
+                durationSec: t.duration,
+                elapsedSec: max(0, t.duration - remaining),
+                remainingSec: remaining
+            ))
+        }
         mutate { $0.removeAll { $0.id == id } }
         alarmScheduler.cancelAlarm(id: id)
     }
@@ -209,6 +238,7 @@ public final class DefaultTimerUseCase: TimerUseCase {
             .map { $0 ? TimerAlarmAuthorizationStatus.authorized : .denied }
             .sink { [weak self] status in
                 self?.updateAlarmAuthorized(status == .authorized)
+                self?.alarmPermissionPrompted.send(status == .authorized)  // 프롬프트 응답만
                 self?.alarmPermission.send(status)
             }
             .store(in: &cancellables)
