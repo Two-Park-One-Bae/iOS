@@ -14,6 +14,5 @@ public extension TargetDependency {
         public static let FirebaseAppCheck = TargetDependency.external(name: "FirebaseAppCheck")
         public static let Lottie = TargetDependency.external(name: "Lottie")
         public static let Then = TargetDependency.external(name: "Then")
-        public static let Clarity = TargetDependency.external(name: "Clarity")
     }
 }

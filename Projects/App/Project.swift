@@ -21,7 +21,6 @@ let project = Project(
                 "ITSAppUsesNonExemptEncryption": false,
                 "AMPLITUDE_API_KEY": "$(AMPLITUDE_API_KEY)",
                 "BASE_URL": "$(BASE_URL)",
-                "CLARITY_PROJECT_ID": "$(CLARITY_PROJECT_ID)",
                 // Firebase Analytics 자동수집을 빌드 구성으로 제어(NM-364). 내부(Debug·beta_internal)=NO →
                 // FirebaseApp.configure() 전부터 꺼져 first_open 등 'leak 창' 자체가 없다. 외부·프로덕션=YES.
                 "FIREBASE_ANALYTICS_COLLECTION_ENABLED": "$(FIREBASE_ANALYTICS_ENABLED)",

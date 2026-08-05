@@ -11,6 +11,5 @@ let project = Project.makeModule(
         .SPM.FirebaseRemoteConfig,
         .SPM.FirebaseAppCheck,
         .SPM.AmplitudeSwift,
-        .SPM.Clarity,
     ]
 )
