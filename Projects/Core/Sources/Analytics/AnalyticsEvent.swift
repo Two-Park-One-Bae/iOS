@@ -25,6 +25,8 @@ public enum AnalyticsEvent {
     case pillConfirm(pillIndex: Int, candidateIndex: Int, editCount: Int, editedAttrs: String, dwellMs: Int)
     /// 확정 없이 알약 수정 화면을 이탈 — 어떤 알약·어떤 속성 입력 중이었나.
     case pillFlowExit(pillIndex: Int, editingAttribute: String, enteredValues: String, editCount: Int)
+    /// 사용 한도 도달 — source: gate(요청 전 게이트) / server(429).
+    case pillLimitReached(source: String)
 
     // MARK: 타이머
     /// 타이머 시작 — source(iphone/watch)·프리셋.
@@ -38,6 +40,7 @@ public enum AnalyticsEvent {
         case .pillAttrEdit:     return "pill_attr_edit"
         case .pillConfirm:      return "pill_confirm"
         case .pillFlowExit:     return "pill_flow_exit"
+        case .pillLimitReached: return "pill_limit_reached"
         case .timerStart:       return "timer_start"
         }
     }
@@ -58,6 +61,8 @@ public enum AnalyticsEvent {
         case let .pillFlowExit(pillIndex, editingAttribute, enteredValues, editCount):
             return ["pill_index": pillIndex, "editing_attribute": editingAttribute,
                     "entered_values": enteredValues, "edit_count": editCount]
+        case let .pillLimitReached(source):
+            return ["source": source]
         case let .timerStart(source, presetLabel, category, durationSec):
             return ["source": source, "preset_label": presetLabel,
                     "category": category, "duration_sec": durationSec]
