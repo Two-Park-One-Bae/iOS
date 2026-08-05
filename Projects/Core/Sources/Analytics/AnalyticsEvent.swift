@@ -104,11 +104,11 @@ public enum AnalyticsEvent {
         case let .timerCancel(category, elapsedSec, remainingSec):
             return ["category": category, "elapsed_sec": elapsedSec, "remaining_sec": remainingSec]
         case let .presetCreate(label, category, durationSec):
-            return ["label": label, "category": category, "duration_sec": durationSec]
+            return ["preset_label": label, "category": category, "duration_sec": durationSec]
         case let .presetEdit(label, category, durationSec):
-            return ["label": label, "category": category, "duration_sec": durationSec]
+            return ["preset_label": label, "category": category, "duration_sec": durationSec]
         case let .presetDelete(label, category, durationSec):
-            return ["label": label, "category": category, "duration_sec": durationSec]
+            return ["preset_label": label, "category": category, "duration_sec": durationSec]
         }
     }
 }
