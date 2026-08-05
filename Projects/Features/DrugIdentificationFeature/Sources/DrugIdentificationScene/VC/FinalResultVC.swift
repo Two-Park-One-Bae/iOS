@@ -3,6 +3,7 @@ import SnapKit
 import Then
 import DSKit
 import Domain
+import Core
 
 // ⑨ 최종 결과 리스트 — 모든 알약 식별 완료 후 확정 결과를 보여주는 읽기전용 화면 (NM-136)
 final class FinalResultVC: UIViewController {
@@ -238,8 +239,14 @@ final class FinalResultVC: UIViewController {
     // - PDF로 저장: 문서로 필요할 때 파일로 저장/공유 (외부 파일이 안 열리는 병원 PC 대비 보조)
     @objc private func shareTapped() {
         let sheet = ShareActionSheetVC(
-            onCopyText: { [weak self] in self?.copyResultText() },
-            onSavePDF: { [weak self] in self?.saveResultPDF() }
+            onCopyText: { [weak self] in
+                AppAnalytics.track(.share(method: "copy_text", contentType: "pill_result"))
+                self?.copyResultText()
+            },
+            onSavePDF: { [weak self] in
+                AppAnalytics.track(.share(method: "save_pdf", contentType: "pill_result"))
+                self?.saveResultPDF()
+            }
         )
         present(sheet, animated: false)   // 시트가 자체 애니메이션(슬라이드 업)을 수행
     }
