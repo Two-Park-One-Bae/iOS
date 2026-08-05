@@ -290,7 +290,7 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
             pillId: "manual-\(index)", colors: [], isTransparent: false,
             shape: nil, formulation: nil, front: nil, back: nil, error: nil
         )
-        let viewModel = PillEditViewModel(pillIndex: index, attribute: empty, thumbnail: nil)
+        let viewModel = PillEditViewModel(pillIndex: index, attribute: empty, thumbnail: nil, isManual: true)
         let vc = PillEditVC(viewModel: viewModel)
         vc.onBackTapped = { [weak self] in self?.navigationController.popViewController(animated: true) }
         vc.onCancel = { [weak self] in self?.navigationController.popViewController(animated: true) }

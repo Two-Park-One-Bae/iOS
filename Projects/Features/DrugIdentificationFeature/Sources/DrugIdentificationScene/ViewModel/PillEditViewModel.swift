@@ -26,6 +26,9 @@ final class PillEditViewModel {
 
     let pillIndex: Int
     let thumbnail: UIImage?
+    /// 수동 추가(NM-187) 알약 여부. true면 편집·확정·이탈 이벤트를 집계에서 제외한다.
+    /// (검출 모델과 무관 — pill_attr_edit/pill_confirm/pill_flow_exit 정확도 지표 오염 방지)
+    let isManual: Bool
 
     // MARK: - Editable Attribute State
 
@@ -53,9 +56,10 @@ final class PillEditViewModel {
 
     // MARK: - Init
 
-    init(pillIndex: Int, attribute: PillAttributeModel, thumbnail: UIImage?) {
+    init(pillIndex: Int, attribute: PillAttributeModel, thumbnail: UIImage?, isManual: Bool = false) {
         self.pillIndex = pillIndex
         self.thumbnail = thumbnail
+        self.isManual = isManual
         self.colors = attribute.colors
         self.isTransparent = attribute.isTransparent
         self.shape = attribute.shape
@@ -129,6 +133,7 @@ final class PillEditViewModel {
     private func recordEdit(_ attribute: String) {
         editCount += 1
         editedAttrs.insert(attribute)
+        guard !isManual else { return }   // 수동 추가 알약은 집계 제외(모델 정확도 지표 오염 방지)
         AppAnalytics.track(.pillAttrEdit(attribute: attribute, pillIndex: pillIndex))
     }
 

@@ -359,19 +359,23 @@ final class PillEditVC: UIViewController {
     @objc private func confirmTapped() {
         guard let selected = currentResults.first(where: { $0.pillCode == selectedPillCode }) else { return }
         // pill_confirm — 알약 1개 확정: 몇 번째 후보·수정 횟수·수정 속성·확정까지 체류시간.
-        AppAnalytics.track(.pillConfirm(
-            pillIndex: viewModel.pillIndex,
-            candidateIndex: currentResults.firstIndex(where: { $0.pillCode == selectedPillCode }) ?? -1,
-            editCount: viewModel.editCount,
-            editedAttrs: viewModel.editedAttrsJoined,
-            dwellMs: dwellMs()
-        ))
+        // 수동 추가 알약은 검출 모델과 무관해 제외(candidate_index 등 정확도 지표 오염 방지).
+        if !viewModel.isManual {
+            AppAnalytics.track(.pillConfirm(
+                pillIndex: viewModel.pillIndex,
+                candidateIndex: currentResults.firstIndex(where: { $0.pillCode == selectedPillCode }) ?? -1,
+                editCount: viewModel.editCount,
+                editedAttrs: viewModel.editedAttrsJoined,
+                dwellMs: dwellMs()
+            ))
+        }
         onConfirm?(selected)
     }
 
     // MARK: - Analytics helpers
 
     private func trackFlowExit() {
+        guard !viewModel.isManual else { return }   // 수동 추가 알약은 집계 제외
         AppAnalytics.track(.pillFlowExit(
             pillIndex: viewModel.pillIndex,
             editingAttribute: editingAttributeName,
