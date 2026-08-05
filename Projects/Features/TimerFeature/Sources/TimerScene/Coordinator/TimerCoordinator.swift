@@ -138,8 +138,10 @@ public final class TimerCoordinator: BaseCoordinator {
                 updated.category = category
                 updated.duration = duration
                 self.viewModel?.updatePreset(updated)
+                AppAnalytics.track(.presetEdit(label: label, category: category.displayName, durationSec: duration))
             } else {
                 self.viewModel?.addPreset(label: label, category: category, duration: duration)
+                AppAnalytics.track(.presetCreate(label: label, category: category.displayName, durationSec: duration))
             }
             vc?.dismiss(animated: true)
         }
@@ -163,6 +165,7 @@ public final class TimerCoordinator: BaseCoordinator {
         card.onDelete = { [weak self] in
             dim.removeFromSuperview()
             self?.viewModel?.deletePreset(id: preset.id)
+            AppAnalytics.track(.presetDelete(label: preset.label, category: preset.category.displayName, durationSec: preset.duration))
         }
         dim.addSubview(card)
         presenter.view.addSubview(dim)

@@ -41,6 +41,12 @@ public enum AnalyticsEvent {
     case timerComplete(category: String, durationSec: Int)
     /// 타이머 중도 취소 — 울리기 전 정지. elapsed/remaining 로 언제 껐는지.
     case timerCancel(category: String, elapsedSec: Int, remainingSec: Int)
+    /// 프리셋 생성 — label(사용자 입력 텍스트)·category·durationSec.
+    case presetCreate(label: String, category: String, durationSec: Int)
+    /// 프리셋 수정.
+    case presetEdit(label: String, category: String, durationSec: Int)
+    /// 프리셋 삭제.
+    case presetDelete(label: String, category: String, durationSec: Int)
 
     var name: String {
         switch self {
@@ -57,6 +63,9 @@ public enum AnalyticsEvent {
         case .timerStart:       return "timer_start"
         case .timerComplete:    return "timer_complete"
         case .timerCancel:      return "timer_cancel"
+        case .presetCreate:     return "preset_create"
+        case .presetEdit:       return "preset_edit"
+        case .presetDelete:     return "preset_delete"
         }
     }
 
@@ -94,6 +103,12 @@ public enum AnalyticsEvent {
             return ["category": category, "duration_sec": durationSec]
         case let .timerCancel(category, elapsedSec, remainingSec):
             return ["category": category, "elapsed_sec": elapsedSec, "remaining_sec": remainingSec]
+        case let .presetCreate(label, category, durationSec):
+            return ["label": label, "category": category, "duration_sec": durationSec]
+        case let .presetEdit(label, category, durationSec):
+            return ["label": label, "category": category, "duration_sec": durationSec]
+        case let .presetDelete(label, category, durationSec):
+            return ["label": label, "category": category, "duration_sec": durationSec]
         }
     }
 }
