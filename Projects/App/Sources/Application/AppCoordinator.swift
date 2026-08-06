@@ -26,8 +26,20 @@ final class AppCoordinator: BaseCoordinator {
     /// 탭 전환 요청을 위임할 대상. 아래 옵저버 클로저에서 참조해야 하므로 프로퍼티로 보유한다.
     private var tabBarCoordinator: TabBarCoordinator?
 
+    /*
+     탭바가 화면에 올라온 직후 1회 실행할 작업 (NM-372).
+
+     SceneDelegate가 콜드런치 딥링크 처리를 여기에 건다. 스플래시가 떠 있는 동안
+     딥링크를 처리하면 탭 전환 신호가 버려지고(옵저버·탭바 미존재) 모달이 스플래시
+     위에 뜨므로, "탭바가 준비된 시점"을 알려줄 지점이 필요하다.
+     */
+    var onTabBarReady: (() -> Void)?
+
     /// SceneDelegate가 window를 세팅한 직후 호출하는 진입점.
     override func start() {
+        // 옵저버를 스플래시보다 먼저 건다. onTabBarReady 로 처리되는 딥링크가
+        // 탭바 등장 직후 곧바로 .openTimerTab 을 쏘는데, 등록이 그보다 늦으면 삼켜진다.
+        observeTabSwitching()
         showSplash()
     }
 
@@ -48,7 +60,11 @@ final class AppCoordinator: BaseCoordinator {
             ) {
                 self.showTabBar()
             } completion: { _ in
-                self.observeTabSwitching()
+                // 크로스디졸브가 끝나 탭바가 완전히 자리잡은 뒤 보류해둔 딥링크를 처리한다.
+                // 애니메이션 블록 안에서 present 하면 전환과 겹치므로 completion 이어야 한다.
+                let ready = self.onTabBarReady
+                self.onTabBarReady = nil
+                ready?()
             }
         }
         navigationController.setViewControllers([splash], animated: false)

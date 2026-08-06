@@ -1,11 +1,7 @@
 import Foundation
 import TimerDomain
-import UserNotifications
 #if canImport(WidgetKit)
 import WidgetKit
-#endif
-#if canImport(AlarmKit)
-import AlarmKit
 #endif
 
 // 위젯 전용 App Group 접근 (NM-302) — 앱(Data/TimerRepository)과 "같은 suite·같은 키"를 읽고 쓴다.
@@ -35,16 +31,12 @@ enum TimerPresetStore {
         store.bool(forKey: Keys.alarmAuthorized)
     }
 
-    /// 실시작 직전 최종 확인용 — 위젯 프로세스에서 시스템 권한 상태를 직접 읽는다.
-    /// 캐시 플래그가 stale(승인으로 굳어졌지만 실제로는 해제됨)해도 죽는 타이머를 만들지 않는다.
-    private static var isAlarmGranted: Bool {
-        #if canImport(AlarmKit)
-        if #available(iOS 26.1, *) {
-            return AlarmManager.shared.authorizationState == .authorized
-        }
-        #endif
-        // 26.1 미만은 위젯 버튼이 애초에 딥링크로만 라우팅되어 이 경로로 오지 않음 — 방어적으로 캐시 신뢰.
-        return alarmAuthorized
+    /// 무음 시작이 실패했을 때 캐시 플래그를 미승인으로 되돌리고 위젯을 다시 그린다 (NM-371).
+    /// 위젯이 즉시 딥링크 분기로 바뀌어, 다음 탭부터는 버튼이 아니라 앱이 열린다.
+    /// 앱은 다음 활성화 때 실제 권한 상태로 이 값을 다시 덮어쓴다.
+    private static func markAlarmUnauthorized() {
+        store.set(false, forKey: Keys.alarmAuthorized)
+        reloadWidgets()
     }
 
     // MARK: - 프리셋 조회 (위젯 설정 선택지 · 렌더용)
@@ -62,14 +54,14 @@ enum TimerPresetStore {
 
     // MARK: - 원탭 시작 (앱 안 열고 조용히 — NM-302 "+" 프리셋 시작)
 
-    /// 러닝 타이머를 공유 저장소에 추가하고 만료 알람을 예약한다.
+    /// 러닝 타이머를 공유 저장소에 추가하고 만료 알람(AlarmKit)을 예약한다.
     /// 앱은 다음 활성화 때 `TimerUseCase.reload()`(SceneDelegate)로 이 타이머를 흡수한다.
-    /// 버전별: iOS 26.1+ → AlarmKit(앱과 동일), 미만 → 로컬 알림.
-    static func startTimer(preset: TimerPresetModel) async {
-        // 안전망(NM-360): 알람 미승인이면 조용히 죽는 타이머를 만들지 않는다.
-        // 위젯 버튼은 승인 시에만 AppIntent 로 라우팅하지만, 캐시 플래그가 stale 일 수 있어 실시작 직전 재확인.
-        guard isAlarmGranted else { return }
-
+    ///
+    /// 예약을 **먼저** 시도하고 성공했을 때만 타이머를 저장한다 (NM-371).
+    /// 울리지 않는 타이머를 남기지 않으면서, 실패를 호출자에게 돌려줘 앱의 권한 게이트로 보낼 수 있다.
+    ///
+    /// - Returns: 무음 시작 성공 여부. `false` 면 호출자가 앱을 열어 권한 게이트를 태워야 한다.
+    static func startTimer(preset: TimerPresetModel) async -> Bool {
         let endAt = Date().addingTimeInterval(TimeInterval(preset.duration))
         let timer = TreatmentTimerModel(
             label: preset.label,
@@ -78,6 +70,16 @@ enum TimerPresetStore {
             endAt: endAt,
             state: .running
         )
+
+        guard await scheduleAlarm(
+            id: timer.id,
+            label: timer.label,
+            categoryName: timer.category.displayName,
+            fireDate: endAt
+        ) else {
+            markAlarmUnauthorized()
+            return false
+        }
 
         var timers = loadTimers()
         timers.append(timer)
@@ -94,14 +96,8 @@ enum TimerPresetStore {
             )
         )
 
-        await scheduleAlarm(
-            id: timer.id,
-            label: timer.label,
-            categoryName: timer.category.displayName,
-            fireDate: endAt,
-            duration: timer.duration
-        )
         reloadWidgets()
+        return true
     }
 
     /// [완료] 등으로 타이머 제거 (위젯 stop 인텐트가 호출).
@@ -120,20 +116,31 @@ enum TimerPresetStore {
 
     // MARK: - Private (알람 예약 · 타이머 저장)
 
-    // iOS 26.1+ 는 AlarmKit(앱 경로와 동일한 시스템 알람), 미만·실패 시 로컬 알림 폴백.
-    private static func scheduleAlarm(id: UUID, label: String, categoryName: String, fireDate: Date, duration: Int) async {
-        let remaining = max(1, Int(fireDate.timeIntervalSinceNow.rounded()))
+    /*
+     AlarmKit 예약 (iOS 26.1+). 성공 여부를 돌려준다.
+
+     실패해도 로컬 알림으로 강등하지 않는다 (NM-371). 로컬 알림은 별도 권한(UNAuthorization)이
+     필요해서, 알람 권한이 없는 사용자는 알림 권한도 없을 수 있고 그러면 진짜로 아무것도
+     울리지 않는다(ISS-05 재현). 권한 문제는 앱의 게이트가 요청으로 풀어야 한다.
+
+     26.1 미만은 위젯이 버튼 대신 딥링크로 렌더되어 이 경로로 오지 않는다.
+     혹시 오더라도 false 를 돌려 앱을 열게 하면 앱이 정식 시작한다.
+     */
+    private static func scheduleAlarm(id: UUID, label: String, categoryName: String, fireDate: Date) async -> Bool {
         #if canImport(AlarmKit)
         if #available(iOS 26.1, *) {
+            let remaining = max(1, Int(fireDate.timeIntervalSinceNow.rounded()))
             do {
-                try await TimerWidgetAlarmScheduler.schedule(id: id, label: label, categoryName: categoryName, seconds: remaining)
-                return
+                try await TimerWidgetAlarmScheduler.schedule(
+                    id: id, label: label, categoryName: categoryName, seconds: remaining
+                )
+                return true
             } catch {
-                // 권한 미승인 등 실패 → 로컬 알림 폴백
+                return false
             }
         }
         #endif
-        scheduleExpiryNotification(id: id, label: label, duration: duration, fireDate: fireDate)
+        return false
     }
 
     private static func loadTimers() -> [TreatmentTimerModel] {
@@ -149,24 +156,6 @@ enum TimerPresetStore {
         }
         // 워치 동기화 트리거 — 앱/워치가 최신 스냅샷을 인지.
         store.set(Date().timeIntervalSince1970, forKey: Keys.snapshotAt)
-    }
-
-    // 만료 로컬 알림(기본 폴백) — 익스텐션에서도 예약 가능하다.
-    // 카테고리(CARE_TIMER_ALARM · [완료] 액션)는 앱이 등록하므로 identifier 만 맞춘다.
-    // (iOS 26.1+ AlarmKit 승격은 후속 — 위젯 프로세스 AlarmKit 예약은 실기기 실측 필요)
-    private static func scheduleExpiryNotification(id: UUID, label: String, duration: Int, fireDate: Date) {
-        let content = UNMutableNotificationContent()
-        content.title = "\(label) 종료"
-        content.body = "\(Self.durationText(duration)) 타이머가 끝났어요"
-        content.sound = .default
-        content.interruptionLevel = .timeSensitive
-        content.categoryIdentifier = "CARE_TIMER_ALARM"
-
-        let interval = max(1, fireDate.timeIntervalSinceNow)
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: interval, repeats: false)
-        UNUserNotificationCenter.current().add(
-            UNNotificationRequest(identifier: id.uuidString, content: content, trigger: trigger)
-        )
     }
 
     private static func reloadWidgets() {

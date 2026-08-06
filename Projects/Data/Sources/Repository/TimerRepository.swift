@@ -9,6 +9,9 @@
 
 import Foundation
 import Domain
+#if canImport(WidgetKit)
+import WidgetKit
+#endif
 
 public final class TimerRepository: TimerRepositoryProtocol {
 
@@ -61,7 +64,15 @@ public final class TimerRepository: TimerRepositoryProtocol {
     }
 
     public func setAlarmAuthorized(_ authorized: Bool) {
+        // 값이 바뀔 때만 위젯을 다시 그린다 (NM-371).
+        // 설정형 위젯은 timeline policy 가 .never 라, 이 신호가 없으면 렌더 당시의 라우팅
+        // (무음 시작 ↔ 앱 열기)에 그대로 굳어 권한을 나중에 허용해도 반영되지 않는다.
+        let previous = store.object(forKey: Keys.alarmAuthorized) as? Bool
         store.set(authorized, forKey: Keys.alarmAuthorized)
+        guard previous != authorized else { return }
+        #if canImport(WidgetKit)
+        WidgetCenter.shared.reloadAllTimelines()
+        #endif
     }
 
     public func alarmAuthorizedFlag() -> Bool? {
