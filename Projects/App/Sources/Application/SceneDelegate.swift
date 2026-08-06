@@ -66,6 +66,8 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
         let navigationController = UINavigationController()
         appCoordinator = AppCoordinator(navigationController: navigationController)
+        // 콜드런치 딥링크는 탭바가 준비된 뒤에 처리한다 (NM-372). start() 보다 먼저 걸어둔다.
+        appCoordinator?.onTabBarReady = { [weak self] in self?.flushPendingURL() }
         appCoordinator?.start()
 
         window.rootViewController = navigationController
@@ -73,7 +75,7 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
         appGate = AppGate(windowScene: windowScene)
 
-        // 콜드런치 딥링크는 저장만 — 창이 활성화된 sceneDidBecomeActive 에서 present.
+        // 콜드런치 딥링크는 저장만 — 탭바가 뜬 뒤(onTabBarReady) 처리한다.
         pendingURL = connectionOptions.urlContexts.first?.url
     }
 
@@ -119,6 +121,9 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
               let id = UUID(uuidString: raw) else { return }
         let useCase = DIContainer.shared.resolve(TimerUseCase.self)
         guard let preset = useCase.presets.value.first(where: { $0.id == id }) else { return }
+        // 시작 전에 타이머 탭으로 옮긴다 (NM-372) — 방금 만든 타이머가 바로 보이고,
+        // 권한 시트가 뜨는 경우에도 타이머 탭 위에 떠서 닫은 뒤 맥락이 이어진다.
+        NotificationCenter.default.post(name: .openTimerTab, object: nil)
         startWithAlarmGate(preset: preset, useCase: useCase)
     }
 
@@ -131,6 +136,9 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
      앱이 열려 있는 상태이므로 UseCase를 통해 정식 시작(알람 예약까지) 경로를 탄다.
      */
     private func presentQuickStart() {
+        // 피커를 띄우기 전에 타이머 탭으로 옮긴다 (NM-372) — 피커가 닫힐 때
+        // 홈 탭이 잠깐 보였다가 전환되는 깜빡임을 없앤다.
+        NotificationCenter.default.post(name: .openTimerTab, object: nil)
         let useCase = DIContainer.shared.resolve(TimerUseCase.self)
         let picker = TimerQuickStartPickerViewController(presets: useCase.presets.value) { [weak self] preset in
             // 피커를 먼저 닫고(권한 시트와의 표시 충돌 방지) 알람 권한 게이트를 태운다.
@@ -245,7 +253,8 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         endAt 기반이라 잔여시간 복원은 자동(NM-276 QA 규칙).
         AlarmKit App Intent가 App Group 저장소를 앱 밖에서 직접 바꿨을 수 있으므로 reload가 먼저다.
      2) Remote Config 게이팅 — 실행 중 점검이 시작될 수 있어 복귀 때마다 재평가한다.
-     3) 콜드런치 딥링크 — willConnectTo 에서 보류해둔 URL을 창이 준비된 지금 처리한다.
+     콜드런치 딥링크는 여기서 처리하지 않는다 — 이 시점엔 스플래시가 떠 있다.
+     탭바가 뜬 뒤 AppCoordinator.onTabBarReady 가 flushPendingURL() 을 부른다 (NM-372).
      */
     func sceneDidBecomeActive(_ scene: UIScene) {
         let useCase = DIContainer.shared.resolve(TimerUseCase.self) // 타이머 usecase
@@ -281,11 +290,18 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
             await RemoteConfigService.shared.fetchAndActivate()
             appGate?.evaluate()
         }
+    }
 
-        // 콜드런치 딥링크: 창이 활성화된 지금 present.
-        if let url = pendingURL {
-            pendingURL = nil
-            handle(url: url)
-        }
+    /*
+     콜드런치 딥링크 처리 (NM-372).
+
+     AppCoordinator 가 탭바를 띄운 직후 호출한다. sceneDidBecomeActive 에서 처리하면
+     아직 스플래시가 떠 있어서 ─ 탭 전환 신호는 옵저버·탭바가 없어 버려지고,
+     피커·온보딩 모달은 탭바가 아닌 스플래시 위에 뜬다.
+     */
+    private func flushPendingURL() {
+        guard let url = pendingURL else { return }
+        pendingURL = nil
+        handle(url: url)
     }
 }
