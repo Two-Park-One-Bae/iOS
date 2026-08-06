@@ -10,7 +10,7 @@ let project = Project(
     targets: [
         .target(
             name: "App",
-            destinations: .iOS,
+            destinations: [.iPhone],
             product: .app,
             bundleId: "\(Environment.bundlePrefix).app",
             deploymentTargets: Environment.deploymentTarget,
@@ -121,7 +121,7 @@ let project = Project(
         // 잠금화면 Live Activity · Dynamic Island (spec: 잠금화면 실시간 표시)
         .target(
             name: "TimerWidget",
-            destinations: .iOS,
+            destinations: [.iPhone],
             product: .appExtension,
             bundleId: "\(Environment.bundlePrefix).app.timerwidget",
             deploymentTargets: Environment.deploymentTarget,
@@ -149,7 +149,7 @@ let project = Project(
         ),
         .target(
             name: "AppTests",
-            destinations: .iOS,
+            destinations: [.iPhone],
             product: .unitTests,
             bundleId: "\(Environment.bundlePrefix).app.tests",
             deploymentTargets: Environment.deploymentTarget,
