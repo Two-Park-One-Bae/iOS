@@ -100,13 +100,8 @@ final class FinalResultVC: UIViewController {
     }
 
     private func setupFooter() {
-        let disclaimer = UILabel().then {
-            $0.text = "본 결과는 참고용입니다. 투약 전 처방·약품 라벨을 확인하세요."
-            $0.font = DSKitFontFamily.Pretendard.regular.font(size: 11)
-            $0.textColor = DSColor.textTertiary
-            $0.textAlignment = .center
-            $0.numberOfLines = 0
-        }
+        // 고지 문구는 세 화면 공통 (Guideline 1.4.1) — PillDisclaimer 참조.
+        let disclaimer = PillDisclaimer.makeLabel()
 
         let buttons = UIStackView(arrangedSubviews: [shareButton, completeButton]).then {
             $0.axis = .horizontal
@@ -115,7 +110,8 @@ final class FinalResultVC: UIViewController {
         }
         completeButton.snp.makeConstraints { $0.height.equalTo(52) }
 
-        let stack = UIStackView(arrangedSubviews: [disclaimer, buttons]).then {
+        // 디자인(⑨ Footer)상 고지는 버튼 '아래'.
+        let stack = UIStackView(arrangedSubviews: [buttons, disclaimer]).then {
             $0.axis = .vertical
             $0.spacing = 10
         }
