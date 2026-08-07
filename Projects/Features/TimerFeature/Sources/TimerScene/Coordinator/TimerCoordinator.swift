@@ -13,6 +13,12 @@ public final class TimerCoordinator: BaseCoordinator {
     private var pendingPermissionFlow = false
 
     public override func start() {
+        // 타이머는 AlarmKit(26.1+) 전용 — 그 미만은 알람을 보장할 수 없어 안내만 띄운다.
+        guard #available(iOS 26.1, *) else {
+            navigationController.pushViewController(TimerUnavailableVC(), animated: false)
+            return
+        }
+
         let viewModel = TimerListViewModel()
         self.viewModel = viewModel
 

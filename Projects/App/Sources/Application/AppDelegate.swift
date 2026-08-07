@@ -93,15 +93,8 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         }
         // Remote Config fetch + 게이팅(강제 업데이트·점검)은 window 를 소유한 SceneDelegate 가
         // sceneDidBecomeActive 에서 담당한다(포그라운드 복귀 시에도 최신값 반영).
-        if #available(iOS 26.1, *) {
-            // iOS 26: AlarmKit이 시스템 알람 + 카운트다운 위젯을 단독 담당.
-            // (커스텀 LA / 포그라운드 풀스크린 / UN 알림 / 백그라운드 오디오 모두 비활성)
-        } else {
-            TimerNotificationHandler.shared.activate()
-            TimerLiveActivityManager.shared.activate()
-            TimerRingingAlarmPresenter.shared.activate()
-            BackgroundAudioKeepAlive.shared.activate()
-        }
+        // 타이머 알람은 AlarmKit(26.1+)이 단독 담당한다 — 시스템 알람과 카운트다운 위젯까지
+        // 시스템이 처리하므로 앱이 켜둘 스택이 없다. 26.1 미만은 타이머 탭이 안내만 띄운다.
         return true
     }
 

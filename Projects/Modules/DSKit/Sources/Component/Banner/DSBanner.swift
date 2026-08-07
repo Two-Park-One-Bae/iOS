@@ -133,13 +133,24 @@ public final class DSBanner: UIView {
 extension DSBanner {
 
     public func setMessage(_ message: String) {
+        let font = DSKitFontFamily.Pretendard.medium.font(size: 13)
+
+        /*
+         줄 간격은 lineHeight(min/max·multiple)가 아니라 lineSpacing 으로 준다.
+
+         lineHeight 를 키우면 UIKit 이 늘어난 여백을 각 줄의 '위쪽'에 붙인다. 한 줄짜리
+         메시지에서도 글자 위에 빈 공간이 생겨 글자가 아래로 쏠리고, 옆 아이콘과 세로
+         중심이 어긋난다. 배너 자체 패딩(12pt)까지 겹쳐 위아래가 더 벌어져 보인다.
+         lineSpacing 은 줄과 줄 '사이'에만 들어가 첫 줄 위에는 여백을 만들지 않는다.
+         */
         let style = NSMutableParagraphStyle()
-        style.lineHeightMultiple = 1.4
+        style.lineSpacing = font.lineHeight * 0.4
+
         messageLabel.attributedText = NSAttributedString(
             string: message,
             attributes: [
                 .paragraphStyle: style,
-                .font: DSKitFontFamily.Pretendard.medium.font(size: 13),
+                .font: font,
                 .foregroundColor: messageLabel.textColor ?? DSColor.Warning._700
             ]
         )
