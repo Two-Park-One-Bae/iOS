@@ -104,6 +104,14 @@ final class PillEditVC: UIViewController {
     }
     private let cancelButton = SecondaryButton(title: "취소")
     private let confirmButton = PrimaryButton(title: "확인")
+    /// 취소·확인 묶음 — 후보를 골라야 나타난다. UIStackView 의 arranged subview 라 숨기면 접힌다.
+    private lazy var buttonsRow = UIStackView(arrangedSubviews: [cancelButton, confirmButton]).then {
+        $0.axis = .horizontal
+        $0.spacing = 10
+        $0.distribution = .fillEqually
+    }
+    /// 고지 문구 (Guideline 1.4.1) — 선택 여부와 무관하게 항상 노출.
+    private let disclaimerLabel = PillDisclaimer.makeLabel()
 
     // MARK: - Init
 
@@ -145,7 +153,9 @@ final class PillEditVC: UIViewController {
         [colorPanel, colorDivider, transparencyRow, shapePanel, formulationPanel].forEach { $0.isHidden = true }
         imprintPanel.isHidden = false
         imprintChevron.transform = CGAffineTransform(rotationAngle: .pi)
-        footer.isHidden = true
+        // footer 는 항상 보인다 — 고지가 들어 있어 선택 전에도 노출돼야 한다(⑧-a).
+        // 후보를 골라야 나타나는 건 버튼뿐이라 buttonsRow 만 접어 둔다.
+        buttonsRow.isHidden = true
     }
 
     private func setLayout() {
@@ -164,11 +174,17 @@ final class PillEditVC: UIViewController {
         setupFooter()
     }
 
+    /*
+     하단 footer — 버튼(선택 시) + 고지(항상).
+
+     디자인상 고지는 footer 안, 버튼 '아래'에 있고 "⑧-a 진입 (선택 전)"에도 노출된다.
+     그래서 footer 자체는 늘 띄워두고 buttonsRow 만 접는다. footer 를 통째로 숨기면
+     선택 전에 고지가 사라진다.
+     */
     private func setupFooter() {
-        let stack = UIStackView(arrangedSubviews: [cancelButton, confirmButton]).then {
-            $0.axis = .horizontal
+        let stack = UIStackView(arrangedSubviews: [buttonsRow, disclaimerLabel]).then {
+            $0.axis = .vertical
             $0.spacing = 10
-            $0.distribution = .fillEqually
         }
         footer.addSubview(stack)
         footer.snp.makeConstraints { $0.leading.trailing.bottom.equalToSuperview() }
@@ -449,8 +465,11 @@ final class PillEditVC: UIViewController {
 
     private func updateFooterVisibility() {
         let hasSelection = selectedPillCode != nil
-        setHidden(footer, !hasSelection)
-        let inset = hasSelection ? footer.frame.height : 0
+        // 고지는 항상 보여야 하므로(⑧-a 선택 전) footer 가 아니라 버튼만 접는다.
+        setHidden(buttonsRow, !hasSelection)
+        // 접힘/펼침이 반영된 높이를 읽어야 스크롤 하단 여백이 맞는다.
+        view.layoutIfNeeded()
+        let inset = footer.frame.height
         if collectionView.contentInset.bottom != inset { collectionView.contentInset.bottom = inset }
     }
 
