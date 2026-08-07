@@ -26,12 +26,13 @@ enum RegisterDependencies {
             TimerRepository()
         }
         container.register(TimerAlarmScheduling.self) {
-            // iOS 26.1+ → AlarmKit(시스템 알람, 무음/잠금/강제종료 뚫음).
-            // 미만 → 커스텀 방식(단발 알림 + 반복 폴백 + 백그라운드 오디오).
+            // 타이머는 iOS 26.1+ 전용 — AlarmKit(시스템 알람)만 처치 시각을 보장한다.
+            // 그 미만은 타이머 탭이 안내 화면만 띄우므로 호출되지 않는 no-op 을 등록한다
+            // (SceneDelegate 가 버전 무관하게 TimerUseCase 를 resolve 해서 등록 자체는 필요).
             if #available(iOS 26.1, *) {
                 return AlarmKitAlarmScheduler()
             }
-            return CustomAlarmScheduler()
+            return UnavailableAlarmScheduler()
         }
 
         // UseCases

@@ -31,7 +31,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             if #available(iOS 26.1, *) {
                 return AlarmKitAlarmScheduler()
             }
-            return CustomAlarmScheduler()
+            return UnavailableAlarmScheduler()
         }
         container.register(TimerUseCase.self) {
             DefaultTimerUseCase(

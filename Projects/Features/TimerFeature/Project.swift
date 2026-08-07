@@ -4,13 +4,13 @@ import DependencyPlugin
 import EnvPlugin
 import ConfigPlugin
 
-// MARK: - 버전별 데모 (26+ AlarmKit / <26 커스텀)
+// MARK: - 데모 (AlarmKit)
 //
-// 배포 타깃이 iOS 17.0 이라 26 미만 경로가 실제로 존재한다. 두 데모는 알람/LiveActivity
-// 전략을 DI에서 강제(force)해, 시뮬레이터 버전과 무관하게 각 경험을 검증한다.
-//  - TimerFeatureDemoAlarmKit : AlarmKitAlarmScheduler (26.1+ 시스템 알람) → 26 시뮬에서 실행
-//  - TimerFeatureDemoCustom   : CustomAlarmScheduler + 커스텀 스택 activate → 17~25 시뮬에서 실행
-// 각 데모는 자체 위젯 익스텐션을 embed 해 잠금화면 Live Activity·Dynamic Island 까지 확인한다.
+// 타이머는 iOS 26.1+ 전용이다 — 무음·잠금·앱 종료를 모두 관통하는 시스템 알람이 있어야
+// 처치 시각을 보장할 수 있어, 그 미만에서 쓰던 커스텀 스택(로컬 알림 + 백그라운드 오디오)은
+// 제거했다. 따라서 커스텀 경로 검증용 TimerFeatureDemoCustom 도 함께 사라졌다.
+//  - TimerFeatureDemoAlarmKit : AlarmKitAlarmScheduler → 26.1+ 시뮬/기기에서 실행
+// 데모는 자체 위젯 익스텐션을 embed 해 잠금화면 카운트다운·Dynamic Island 까지 확인한다.
 // 위젯 소스는 앱 타깃(App/Widget)과 동일 파일을 공유(중복 없음).
 
 private let appGroup = "group.app.nursemate.timer"
@@ -34,7 +34,7 @@ private func demoInfoPlist(displayName: String) -> InfoPlist {
         "CFBundleDisplayName": .string(displayName),
         "UILaunchScreen": .dictionary(["UIColorName": "", "UIImageName": ""]),
         "NSSupportsLiveActivities": true,
-        "UIBackgroundModes": .array([.string("audio")]),
+        // audio 백그라운드 모드는 본 앱과 맞춰 선언하지 않는다 (App Store 2.5.4).
         "NSAlarmKitUsageDescription": "치료 타이머 종료 알람 데모입니다.",
         "UIApplicationSceneManifest": .dictionary([
             "UIApplicationSupportsMultipleScenes": .boolean(false),
@@ -107,18 +107,12 @@ private func demoPair(name: String, bundleSuffix: String, sources: String, displ
 
 private let demoTargets: [Target] =
     demoPair(name: "TimerFeatureDemoAlarmKit", bundleSuffix: "demo.alarmkit", sources: "DemoAlarmKit/Sources", displayName: "타이머 데모 (AlarmKit)")
-    + demoPair(name: "TimerFeatureDemoCustom", bundleSuffix: "demo.custom", sources: "DemoCustom/Sources", displayName: "타이머 데모 (Custom)")
 
 private let demoSchemes: [Scheme] = [
     .scheme(
         name: "TimerFeatureDemoAlarmKit",
         buildAction: .buildAction(targets: [.target("TimerFeatureDemoAlarmKit")]),
         runAction: .runAction(executable: .target("TimerFeatureDemoAlarmKit"))
-    ),
-    .scheme(
-        name: "TimerFeatureDemoCustom",
-        buildAction: .buildAction(targets: [.target("TimerFeatureDemoCustom")]),
-        runAction: .runAction(executable: .target("TimerFeatureDemoCustom"))
     ),
 ]
 

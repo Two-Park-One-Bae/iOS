@@ -32,7 +32,9 @@ let project = Project(
                     "CFBundleURLSchemes": ["nursemate"],
                 ]],
                 "NSSupportsLiveActivities": true,
-                "UIBackgroundModes": ["audio"],
+                // UIBackgroundModes: audio 는 선언하지 않는다 (App Store 2.5.4).
+                // 무음 루프로 앱을 백그라운드에 살려두던 방식이 리젝 사유였고, 타이머를
+                // AlarmKit 전용으로 바꾸면서 그 경로 자체가 사라졌다.
                 "NSAlarmKitUsageDescription": "치료 타이머 종료 알람을 예약·알림하기 위해 필요합니다.",
                 "UIUserInterfaceStyle": "Light",
                 "UILaunchScreen": ["UIColorName": "", "UIImageName": ""],
