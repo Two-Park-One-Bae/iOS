@@ -478,11 +478,8 @@ final class PillDetailVC: UIViewController {
     }
 
     private func makeSource() -> UIView {
-        let label = UILabel()
-        label.text = "출처: 식품의약품안전처 의약품 제품 허가정보. 실제 복약은 반드시 의사·약사와 상의하세요."
-        label.font = DSKitFontFamily.Pretendard.regular.font(size: 11)
-        label.textColor = DSColor.textTertiary
-        label.numberOfLines = 0
+        // 출처 + 고지 (Guideline 1.4.1). 세부정보만 데이터 출처를 함께 밝힌다.
+        let label = PillDisclaimer.makeLabel(withSource: true)
 
         let container = UIView()
         container.addSubview(label)
