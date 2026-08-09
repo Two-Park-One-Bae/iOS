@@ -1,7 +1,7 @@
 import UIKit
 
 // MARK: - Nav Bar
-// 높이 56, 배경 BgApp, 좌측 chevron-left 26x26, 중앙 제목 SemiBold 17, 우측 26x26 spacer
+// 높이 56, 배경 BgApp, 좌측 뒤로가기 버튼 56x56(chevron-left 아이콘 26), 중앙 제목 SemiBold 17, 우측 56x56 spacer
 
 public final class DSNavBar: UIView {
 
@@ -18,10 +18,12 @@ public final class DSNavBar: UIView {
         let button = UIButton(type: .system)
         button.setImage(DSIcon.chevronLeft.uiImage, for: .normal)
         button.tintColor = DSColor.textPrimary
+        // chevron은 좌측에 붙이고 넓힌 터치 영역은 오른쪽으로만 — 좌측 여백이 커지지 않게.
+        button.contentHorizontalAlignment = .leading
         button.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
-            button.widthAnchor.constraint(equalToConstant: 26),
-            button.heightAnchor.constraint(equalToConstant: 26)
+            button.widthAnchor.constraint(equalToConstant: 56),
+            button.heightAnchor.constraint(equalToConstant: 56)
         ])
         return button
     }()
@@ -30,8 +32,8 @@ public final class DSNavBar: UIView {
         let view = UIView()
         view.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
-            view.widthAnchor.constraint(equalToConstant: 26),
-            view.heightAnchor.constraint(equalToConstant: 26)
+            view.widthAnchor.constraint(equalToConstant: 56),
+            view.heightAnchor.constraint(equalToConstant: 56)
         ])
         return view
     }()

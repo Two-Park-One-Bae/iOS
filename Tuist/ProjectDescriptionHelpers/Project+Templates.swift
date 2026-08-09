@@ -10,7 +10,10 @@ public extension Project {
         internalDependencies: [TargetDependency] = [],
         externalDependencies: [TargetDependency] = [],
         interfaceDependencies: [TargetDependency] = [],
-        hasResources: Bool = false
+        hasResources: Bool = false,
+        // 모듈별로 추가할 커스텀 타깃·스킴 (예: 버전별 데모 앱 + 위젯 익스텐션).
+        extraTargets: [Target] = [],
+        extraSchemes: [Scheme] = []
     ) -> Project {
         var projectTargets: [Target] = []
         let bundleId = "\(Environment.bundlePrefix).\(name.lowercased())"
@@ -25,7 +28,12 @@ public extension Project {
                     product: product,
                     bundleId: bundleId,
                     deploymentTargets: Environment.deploymentTarget,
-                    sources: ["Sources/**"],
+                    // .mlpackage는 디렉토리 번들이라 ** 글로브가 내부 파일까지 펼쳐 빌드 페이즈 오류 발생.
+                    // 내부 파일을 제외하고 .mlpackage 폴더 자체를 CoreML 컴파일 페이즈에 올리기 위해 excluding 처리.
+                    sources: [
+                        .glob("Sources/**", excluding: ["Sources/*.mlpackage", "Sources/*.mlpackage/**"]),
+                        .glob("Sources/*.mlpackage"),
+                    ],
                     resources: hasResources ? ["Resources/**"] : nil,
                     dependencies: allDependencies,
                     settings: .settings(base: XCConfig.base)
@@ -74,6 +82,19 @@ public extension Project {
                     infoPlist: .extendingDefault(with: [
                         "UIRequiresFullScreen": true,
                         "UILaunchScreen": ["UIColorName": "", "UIImageName": ""],
+                        "NSCameraUsageDescription": "카메라로 알약을 촬영합니다.",
+                        "NSPhotoLibraryUsageDescription": "갤러리에서 알약 사진을 선택합니다.",
+                        "UIApplicationSceneManifest": .dictionary([
+                            "UIApplicationSupportsMultipleScenes": .boolean(false),
+                            "UISceneConfigurations": .dictionary([
+                                "UIWindowSceneSessionRoleApplication": .array([
+                                    .dictionary([
+                                        "UISceneConfigurationName": .string("Default Configuration"),
+                                        "UISceneDelegateClassName": .string("$(PRODUCT_MODULE_NAME).SceneDelegate"),
+                                    ])
+                                ])
+                            ])
+                        ]),
                     ]),
                     sources: ["Demo/Sources/**"],
                     dependencies: [.target(name: name)],
@@ -82,10 +103,22 @@ public extension Project {
             )
         }
 
+        var schemes: [Scheme] = []
+        if targets.contains(.demo) {
+            schemes.append(
+                .scheme(
+                    name: "\(name)Demo",
+                    buildAction: .buildAction(targets: [.target("\(name)Demo")]),
+                    runAction: .runAction(executable: .target("\(name)Demo"))
+                )
+            )
+        }
+
         return Project(
             name: name,
             settings: .settings(base: XCConfig.base, configurations: XCConfig.framework),
-            targets: projectTargets
+            targets: projectTargets + extraTargets,
+            schemes: schemes + extraSchemes
         )
     }
 }

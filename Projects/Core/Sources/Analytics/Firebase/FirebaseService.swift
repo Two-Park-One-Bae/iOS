@@ -1,3 +1,4 @@
+import FirebaseAnalytics
 import FirebaseCore
 import FirebaseCrashlytics
 
@@ -6,8 +7,19 @@ public enum FirebaseService {
         FirebaseApp.configure()
     }
 
+    /// Firebase Analytics 자동 수집 on/off. 내부 빌드에선 꺼서 SaaS에 내부 트래픽이 안 잡히게 한다.
+    /// (App Check·Remote Config·Crashlytics는 그대로 — Analytics 수집만 제어)
+    public static func setAnalyticsCollectionEnabled(_ enabled: Bool) {
+        Analytics.setAnalyticsCollectionEnabled(enabled)
+    }
+
     public static func setUserID(_ userID: String) {
         Crashlytics.crashlytics().setUserID(userID)
+    }
+
+    /// GA4 커스텀 이벤트 전송. 내부 빌드는 setAnalyticsCollectionEnabled(false)라 실제 전송이 no-op이 된다.
+    public static func log(event name: String, _ params: [String: Any]? = nil) {
+        Analytics.logEvent(name, parameters: params)
     }
 
     public static func log(_ message: String) {

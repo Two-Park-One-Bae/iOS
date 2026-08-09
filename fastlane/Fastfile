@@ -28,6 +28,71 @@ platform :ios do
     end
   end
 
+  # Firebase Crashlytics 심볼 업로드 — 릴리즈 크래시를 심볼화(함수·줄번호)하려면 dSYM을 올려야 한다.
+  # 비트코드가 꺼져 있어 아카이브의 로컬 dSYM이 최종본이므로, App Store Connect 처리 대기 없이 바로 올린다.
+  # 경로/바이너리를 못 찾아도 배포는 막지 않고 경고만 남긴다(심볼 업로드는 부가 작업).
+  def upload_dsyms_to_crashlytics
+    dsym = lane_context[SharedValues::DSYM_OUTPUT_PATH]
+    unless dsym && File.exist?(dsym)
+      UI.important("dSYM을 찾지 못해 Crashlytics 심볼 업로드를 건너뜁니다 (DSYM_OUTPUT_PATH 없음).")
+      return
+    end
+    binary = crashlytics_upload_symbols_binary
+    unless binary && File.exist?(binary)
+      UI.important("upload-symbols 바이너리를 찾지 못해 Crashlytics 심볼 업로드를 건너뜁니다.")
+      return
+    end
+    upload_symbols_to_crashlytics(
+      dsym_path: dsym,
+      gsp_path: "#{repo_root}/Projects/App/Resources/GoogleService-Info.plist",
+      binary_path: binary
+    )
+  end
+
+  # fastlane 실행 CWD 와 무관하게 레포 루트를 앵커한다.
+  # FastlaneFolder.path(=<root>/fastlane) 를 우선 쓰고, 없으면 __dir__(Fastfile 위치)로 폴백.
+  # (CI에서 CWD가 fastlane/ 로 바뀌면 상대경로가 깨지므로 절대 앵커가 필요하다)
+  def repo_root
+    base = (defined?(FastlaneCore::FastlaneFolder) && FastlaneCore::FastlaneFolder.path) || __dir__
+    File.expand_path("..", base)
+  end
+
+  # SPM(Tuist)로 받은 firebase-ios-sdk 안 upload-symbols 위치 탐색 — 환경별 경로차를 흡수.
+  # 주의: Tuist/.build 는 숨김 디렉터리라 광역 glob 에 FNM_DOTMATCH 를 줘야 뒤진다.
+  def crashlytics_upload_symbols_binary
+    root = repo_root
+    # 1) 정확 경로 우선 (File.exist? 는 숨김 디렉터리도 문제없음)
+    [
+      "#{root}/Tuist/.build/checkouts/firebase-ios-sdk/Crashlytics/upload-symbols",
+      "#{root}/.build/checkouts/firebase-ios-sdk/Crashlytics/upload-symbols",
+    ].each { |p| return p if File.exist?(p) }
+    # 2) 광역 탐색 — Tuist/.build(숨김)·커스텀 derivedDataPath·기본 DerivedData 모두 커버
+    [
+      "#{root}/Tuist/.build/**/firebase-ios-sdk/Crashlytics/upload-symbols",
+      "#{root}/**/SourcePackages/checkouts/firebase-ios-sdk/Crashlytics/upload-symbols",
+      File.expand_path("~/Library/Developer/Xcode/DerivedData/**/SourcePackages/checkouts/firebase-ios-sdk/Crashlytics/upload-symbols"),
+      "#{root}/**/firebase-ios-sdk/Crashlytics/upload-symbols",
+    ].each do |pattern|
+      hit = Dir.glob(pattern, File::FNM_DOTMATCH).first
+      return hit if hit
+    end
+    nil
+  end
+
+  # 외부 테스터에게 보일 '테스트 사항'(업데이트 설명) 소스. 우선순위:
+  #   1) 워크플로 수동 실행 입력(CHANGELOG env)  2) fastlane/changelog_external.txt  3) 기본 문구
+  # → 릴리스마다 파일만 고치면 push 자동 배포에도 업데이트 설명이 실린다(비우면 기본 문구).
+  def beta_changelog
+    from_input = ENV["CHANGELOG"].to_s.strip
+    return from_input unless from_input.empty?
+    path = File.expand_path("../changelog_external.txt", __FILE__)
+    if File.exist?(path)
+      text = File.read(path).strip
+      return text unless text.empty?
+    end
+    "버그 수정 및 개선 사항"
+  end
+
   desc "Run unit tests"
   lane :test do
     run_tests(
@@ -60,13 +125,22 @@ platform :ios do
       xcodeproj: "Projects/App/App.xcodeproj"
     )
 
-    update_code_signing_settings(
-      use_automatic_signing: false,
-      path: "Projects/App/App.xcodeproj",
-      targets: ["App"],
-      code_sign_identity: "iPhone Distribution",
-      profile_name: "match AppStore app.nursemate.app"
-    )
+    # App + 임베드되는 익스텐션(워치앱·위젯·컴플리케이션) 각각을 해당 match 프로파일로 수동 서명.
+    signing = {
+      "App"               => "app.nursemate.app",
+      "WatchApp"          => "app.nursemate.app.watchapp",
+      "TimerWidget"       => "app.nursemate.app.timerwidget",
+      "WatchComplication" => "app.nursemate.app.watchapp.presetcomplication",
+    }
+    signing.each do |target, bundle_id|
+      update_code_signing_settings(
+        use_automatic_signing: false,
+        path: "Projects/App/App.xcodeproj",
+        targets: [target],
+        code_sign_identity: "iPhone Distribution",
+        profile_name: "match AppStore #{bundle_id}"
+      )
+    end
 
     build_app(
       workspace: "Application.xcworkspace",
@@ -74,15 +148,22 @@ platform :ios do
       configuration: "Release",
       export_method: "app-store",
       output_directory: "build",
-      xcargs: "DEVELOPMENT_TEAM=#{ENV.fetch('DEVELOPMENT_TEAM', '')}",
+      # 프레임워크 타깃(TimerDomain 등)이 아카이브 시 개발 인증서를 찾다 실패하는 문제 방지.
+      # 아카이브 전체를 수동 서명(Manual) + 배포 인증서로 통일 — 프레임워크는 프로파일 없이
+      # 인증서만으로 서명되고, 앱·익스텐션은 export_options 의 프로파일을 그대로 사용한다.
+      # (Manual 없이 identity 만 강제하면 자동 서명 프레임워크와 "conflicting settings" 충돌)
+      # 내부 TestFlight 빌드에만 INTERNAL 컴파일 조건 주입 → AppEnvironment.isInternal=true
+      # → Amplitude·Clarity·Firebase Analytics·S3 원본업로드 OFF(내부 테스트로 지표·데이터셋 오염 방지).
+      # external/release 레인은 주입 안 함 → 외부 테스터·프로덕션은 정상 수집.
+      xcargs: "DEVELOPMENT_TEAM=#{ENV.fetch('DEVELOPMENT_TEAM', '')} CODE_SIGN_IDENTITY='Apple Distribution' CODE_SIGN_STYLE=Manual SWIFT_ACTIVE_COMPILATION_CONDITIONS='$(inherited) INTERNAL' FIREBASE_ANALYTICS_ENABLED=NO",
       export_options: {
         method: "app-store",
         signingStyle: "manual",
-        provisioningProfiles: {
-          "app.nursemate.app" => "match AppStore app.nursemate.app"
-        }
+        provisioningProfiles: signing.each_with_object({}) { |(_, bundle_id), h| h[bundle_id] = "match AppStore #{bundle_id}" }
       }
     )
+
+    upload_dsyms_to_crashlytics
 
     upload_to_testflight(
       api_key: app_store_connect_api_key(
@@ -92,6 +173,81 @@ platform :ios do
         in_house: false
       ),
       skip_waiting_for_build_processing: true
+    )
+  end
+
+  desc "Build and upload to TestFlight (external testers)"
+  lane :beta_external do
+    key = api_key
+
+    match(
+      type: "appstore",
+      api_key: key,
+      readonly: true
+    )
+
+    build_number = latest_testflight_build_number(
+      api_key: key,
+      app_identifier: "app.nursemate.app",
+      initial_build_number: 1
+    ) + 1
+
+    increment_build_number(
+      build_number: build_number,
+      xcodeproj: "Projects/App/App.xcodeproj"
+    )
+
+    # App + 임베드되는 익스텐션(워치앱·위젯·컴플리케이션) 각각을 해당 match 프로파일로 수동 서명.
+    signing = {
+      "App"               => "app.nursemate.app",
+      "WatchApp"          => "app.nursemate.app.watchapp",
+      "TimerWidget"       => "app.nursemate.app.timerwidget",
+      "WatchComplication" => "app.nursemate.app.watchapp.presetcomplication",
+    }
+    signing.each do |target, bundle_id|
+      update_code_signing_settings(
+        use_automatic_signing: false,
+        path: "Projects/App/App.xcodeproj",
+        targets: [target],
+        code_sign_identity: "iPhone Distribution",
+        profile_name: "match AppStore #{bundle_id}"
+      )
+    end
+
+    build_app(
+      workspace: "Application.xcworkspace",
+      scheme: "App",
+      configuration: "Release",
+      export_method: "app-store",
+      output_directory: "build",
+      # beta_internal 과 동일한 수동 서명 정책(프레임워크 자동 서명 충돌 방지).
+      xcargs: "DEVELOPMENT_TEAM=#{ENV.fetch('DEVELOPMENT_TEAM', '')} CODE_SIGN_IDENTITY='Apple Distribution' CODE_SIGN_STYLE=Manual",
+      export_options: {
+        method: "app-store",
+        signingStyle: "manual",
+        provisioningProfiles: signing.each_with_object({}) { |(_, bundle_id), h| h[bundle_id] = "match AppStore #{bundle_id}" }
+      }
+    )
+
+    upload_dsyms_to_crashlytics
+
+    # 외부 테스터 그룹에 배포. 내부와 달리 distribute_external·groups·changelog 가 필수이고,
+    # 빌드 처리 완료를 기다려야 한다(skip_waiting=false). 첫 외부 빌드는 애플 Beta App Review 통과 후 노출.
+    # groups 는 App Store Connect 에 생성한 외부 그룹명과 정확히 일치해야 한다.
+    upload_to_testflight(
+      api_key: app_store_connect_api_key(
+        key_id: ENV["APP_STORE_CONNECT_API_KEY_ID"],
+        issuer_id: ENV["APP_STORE_CONNECT_API_KEY_ISSUER_ID"],
+        key_filepath: API_KEY_RAW_PATH,
+        in_house: false
+      ),
+      distribute_external: true,
+      groups: ["Nurse"],   # App Store Connect 외부 그룹명과 대소문자까지 정확히 일치해야 함
+      # 베타 앱 설명·피드백 이메일·심사 연락처는 App Store Connect(TestFlight 테스트 정보)를 단일 소스로 둔다.
+      # (한 번 설정하면 유지됨. 레인에서 beta_app_description을 넣으면 로케일 불일치로 심사 제출이
+      #  "Beta App Description is missing"로 반려될 수 있어 제외 — NM-217.)
+      changelog: beta_changelog,
+      skip_waiting_for_build_processing: false
     )
   end
 
@@ -116,13 +272,22 @@ platform :ios do
       xcodeproj: "Projects/App/App.xcodeproj"
     )
 
-    update_code_signing_settings(
-      use_automatic_signing: false,
-      path: "Projects/App/App.xcodeproj",
-      targets: ["App"],
-      code_sign_identity: "iPhone Distribution",
-      profile_name: "match AppStore app.nursemate.app"
-    )
+    # App + 임베드되는 익스텐션(워치앱·위젯·컴플리케이션) 각각을 해당 match 프로파일로 수동 서명.
+    signing = {
+      "App"               => "app.nursemate.app",
+      "WatchApp"          => "app.nursemate.app.watchapp",
+      "TimerWidget"       => "app.nursemate.app.timerwidget",
+      "WatchComplication" => "app.nursemate.app.watchapp.presetcomplication",
+    }
+    signing.each do |target, bundle_id|
+      update_code_signing_settings(
+        use_automatic_signing: false,
+        path: "Projects/App/App.xcodeproj",
+        targets: [target],
+        code_sign_identity: "iPhone Distribution",
+        profile_name: "match AppStore #{bundle_id}"
+      )
+    end
 
     build_app(
       workspace: "Application.xcworkspace",
@@ -130,15 +295,19 @@ platform :ios do
       configuration: "Release",
       export_method: "app-store",
       output_directory: "build",
-      xcargs: "DEVELOPMENT_TEAM=#{ENV.fetch('DEVELOPMENT_TEAM', '')}",
+      # 프레임워크 타깃(TimerDomain 등)이 아카이브 시 개발 인증서를 찾다 실패하는 문제 방지.
+      # 아카이브 전체를 수동 서명(Manual) + 배포 인증서로 통일 — 프레임워크는 프로파일 없이
+      # 인증서만으로 서명되고, 앱·익스텐션은 export_options 의 프로파일을 그대로 사용한다.
+      # (Manual 없이 identity 만 강제하면 자동 서명 프레임워크와 "conflicting settings" 충돌)
+      xcargs: "DEVELOPMENT_TEAM=#{ENV.fetch('DEVELOPMENT_TEAM', '')} CODE_SIGN_IDENTITY='Apple Distribution' CODE_SIGN_STYLE=Manual",
       export_options: {
         method: "app-store",
         signingStyle: "manual",
-        provisioningProfiles: {
-          "app.nursemate.app" => "match AppStore app.nursemate.app"
-        }
+        provisioningProfiles: signing.each_with_object({}) { |(_, bundle_id), h| h[bundle_id] = "match AppStore #{bundle_id}" }
       }
     )
+
+    upload_dsyms_to_crashlytics
 
     upload_to_testflight(
       api_key: app_store_connect_api_key(
@@ -148,6 +317,17 @@ platform :ios do
         in_house: false
       ),
       skip_waiting_for_build_processing: false
+    )
+  end
+
+  desc "Regenerate App Store signing profiles for all targets (match --force)"
+  desc "타깃·capability 추가 후 수동 트리거로 실행. certificates repo에 재발급 프로파일을 커밋한다."
+  lane :sync_signing do
+    match(
+      type: "appstore",
+      api_key: api_key,
+      force: true,      # 유효하더라도 프로파일 재발급(capability 반영 + 신규 번들 ID)
+      readonly: false   # certificates repo 에 쓰기(재발급본 커밋)
     )
   end
 end

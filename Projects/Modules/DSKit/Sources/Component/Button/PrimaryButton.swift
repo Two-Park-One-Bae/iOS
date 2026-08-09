@@ -21,6 +21,19 @@ public final class PrimaryButton: BaseButton {
         config.attributedTitle = self.title
 
         configuration = config
+
+        // 비활성 상태: Neutral200 배경 + textTertiary 텍스트
+        configurationUpdateHandler = { button in
+            guard var updated = button.configuration else { return }
+            if button.state.contains(.disabled) {
+                updated.baseBackgroundColor = DSColor.Neutral._200
+                updated.baseForegroundColor = DSColor.textTertiary
+            } else {
+                updated.baseBackgroundColor = DSColor.Primary._500
+                updated.baseForegroundColor = .white
+            }
+            button.configuration = updated
+        }
     }
 }
 

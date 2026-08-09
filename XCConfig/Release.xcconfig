@@ -3,4 +3,6 @@
 CODE_SIGN_STYLE = Automatic
 ENABLE_USER_SCRIPT_SANDBOXING = NO
 SWIFT_EMIT_LOC_STRINGS = YES
-BASE_URL = https:$()/your-prod-api.com
+BASE_URL = $(BASE_URL_RELEASE)
+// 외부 테스터·프로덕션은 Firebase Analytics 자동수집 ON (NM-364). 내부 TestFlight는 beta_internal 레인이 NO로 덮어씀.
+FIREBASE_ANALYTICS_ENABLED = YES

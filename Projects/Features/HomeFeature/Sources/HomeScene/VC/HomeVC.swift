@@ -8,25 +8,51 @@ import Domain
 public final class HomeVC: UIViewController {
 
     // MARK: - Properties
+
     private let viewModel: HomeViewModel
     private var cancelBag = Set<AnyCancellable>()
-    weak var coordinator: HomeCoordinator?
 
-    private let itemSelectedSubject = PassthroughSubject<Int, Never>()
-    private var items: [HomeEntity] = []
+    private let viewWillAppearSubject = PassthroughSubject<Void, Never>()
+    private let drugIdentifySubject = PassthroughSubject<Void, Never>()
+    private let treatmentTimerSubject = PassthroughSubject<Void, Never>()
 
     // MARK: - UI
-    private lazy var tableView = UITableView(frame: .zero, style: .plain).then {
-        $0.register(HomeCell.self, forCellReuseIdentifier: HomeCell.identifier)
-        $0.separatorStyle = .none
-        $0.backgroundColor = DSColor.bgApp
-        $0.dataSource = self
-        $0.delegate = self
+
+    private let scrollView = UIScrollView().then {
+        $0.showsVerticalScrollIndicator = false
     }
 
-    private let loadingIndicator = UIActivityIndicatorView(style: .medium)
+    private let contentStack = UIStackView().then {
+        $0.axis = .vertical
+        $0.spacing = 20
+    }
+
+    private let greetingLabel = UILabel().then {
+        $0.text = "안녕하세요,"
+        $0.font = DSKitFontFamily.Pretendard.bold.font(size: 28)
+        $0.textColor = DSColor.textSecondary
+    }
+
+    private let roleLabel = UILabel().then {
+        $0.text = "간호사님"
+        $0.font = DSKitFontFamily.Pretendard.bold.font(size: 28)
+        $0.textColor = DSColor.textPrimary
+    }
+
+    private let dateLabel = UILabel().then {
+        $0.font = DSKitFontFamily.Pretendard.regular.font(size: 13)
+        $0.textColor = DSColor.textTertiary
+        $0.text = HomeVC.todayText()
+    }
+
+    private lazy var greetingStack = UIStackView(arrangedSubviews: [greetingLabel, roleLabel, dateLabel]).then {
+        $0.axis = .vertical
+        $0.spacing = 2
+        $0.setCustomSpacing(8, after: roleLabel)
+    }
 
     // MARK: - Init
+
     public init(viewModel: HomeViewModel) {
         self.viewModel = viewModel
         super.init(nibName: nil, bundle: nil)
@@ -35,78 +61,143 @@ public final class HomeVC: UIViewController {
     required init?(coder: NSCoder) { fatalError() }
 
     // MARK: - Lifecycle
+
     public override func viewDidLoad() {
         super.viewDidLoad()
+        navigationController?.setNavigationBarHidden(true, animated: false)
         setUI()
         setLayout()
+        buildContent()
         bind()
     }
 
-    // MARK: - Binding
-    private func bind() {
-        let input = HomeViewModel.Input(
-            viewDidLoad: Just(()).eraseToAnyPublisher(),
-            itemSelected: itemSelectedSubject.eraseToAnyPublisher()
-        )
-        let output = viewModel.transform(input: input)
-
-        output.items
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] items in
-                self?.items = items
-                self?.tableView.reloadData()
-            }
-            .store(in: &cancelBag)
-
-        output.isLoading
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] isLoading in
-                isLoading ? self?.loadingIndicator.startAnimating()
-                          : self?.loadingIndicator.stopAnimating()
-            }
-            .store(in: &cancelBag)
+    public override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        // 식별을 마치고 돌아왔을 때 남은 횟수를 갱신한다.
+        viewWillAppearSubject.send()
     }
 
     // MARK: - Setup
+
     private func setUI() {
         view.backgroundColor = DSColor.bgApp
-        navigationItem.title = "홈"
     }
 
     private func setLayout() {
-        view.addSubview(tableView)
-        view.addSubview(loadingIndicator)
+        view.addSubview(scrollView)
+        scrollView.addSubview(contentStack)
 
-        tableView.snp.makeConstraints {
-            $0.edges.equalTo(view.safeAreaLayoutGuide)
+        scrollView.snp.makeConstraints {
+            $0.top.equalTo(view.safeAreaLayoutGuide)
+            $0.leading.trailing.bottom.equalToSuperview()
         }
-        loadingIndicator.snp.makeConstraints {
-            $0.center.equalToSuperview()
+
+        contentStack.snp.makeConstraints {
+            $0.edges.equalToSuperview().inset(UIEdgeInsets(top: 20, left: 20, bottom: 20, right: 20))
+            $0.width.equalToSuperview().offset(-40)
         }
     }
-}
 
-// MARK: - UITableViewDataSource
-extension HomeVC: UITableViewDataSource {
-    public func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        items.count
+    // MARK: - Content
+
+    private func buildContent() {
+        contentStack.addArrangedSubview(greetingStack)
+        contentStack.addArrangedSubview(makeChipsRow())
+        contentStack.addArrangedSubview(makeCardsSection())
     }
 
-    public func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        guard let cell = tableView.dequeueReusableCell(
-            withIdentifier: HomeCell.identifier,
-            for: indexPath
-        ) as? HomeCell else { return UITableViewCell() }
-        cell.configure(with: items[indexPath.row])
-        return cell
+    // 오늘 날짜 — "M월 d일 EEEE"(예: 7월 23일 수요일).
+    private static func todayText() -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ko_KR")
+        formatter.dateFormat = "M월 d일 EEEE"
+        return formatter.string(from: Date())
     }
-}
 
-// MARK: - UITableViewDelegate
-extension HomeVC: UITableViewDelegate {
-    public func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        tableView.deselectRow(at: indexPath, animated: true)
-        itemSelectedSubject.send(indexPath.row)
-        coordinator?.pushDetail(id: items[indexPath.row].id)
+    // 활성 타이머 수를 갱신해야 해서 프로퍼티로 유지한다.
+    private let timerChip = DSChip(text: "활성 타이머 0", icon: .timer, style: .secondary)
+
+    private func makeChipsRow() -> UIView {
+        let spacer = UIView()
+
+        let stack = UIStackView(arrangedSubviews: [timerChip, spacer]).then {
+            $0.axis = .horizontal
+            $0.spacing = 8
+        }
+        return stack
+    }
+
+    // 남은 횟수를 갱신해야 해서 프로퍼티로 유지한다.
+    private let drugCard = DSListRow(
+        icon: .pill,
+        title: "알약 식별",
+        subtitle: "환자 지참약을 한 번에 식별하고 정보를 확인하세요."
+    )
+
+    private func makeCardsSection() -> UIView {
+        drugCard.setIconBackground(DSColor.Primary._50)
+        drugCard.setIconTint(DSColor.Primary._500)
+        drugCard.onTap { [weak self] in self?.drugIdentifySubject.send() }
+
+        let timerCard = DSListRow(
+            icon: .timer,
+            title: "처치 타이머",
+            subtitle: "투약 및 처치 시간을 체계적으로 관리하세요."
+        )
+        timerCard.setIconBackground(DSColor.Secondary._50)
+        timerCard.setIconTint(DSColor.Secondary._500)
+        timerCard.onTap { [weak self] in self?.treatmentTimerSubject.send() }
+
+        let stack = UIStackView(arrangedSubviews: [drugCard, timerCard]).then {
+            $0.axis = .vertical
+            $0.spacing = 12
+        }
+        return stack
+    }
+
+    // MARK: - Bind
+
+    private func bind() {
+        let input = HomeViewModel.Input(
+            viewDidLoad: Just(()).eraseToAnyPublisher(),
+            viewWillAppear: viewWillAppearSubject.eraseToAnyPublisher(),
+            drugIdentifyTapped: drugIdentifySubject.eraseToAnyPublisher(),
+            treatmentTimerTapped: treatmentTimerSubject.eraseToAnyPublisher()
+        )
+        let output = viewModel.transform(input: input)
+
+        // 남은 횟수 — 0회일 때만 경고색, 그 외엔 기본색. 값을 모르면 표시하지 않는다.
+        output.usage
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] usage in
+                guard let usage else {
+                    self?.drugCard.setCaption(nil)
+                    return
+                }
+                self?.drugCard.setCaption(
+                    usage.remainingText,
+                    color: usage.isExhausted ? DSColor.Error._600 : DSColor.Primary._600
+                )
+            }
+            .store(in: &cancelBag)
+
+        output.limitExceeded
+            .receive(on: DispatchQueue.main)
+            .sink { usage in
+                // 식별 플로우의 한도 팝업과 같은 표현을 쓴다 — dim이 탭바까지 덮는다(디자인 기준).
+                DSAlertCardView.presentOverWindow(
+                    title: PillLimitAlertText.title,
+                    message: PillLimitAlertText.message(resetAt: usage?.resetAt)
+                )
+            }
+            .store(in: &cancelBag)
+
+        // 활성 타이머 수 — 0이어도 항상 표시한다(칩이 사라지면 홈이 허전해 보임).
+        output.activeTimerCount
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] count in
+                self?.timerChip.setText("활성 타이머 \(count)")
+            }
+            .store(in: &cancelBag)
     }
 }

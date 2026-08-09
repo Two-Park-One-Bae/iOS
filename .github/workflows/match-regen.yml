@@ -1,0 +1,48 @@
+name: Regenerate Signing (match --force)
+
+# 타깃·capability 추가 후 수동으로 실행해 App Store 서명 프로파일을 재발급한다.
+# 배포(cd-beta)는 readonly 로 두고, 재발급이 필요할 때만 Actions 탭에서 버튼 클릭.
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: match-regen
+  cancel-in-progress: false
+
+jobs:
+  regenerate:
+    name: match appstore --force
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler: "latest"
+          bundler-cache: true
+
+      - name: Write API Key
+        env:
+          APP_STORE_CONNECT_API_KEY_CONTENT: ${{ secrets.APP_STORE_CONNECT_API_KEY_CONTENT }}
+          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+        run: |
+          echo "$APP_STORE_CONNECT_API_KEY_CONTENT" | base64 --decode > /tmp/AuthKey_raw.p8
+          OPENSSL=$(brew --prefix openssl@3)/bin/openssl
+          $OPENSSL pkey -traditional -in /tmp/AuthKey_raw.p8 -out /tmp/AuthKey.p8
+          mkdir -p ~/.appstoreconnect/private_keys
+          cp /tmp/AuthKey_raw.p8 ~/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_API_KEY_ID}.p8
+
+      - name: Regenerate signing profiles
+        env:
+          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_CONTENT: ${{ secrets.APP_STORE_CONNECT_API_KEY_CONTENT }}
+          DEVELOPMENT_TEAM: ${{ secrets.DEVELOPMENT_TEAM }}
+          MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
+        run: bundle exec fastlane sync_signing

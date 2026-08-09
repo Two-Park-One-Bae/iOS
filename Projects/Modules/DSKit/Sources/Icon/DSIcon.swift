@@ -91,6 +91,7 @@ public enum DSIcon: String {
 
     case file = "Icons/ic_file"
     case fileText = "Icons/ic_file_text"
+    case fileX = "Icons/ic_file_x"
     case folder = "Icons/ic_folder"
     case folderOpen = "Icons/ic_folder_open"
     case paperclip = "Icons/ic_paperclip"
@@ -131,6 +132,34 @@ public enum DSIcon: String {
     case sun = "Icons/ic_sun"
     case moon = "Icons/ic_moon"
     case app = "Icons/ic_app"
+
+    // MARK: - System & State
+
+    case signal = "Icons/ic_signal"
+    case battery = "Icons/ic_battery"
+    case wifiOff = "Icons/ic_wifi_off"
+    case cameraOff = "Icons/ic_camera_off"
+    case searchX = "Icons/ic_search_x"
+    case zap = "Icons/ic_zap"
+    case circle = "Icons/ic_circle"
+
+    // MARK: - App & Domain
+
+    case pill = "Icons/ic_pill"
+    case syringe = "Icons/ic_syringe"
+    case timer = "Icons/ic_timer"
+    case clipboardList = "Icons/ic_clipboard_list"
+    case history = "Icons/ic_history"
+    case shapes = "Icons/ic_shapes"
+    case bellRing = "Icons/ic_bell_ring"
+    case stickyNote = "Icons/ic_sticky_note"
+    case square = "Icons/ic_square"
+    case heartPulse = "Icons/ic_heart_pulse"
+    case batteryFull = "Icons/ic_battery_full"
+    case flashlight = "Icons/ic_flashlight"
+    case vibrate = "Icons/ic_vibrate"
+    case fileSearch = "Icons/ic_file_search"
+    case circlePlay = "Icons/ic_circle_play"
 
     // MARK: - UIImage
 

@@ -10,8 +10,9 @@ public extension TargetDependency {
         public static let AmplitudeSwift = TargetDependency.external(name: "AmplitudeSwift")
         public static let FirebaseAnalytics = TargetDependency.external(name: "FirebaseAnalytics")
         public static let FirebaseCrashlytics = TargetDependency.external(name: "FirebaseCrashlytics")
+        public static let FirebaseRemoteConfig = TargetDependency.external(name: "FirebaseRemoteConfig")
+        public static let FirebaseAppCheck = TargetDependency.external(name: "FirebaseAppCheck")
         public static let Lottie = TargetDependency.external(name: "Lottie")
         public static let Then = TargetDependency.external(name: "Then")
-        public static let Clarity = TargetDependency.external(name: "Clarity")
     }
 }

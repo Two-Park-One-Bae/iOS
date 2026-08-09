@@ -1,19 +1,21 @@
 import UIKit
 import BaseFeatureDependency
 import Core
-import Domain
 
 public final class HomeCoordinator: BaseCoordinator {
-    @Injected var homeUseCase: HomeUseCaseProtocol
 
     public override func start() {
-        let viewModel = HomeViewModel(useCase: homeUseCase)
-        let homeVC = HomeVC(viewModel: viewModel)
-        homeVC.coordinator = self
-        navigationController.pushViewController(homeVC, animated: false)
-    }
+        let viewModel = HomeViewModel()
 
-    func pushDetail(id: Int) {
-        // TODO: Navigate to detail screen
+        // 홈 버튼 → 홈 탭 내 push 가 아니라 탭바 전환(약물 식별=알약 탭 / 처치 타이머=타이머 탭).
+        viewModel.onDrugIdentifyTapped = {
+            NotificationCenter.default.post(name: .selectPillTab, object: nil)
+        }
+        viewModel.onTreatmentTimerTapped = {
+            NotificationCenter.default.post(name: .selectTimerTab, object: nil)
+        }
+
+        let homeVC = HomeVC(viewModel: viewModel)
+        navigationController.pushViewController(homeVC, animated: false)
     }
 }

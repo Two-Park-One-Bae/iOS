@@ -3,4 +3,6 @@
 CODE_SIGN_STYLE = Automatic
 ENABLE_USER_SCRIPT_SANDBOXING = NO
 SWIFT_EMIT_LOC_STRINGS = YES
-BASE_URL = https:$()/your-dev-api.com
+BASE_URL = $(BASE_URL_DEBUG)
+// 내부(Xcode 디버그)는 Firebase Analytics 자동수집 OFF (NM-364)
+FIREBASE_ANALYTICS_ENABLED = NO
