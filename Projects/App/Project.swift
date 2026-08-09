@@ -80,9 +80,10 @@ let project = Project(
                 "WKCompanionAppBundleIdentifier": "\(Environment.bundlePrefix).app",
                 "CFBundleDisplayName": "NurseMate",
                 "CFBundleShortVersionString": "1.0.2",
-                // 폰 < iOS 26.1(AlarmKit 없음)일 때, 워치가 만료 시각에 WKExtendedRuntimeSession(alarm)을
-                // 예약해 자체적으로 확실히 울리기 위한 백그라운드 모드. 26.1+ 폰이면 워치는 세션을 안 켠다.
-                "WKBackgroundModes": ["alarm"],
+                // WKBackgroundModes: alarm 은 선언하지 않는다.
+                // 26.1 미만 폰을 위해 워치가 WKExtendedRuntimeSession 을 예약하던 폴백이 있었으나,
+                // 타이머가 AlarmKit 전용이 되면서(NM-381) 그 경로가 사라졌다. 26.1+ 는 AlarmKit 이
+                // 워치까지 울린다 — 워치가 자체 세션을 켤 일이 없다.
                 // 컴플리케이션 딥링크(nursemate://presets) 를 앱이 onOpenURL 로 받기 위한 스킴 (NM-303)
                 "CFBundleURLTypes": [[
                     "CFBundleURLSchemes": ["nursemate"],

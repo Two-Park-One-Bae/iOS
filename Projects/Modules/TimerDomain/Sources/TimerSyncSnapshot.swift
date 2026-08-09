@@ -14,10 +14,10 @@ public struct TimerSyncSnapshot: Codable, Equatable, Sendable {
     public let snapshotAt: Date
     public let timers: [TreatmentTimerModel]
     public let presets: [TimerPresetModel]
-    /// 폰이 AlarmKit(iOS 26.1+)으로 알람을 처리하는지.
-    /// true면 AlarmKit이 워치까지 울리므로 워치는 자체 알람(WKExtendedRuntimeSession)을 안 켠다(중복 방지).
-    /// nil/false(구형 폰)면 워치가 자기 세션 알람을 켜서 확실히 울린다.
-    /// (옵셔널 — 구버전 스냅샷과 하위호환)
+    /// 폰이 AlarmKit(iOS 26.1+)을 쓸 수 있는지 = 타이머 기능을 지원하는지 (NM-381·NM-382).
+    /// true면 AlarmKit이 워치까지 알람을 울린다 — 워치는 자체 알람을 켜지 않는다(중복 방지).
+    /// false면 폰이 26.1 미만이라 타이머 자체를 쓸 수 없다 — 워치도 타이머 UI 대신 안내를 띄운다.
+    /// nil(구버전 스냅샷·최초 동기화 전)은 미상이므로 막지 않고 폰에 위임한다.
     public let alarmKitActive: Bool?
     /// 폰(앱)의 알람 권한 승인 여부 (NM-360). false면 폰이 알람을 못 울리므로 워치는
     /// 프리셋 시작을 막고 "앱에서 알림 권한을 켜세요"를 안내한다 — 권한 없이 시작해
