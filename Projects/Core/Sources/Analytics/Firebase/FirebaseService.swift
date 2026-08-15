@@ -13,8 +13,11 @@ public enum FirebaseService {
         Analytics.setAnalyticsCollectionEnabled(enabled)
     }
 
+    /// Crashlytics·Analytics 양쪽에 기기 식별자(Keychain UUID)를 붙인다.
+    /// GA4 기본값인 app-instance ID 는 재설치 시 새로 발급돼 같은 사람이 둘로 잡힌다.
     public static func setUserID(_ userID: String) {
         Crashlytics.crashlytics().setUserID(userID)
+        Analytics.setUserID(userID)
     }
 
     /// GA4 커스텀 이벤트 전송. 내부 빌드는 setAnalyticsCollectionEnabled(false)라 실제 전송이 no-op이 된다.
