@@ -32,6 +32,8 @@ public final class DrugIdentificationVC: UIViewController {
     private let photoSize: CGFloat = 300
 
     private var rowViews: [Int: PillResultRowView] = [:]
+    /// 사진 위 bbox + 번호 태그 — 삭제 시 같이 걷어내려고 index로 들고 있다.
+    private var boxViews: [Int: [UIView]] = [:]
     private var identifiedIndices = Set<Int>()
     private var deletedIndices = Set<Int>()
     private var selectedCandidates: [Int: PillCandidateModel] = [:]
@@ -256,6 +258,8 @@ public final class DrugIdentificationVC: UIViewController {
     private func deletePill(_ pill: IdentifiedPill) {
         rowViews[pill.index]?.removeFromSuperview()
         rowViews[pill.index] = nil
+        boxViews[pill.index]?.forEach { $0.removeFromSuperview() }
+        boxViews[pill.index] = nil
         deletedIndices.insert(pill.index)
         identifiedIndices.remove(pill.index)
         updateProgress()
@@ -390,6 +394,8 @@ public final class DrugIdentificationVC: UIViewController {
                 tag.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: tagX),
                 tag.topAnchor.constraint(equalTo: container.topAnchor, constant: tagY)
             ])
+
+            boxViews[pill.index] = [boxView, tag]
         }
     }
 
