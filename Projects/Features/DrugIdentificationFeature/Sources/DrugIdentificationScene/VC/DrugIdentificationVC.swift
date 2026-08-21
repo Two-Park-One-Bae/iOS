@@ -32,6 +32,8 @@ public final class DrugIdentificationVC: UIViewController {
     private let photoSize: CGFloat = 300
 
     private var rowViews: [Int: PillResultRowView] = [:]
+    /// 사진 위 bbox + 번호 태그 — 삭제 시 같이 걷어내려고 index로 들고 있다.
+    private var boxViews: [Int: [UIView]] = [:]
     private var identifiedIndices = Set<Int>()
     private var deletedIndices = Set<Int>()
     private var selectedCandidates: [Int: PillCandidateModel] = [:]
@@ -55,6 +57,11 @@ public final class DrugIdentificationVC: UIViewController {
     }
 
     private let photoCard = PhotoCardView()
+
+    private let listTitle = UILabel().then {
+        $0.font = DSKitFontFamily.Pretendard.bold.font(size: 15)
+        $0.textColor = DSColor.textPrimary
+    }
 
     private let listStack = UIStackView().then {
         $0.axis = .vertical
@@ -170,11 +177,7 @@ public final class DrugIdentificationVC: UIViewController {
         addBoundingBoxes()
 
         // Result List
-        let listTitle = UILabel().then {
-            $0.text = "알약 \(pills.count)개를 찾았어요"
-            $0.font = DSKitFontFamily.Pretendard.bold.font(size: 15)
-            $0.textColor = DSColor.textPrimary
-        }
+        updateListTitle()
         listStack.addArrangedSubview(listTitle)
 
         for pill in pills {
@@ -256,8 +259,11 @@ public final class DrugIdentificationVC: UIViewController {
     private func deletePill(_ pill: IdentifiedPill) {
         rowViews[pill.index]?.removeFromSuperview()
         rowViews[pill.index] = nil
+        boxViews[pill.index]?.forEach { $0.removeFromSuperview() }
+        boxViews[pill.index] = nil
         deletedIndices.insert(pill.index)
         identifiedIndices.remove(pill.index)
+        updateListTitle()
         updateProgress()
     }
 
@@ -306,6 +312,7 @@ public final class DrugIdentificationVC: UIViewController {
             .filter { !deletedIndices.contains($0.index) }
             .compactMap { pill in selectedCandidates[pill.index].map { (pill, $0) } }
         let manual = manualPills
+            .filter { !deletedIndices.contains($0.index) }
             .compactMap { pill in selectedCandidates[pill.index].map { (pill, $0) } }
         return base + manual
     }
@@ -325,6 +332,16 @@ public final class DrugIdentificationVC: UIViewController {
             manualAddedCount: manual,
             elapsedSec: Int(Date().timeIntervalSince(appearedAt))
         )
+    }
+
+    /// 리스트 제목 — 검출된 알약 중 삭제하고 남은 수.
+    /// 수동 추가분은 '찾은' 게 아니라서 세지 않는다.
+    private func updateListTitle() {
+        // 수동 추가분도 같은 deletedIndices에 들어오므로 뺄셈이 아니라 실제로 남은 걸 센다.
+        let remaining = pills.filter { !deletedIndices.contains($0.index) }.count
+        listTitle.text = remaining > 0
+            ? "알약 \(remaining)개를 찾았어요"
+            : "찾은 알약을 모두 지웠어요"
     }
 
     private func updateProgress() {
@@ -390,6 +407,8 @@ public final class DrugIdentificationVC: UIViewController {
                 tag.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: tagX),
                 tag.topAnchor.constraint(equalTo: container.topAnchor, constant: tagY)
             ])
+
+            boxViews[pill.index] = [boxView, tag]
         }
     }
 

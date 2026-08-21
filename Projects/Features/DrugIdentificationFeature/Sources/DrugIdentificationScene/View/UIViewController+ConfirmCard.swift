@@ -3,6 +3,22 @@ import SnapKit
 import Then
 import DSKit
 
+/// 확인 카드 뒤에 까는 dim 배경.
+///
+/// 배경 탭 닫기를 제스처로 달면 카드 안 버튼(`UIControl`)의 터치까지 가로채
+/// 확인 액션이 삼켜진다. 그래서 hit-test 뷰가 자기 자신일 때 —
+/// 즉 카드 바깥 빈 배경을 탭했을 때만 닫는다.
+private final class ConfirmDimView: UIView {
+
+    var onBackgroundTap: (() -> Void)?
+
+    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+        super.touchesEnded(touches, with: event)
+        guard let touch = touches.first, touch.view === self else { return }
+        onBackgroundTap?()
+    }
+}
+
 extension UIViewController {
 
     /// 확인 카드를 dim 위에 가운데 정렬로 띄운다.
@@ -14,14 +30,13 @@ extension UIViewController {
         dismissOnBackgroundTap: Bool,
         confirmed: @escaping () -> Void
     ) {
-        let dim = UIView(frame: view.bounds).then {
+        let dim = ConfirmDimView(frame: view.bounds).then {
             $0.backgroundColor = DSColor.Neutral._900.withAlphaComponent(0.6)
             $0.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         }
 
         if dismissOnBackgroundTap {
-            let tap = UITapGestureRecognizer(target: dim, action: #selector(UIView.removeFromSuperview))
-            dim.addGestureRecognizer(tap)
+            dim.onBackgroundTap = { [weak dim] in dim?.removeFromSuperview() }
         }
 
         card.onCancel = { dim.removeFromSuperview() }
