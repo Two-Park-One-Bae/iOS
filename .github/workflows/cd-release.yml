@@ -72,13 +72,15 @@ jobs:
           # Project.swift 의 "Firebase 구성 선택" 스크립트가 FIREBASE_ENV 를 보고 번들로 복사한다.
           mkdir -p Projects/App/Firebase/Release Projects/App/Firebase/Debug
           echo "$GOOGLE_SERVICE_INFO_PLIST" | base64 --decode > Projects/App/Firebase/Release/GoogleService-Info.plist
-          if [ -n "$GOOGLE_SERVICE_INFO_PLIST_DEV" ]; then
-            echo "$GOOGLE_SERVICE_INFO_PLIST_DEV" | base64 --decode > Projects/App/Firebase/Debug/GoogleService-Info.plist
-          else
-            # dev 시크릿 미등록이면 Release 것으로 채워 빌드 실패를 막는다
-            # (FIREBASE_ENV=Release 인 동안은 어차피 쓰이지 않는다).
-            cp Projects/App/Firebase/Release/GoogleService-Info.plist Projects/App/Firebase/Debug/GoogleService-Info.plist
+          # Debug 구성(Xcode 디버그·beta_internal)은 dev Firebase 프로젝트를 쓴다.
+          # 시크릿이 없다고 Release(prod) plist 로 대신 채우면, 내부 빌드가 조용히 prod 로 붙어
+          # 운영 Analytics 를 오염시키고 BASE_URL(dev)과 어긋나 App Check 401 이 난다.
+          # 잘못된 프로젝트로 나가느니 여기서 멈춘다.
+          if [ -z "$GOOGLE_SERVICE_INFO_PLIST_DEV" ]; then
+            echo "::error::GOOGLE_SERVICE_INFO_PLIST_DEV 시크릿이 없습니다 — 내부 빌드가 prod Firebase 로 나갑니다."
+            exit 1
           fi
+          echo "$GOOGLE_SERVICE_INFO_PLIST_DEV" | base64 --decode > Projects/App/Firebase/Debug/GoogleService-Info.plist
 
       - name: Write API Key
         env:

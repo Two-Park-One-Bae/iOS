@@ -68,14 +68,15 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         AppCheckService.configure()
         FirebaseService.configure()
 
-        // 내부 빌드(개발자 테스트)는 Analytics SaaS(Amplitude·Firebase Analytics)에 잡히면 안 된다.
-        // → Amplitude는 초기화·전송 자체를 스킵.
-        //   Firebase Analytics는 Info.plist FIREBASE_ANALYTICS_COLLECTION_ENABLED(구성별)로 init 전부터 끈다(주 통제
-        //   — 런타임 disable만으론 first_open 등이 새는 게 확인됨, firebase-ios-sdk#5837).
-        //   아래 런타임 호출은 보강 — 값이 저장·우선되므로 상태를 isInternal에 맞춰 고정한다.
-        //   Crashlytics(크래시)·App Check·Remote Config는 내부에서도 유지(SaaS 지표와 무관).
+        // Firebase Analytics — dev/prod 프로젝트가 분리돼 있어 내부 빌드도 수집한다(dev 속성).
+        //   주 통제는 Info.plist FIREBASE_ANALYTICS_COLLECTION_ENABLED(구성별)로 init 전부터 적용된다
+        //   — 런타임 disable만으론 first_open 등이 새는 게 확인됨(firebase-ios-sdk#5837).
+        //   아래 호출은 보강 — SDK가 런타임 값을 저장·우선하므로 구성값으로 다시 박는다.
+        FirebaseService.setAnalyticsCollectionEnabled(AppEnvironment.isAnalyticsCollectionEnabled)
+
+        // Amplitude·S3 원본 업로드는 환경이 갈려 있지 않아(단일 프로젝트·단일 버킷) 내부 빌드에서 막는다.
+        // Crashlytics(크래시)·App Check·Remote Config는 내부에서도 유지 — dev 프로젝트로 분리돼 있다.
         let isInternal = AppEnvironment.isInternal
-        FirebaseService.setAnalyticsCollectionEnabled(!isInternal)
 
         // Crashlytics userID(= 기기 식별자)는 내부에서도 붙인다(크래시 리포트 식별).
         let deviceID = DeviceIdentifier.current
@@ -84,7 +85,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         }
 
         if !isInternal {
-            // 외부 TestFlight·프로덕션에서만 SaaS 분석 수집.
+            // 외부 TestFlight·프로덕션에서만 Amplitude 수집.
             // Amplitude·Crashlytics를 같은 device_id로 묶어 서버 로그와 교차 대조 가능하게 한다.
             if let deviceID {
                 AmplitudeService.setUserID(deviceID)
