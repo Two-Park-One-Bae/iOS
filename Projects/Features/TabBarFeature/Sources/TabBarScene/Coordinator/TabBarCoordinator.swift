@@ -17,18 +17,26 @@ public final class TabBarCoordinator: CoordinatorProtocol {
     private let drugBuilder: DrugIdentificationFeatureBuildable
     private var tabBarVC: TabBarVC?
 
+    /// 설정 탭의 계정 행 처리 (NM-410). 탭바는 인증을 모르고 그대로 전달만 한다.
+    private let onLogout: () -> Void
+    private let onDeleteAccount: () -> Void
+
     // MARK: - Init
 
     public init(
         navigationController: UINavigationController,
         homeBuilder: HomeFeatureBuildable,
         timerBuilder: TimerFeatureBuildable,
-        drugBuilder: DrugIdentificationFeatureBuildable
+        drugBuilder: DrugIdentificationFeatureBuildable,
+        onLogout: @escaping () -> Void,
+        onDeleteAccount: @escaping () -> Void
     ) {
         self.navigationController = navigationController
         self.homeBuilder = homeBuilder
         self.timerBuilder = timerBuilder
         self.drugBuilder = drugBuilder
+        self.onLogout = onLogout
+        self.onDeleteAccount = onDeleteAccount
     }
 
     // MARK: - Start
@@ -86,7 +94,11 @@ public final class TabBarCoordinator: CoordinatorProtocol {
         addChild(timerCoordinator)
         timerNav.tabBarItem = UITabBarItem(title: "타이머", image: DSIcon.timer.uiImage, tag: 2)
 
-        let settingsNav = UINavigationController(rootViewController: timerBuilder.makeSettingsViewController())
+        let settingsVC = timerBuilder.makeSettingsViewController(
+            onLogout: onLogout,
+            onDeleteAccount: onDeleteAccount
+        )
+        let settingsNav = UINavigationController(rootViewController: settingsVC)
         settingsNav.setNavigationBarHidden(true, animated: false)
         settingsNav.tabBarItem = UITabBarItem(title: "설정", image: DSIcon.settings.uiImage, tag: 3)
 
