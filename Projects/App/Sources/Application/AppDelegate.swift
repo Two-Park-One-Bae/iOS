@@ -1,5 +1,6 @@
 import UIKit
 import Core
+import Data
 import TimerFeature
 
 
@@ -67,6 +68,10 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         // App Check 팩토리는 반드시 FirebaseApp.configure() 이전에 설정해야 적용된다.
         AppCheckService.configure()
         FirebaseService.configure()
+
+        // 소셜 로그인 SDK 초기화 (NM-410). Firebase 설정 뒤에 온다 —
+        // 구글은 GoogleService-Info.plist 의 CLIENT_ID 를 읽고, 카카오는 앱 키가 필요하다.
+        SocialLoginSDK.configure()
 
         // Firebase Analytics — dev/prod 프로젝트가 분리돼 있어 내부 빌드도 수집한다(dev 속성).
         //   주 통제는 Info.plist FIREBASE_ANALYTICS_COLLECTION_ENABLED(구성별)로 init 전부터 적용된다

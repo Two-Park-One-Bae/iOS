@@ -4,6 +4,8 @@ CODE_SIGN_STYLE = Automatic
 ENABLE_USER_SCRIPT_SANDBOXING = NO
 SWIFT_EMIT_LOC_STRINGS = YES
 BASE_URL = $(BASE_URL_RELEASE)
+// 구글 로그인 복귀 URL 스킴 (NM-410). dev/prod Firebase 프로젝트마다 값이 다르다.
+GOOGLE_REVERSED_CLIENT_ID = $(GOOGLE_REVERSED_CLIENT_ID_RELEASE)
 // 외부 테스터·프로덕션은 Firebase Analytics 자동수집 ON (NM-364). 내부 TestFlight는 beta_internal 레인이 NO로 덮어씀.
 FIREBASE_ANALYTICS_ENABLED = YES
 
