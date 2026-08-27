@@ -54,6 +54,26 @@ let project = Project(
                 "com.apple.developer.usernotifications.time-sensitive": .boolean(true),
                 "com.apple.security.application-groups": .array([.string("group.app.nursemate.timer")])
             ]),
+            // GoogleService-Info.plist 는 Resources 가 아니라 Firebase/<구성>/ 에 둔다.
+            // 두 벌을 다 번들에 넣으면 Firebase 가 루트에서 못 찾으므로, 빌드 후 하나만 복사한다.
+            // (Crashlytics 가 파일명을 하드코딩해 이름 분리 방식은 쓸 수 없다 — 디렉터리로 나눈다)
+            scripts: [
+                .post(
+                    script: """
+                    set -euo pipefail
+                    SRC="${SRCROOT}/Firebase/${FIREBASE_ENV}/GoogleService-Info.plist"
+                    DST="${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/GoogleService-Info.plist"
+                    if [ ! -f "$SRC" ]; then
+                      echo "error: GoogleService-Info.plist 가 없다 — $SRC"
+                      exit 1
+                    fi
+                    cp "$SRC" "$DST"
+                    echo "Firebase 구성: ${FIREBASE_ENV}"
+                    """,
+                    name: "Firebase 구성 선택",
+                    basedOnDependencyAnalysis: false
+                )
+            ],
             dependencies: [
                 Dep.Features.Home.Feature,
                 Dep.Features.TabBar.Feature,

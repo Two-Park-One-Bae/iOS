@@ -6,3 +6,6 @@ SWIFT_EMIT_LOC_STRINGS = YES
 BASE_URL = $(BASE_URL_DEBUG)
 // 내부(Xcode 디버그)는 Firebase Analytics 자동수집 OFF (NM-364)
 FIREBASE_ANALYTICS_ENABLED = NO
+
+// 번들에 넣을 GoogleService-Info.plist 를 고른다 (Firebase/<값>/).  // dev Firebase 프로젝트 생성 후 Debug 로 전환
+FIREBASE_ENV = Release

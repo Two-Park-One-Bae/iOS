@@ -66,4 +66,4 @@ glm
 
 # Secrets
 XCConfig/Secrets.xcconfig
-Projects/App/Resources/GoogleService-Info.plist
+Projects/App/Firebase/*/GoogleService-Info.plist
