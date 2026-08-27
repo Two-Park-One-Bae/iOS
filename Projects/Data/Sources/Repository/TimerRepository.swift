@@ -16,7 +16,7 @@ import WidgetKit
 public final class TimerRepository: TimerRepositoryProtocol {
 
     // App Group — AlarmKit App Intent(크로스프로세스)·위젯이 같은 UserDefaults를 공유.
-    public static let appGroupSuiteName: String? = "group.app.nursemate.timer"
+    public static let appGroupSuiteName: String? = "group.app.nursemate.care.timer"
 
     private enum Keys {
         static let timers = "care.timer.timers"

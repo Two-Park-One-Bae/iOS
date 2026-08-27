@@ -17,7 +17,7 @@ import Security
 /// 카운트·리셋·판정은 전부 서버가 소유하고, 앱은 "누구인지"만 담당한다.
 public enum DeviceIdentifier {
 
-    private static let service = "app.nursemate.deviceid"
+    private static let service = "app.nursemate.care.deviceid"
     private static let account = "device_id"
 
     private static let lock = NSLock()

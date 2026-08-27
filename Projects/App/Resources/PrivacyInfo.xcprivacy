@@ -57,7 +57,7 @@
     <!-- 앱 자체 코드가 호출하는 필수 사유(Required Reason) API. SDK는 각자 매니페스트로 선언. -->
     <key>NSPrivacyAccessedAPITypes</key>
     <array>
-        <!-- UserDefaults: 앱·앱그룹(group.app.nursemate.timer) 공유 저장. 위젯·워치·AlarmKit 인텐트가 같은 suite 공유. -->
+        <!-- UserDefaults: 앱·앱그룹(group.app.nursemate.care.timer) 공유 저장. 위젯·워치·AlarmKit 인텐트가 같은 suite 공유. -->
         <dict>
             <key>NSPrivacyAccessedAPIType</key>
             <string>NSPrivacyAccessedAPICategoryUserDefaults</string>

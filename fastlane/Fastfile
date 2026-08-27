@@ -116,7 +116,7 @@ platform :ios do
 
     build_number = latest_testflight_build_number(
       api_key: key,
-      app_identifier: "app.nursemate.app",
+      app_identifier: "app.nursemate.care.app",
       initial_build_number: 1
     ) + 1
 
@@ -127,10 +127,10 @@ platform :ios do
 
     # App + 임베드되는 익스텐션(워치앱·위젯·컴플리케이션) 각각을 해당 match 프로파일로 수동 서명.
     signing = {
-      "App"               => "app.nursemate.app",
-      "WatchApp"          => "app.nursemate.app.watchapp",
-      "TimerWidget"       => "app.nursemate.app.timerwidget",
-      "WatchComplication" => "app.nursemate.app.watchapp.presetcomplication",
+      "App"               => "app.nursemate.care.app",
+      "WatchApp"          => "app.nursemate.care.app.watchapp",
+      "TimerWidget"       => "app.nursemate.care.app.timerwidget",
+      "WatchComplication" => "app.nursemate.care.app.watchapp.presetcomplication",
     }
     signing.each do |target, bundle_id|
       update_code_signing_settings(
@@ -188,7 +188,7 @@ platform :ios do
 
     build_number = latest_testflight_build_number(
       api_key: key,
-      app_identifier: "app.nursemate.app",
+      app_identifier: "app.nursemate.care.app",
       initial_build_number: 1
     ) + 1
 
@@ -199,10 +199,10 @@ platform :ios do
 
     # App + 임베드되는 익스텐션(워치앱·위젯·컴플리케이션) 각각을 해당 match 프로파일로 수동 서명.
     signing = {
-      "App"               => "app.nursemate.app",
-      "WatchApp"          => "app.nursemate.app.watchapp",
-      "TimerWidget"       => "app.nursemate.app.timerwidget",
-      "WatchComplication" => "app.nursemate.app.watchapp.presetcomplication",
+      "App"               => "app.nursemate.care.app",
+      "WatchApp"          => "app.nursemate.care.app.watchapp",
+      "TimerWidget"       => "app.nursemate.care.app.timerwidget",
+      "WatchComplication" => "app.nursemate.care.app.watchapp.presetcomplication",
     }
     signing.each do |target, bundle_id|
       update_code_signing_settings(
@@ -263,7 +263,7 @@ platform :ios do
 
     build_number = latest_testflight_build_number(
       api_key: key,
-      app_identifier: "app.nursemate.app",
+      app_identifier: "app.nursemate.care.app",
       initial_build_number: 1
     ) + 1
 
@@ -274,10 +274,10 @@ platform :ios do
 
     # App + 임베드되는 익스텐션(워치앱·위젯·컴플리케이션) 각각을 해당 match 프로파일로 수동 서명.
     signing = {
-      "App"               => "app.nursemate.app",
-      "WatchApp"          => "app.nursemate.app.watchapp",
-      "TimerWidget"       => "app.nursemate.app.timerwidget",
-      "WatchComplication" => "app.nursemate.app.watchapp.presetcomplication",
+      "App"               => "app.nursemate.care.app",
+      "WatchApp"          => "app.nursemate.care.app.watchapp",
+      "TimerWidget"       => "app.nursemate.care.app.timerwidget",
+      "WatchComplication" => "app.nursemate.care.app.watchapp.presetcomplication",
     }
     signing.each do |target, bundle_id|
       update_code_signing_settings(

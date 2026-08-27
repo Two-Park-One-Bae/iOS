@@ -13,7 +13,7 @@ import ConfigPlugin
 // 데모는 자체 위젯 익스텐션을 embed 해 잠금화면 카운트다운·Dynamic Island 까지 확인한다.
 // 위젯 소스는 앱 타깃(App/Widget)과 동일 파일을 공유(중복 없음).
 
-private let appGroup = "group.app.nursemate.timer"
+private let appGroup = "group.app.nursemate.care.timer"
 
 // App/Widget 과 동일한 위젯 소스 공유
 private let widgetSources: SourceFilesList = [
