@@ -48,9 +48,24 @@ extension ConsentDefinitionEntity {
             type: type,
             version: version,
             isRequired: required,
-            policyUrl: URL(string: policyUrl),
+            policyUrl: Self.webURL(from: policyUrl),
             title: title
         )
+    }
+
+    /// 웹에서 열 수 있는 URL 만 통과시킨다.
+    ///
+    /// `URL(string:)` 은 스킴 없는 문자열("nursemate.app/terms")도 nil 이 아닌 URL 로 만들어 주기 때문에
+    /// 존재 검사만으로는 걸러지지 않는다. 그대로 `SFSafariViewController` 에 넘기면 http·https 가 아닌
+    /// URL 에서 예외가 나 앱이 죽는다 — 값의 출처가 서버라, 동의 정의에 오타 하나면 모든 사용자가
+    /// 반드시 지나는 화면에서 크래시한다. 여기서 잘라 화면에는 '보기'를 감춘다.
+    private static func webURL(from raw: String) -> URL? {
+        guard let url = URL(string: raw),
+              let scheme = url.scheme?.lowercased(),
+              scheme == "http" || scheme == "https" else {
+            return nil
+        }
+        return url
     }
 }
 

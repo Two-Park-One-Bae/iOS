@@ -205,6 +205,10 @@ public final class ConsentOnboardingVC: UIViewController {
     }
 
     /// 약관 전문은 웹 게시분을 그대로 띄운다 — 앱에 복사해두면 개정 때마다 어긋난다.
+    ///
+    /// URL 검증은 매퍼(`ConsentDefinitionEntity.toDomain`)에서 끝나 있고, 여기 nil 이면 행이
+    /// 이미 '보기'를 감춘 상태다. 그래도 남겨두는 건 `SFSafariViewController` 가 http·https 아닌
+    /// URL 에 예외를 던지기 때문 — 이 경로로는 절대 크래시하지 않게 한다.
     private func openPolicy(_ definition: ConsentDefinition) {
         guard let url = definition.policyUrl else { return }
         present(SFSafariViewController(url: url), animated: true)

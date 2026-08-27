@@ -62,6 +62,9 @@ final class ConsentItemRowView: UIView {
         }
 
         let (policyButton, policyRecognizer) = makePolicyButton()
+        // 문서 URL 이 없으면(서버가 못 여는 값을 준 경우) '보기' 를 아예 감춘다 —
+        // 눌러도 아무 일 없는 버튼은 고장으로 보인다.
+        policyButton.isHidden = (definition.policyUrl == nil)
 
         let rowStack = UIStackView(arrangedSubviews: [checkbox, labelStack, UIView(), policyButton]).then {
             $0.axis = .horizontal

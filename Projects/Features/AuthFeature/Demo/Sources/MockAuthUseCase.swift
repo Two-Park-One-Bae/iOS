@@ -52,19 +52,22 @@ final class MockAuthUseCase: AuthUseCase {
         try? await Task.sleep(for: .milliseconds(300))
         // 400 을 한 번 받은 뒤에는 올라간 버전으로 내려준다 — 화면이 새 버전으로 다시 그려지는 걸 확인할 수 있다.
         let version = didRejectOnce ? "2.0" : "1.0"
+        // 실제 문서는 아직 웹에 게시되지 않았다(BE 가 GET /consents 로 내려줄 값).
+        // 남의 약관을 가리키면 연결이 된 것처럼 보여 더 헷갈리므로, 우리 도메인의 예정 경로를 둔다 —
+        // 지금 열면 404 지만 '보기'가 실제로 사파리를 띄우는지는 확인할 수 있다.
         return [
             ConsentDefinition(
                 type: .terms,
                 version: version,
                 isRequired: true,
-                policyUrl: URL(string: "https://www.apple.com/legal/privacy/kr/"),
+                policyUrl: URL(string: "https://nursemate.app/policy/terms"),
                 title: "이용약관"
             ),
             ConsentDefinition(
                 type: .privacy,
                 version: version,
                 isRequired: true,
-                policyUrl: URL(string: "https://policies.google.com/privacy?hl=ko"),
+                policyUrl: URL(string: "https://nursemate.app/policy/privacy"),
                 title: "개인정보처리방침"
             ),
         ]
