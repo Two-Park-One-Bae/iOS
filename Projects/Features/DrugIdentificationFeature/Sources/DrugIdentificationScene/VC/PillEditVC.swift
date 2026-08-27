@@ -138,8 +138,9 @@ final class PillEditVC: UIViewController {
 
     private func setUI() {
         view.backgroundColor = DSColor.bgApp
+        // 이탈 계측(pill_flow_exit)은 여기가 아니라 viewDidDisappear 에서 잡는다 —
+        // 이 화면을 나가는 길이 백 버튼 말고도 [취소] 버튼·스와이프 백으로 여럿이기 때문.
         navBar.onBackTapped = { [weak self] in
-            self?.trackFlowExit()      // 확정 없이 이탈 — 어떤 알약·어떤 속성 입력 중이었나 (NM 분석)
             self?.onBackTapped?()
         }
         refreshChips()
@@ -388,10 +389,28 @@ final class PillEditVC: UIViewController {
                 dwellMs: dwellMs()
             ))
         }
+        didConfirm = true
         onConfirm?(selected)
     }
 
     // MARK: - Analytics helpers
+
+    /// 확정으로 나갔는지 — 확정은 pill_confirm 이 담당하므로 이탈 계측에서 제외한다.
+    private var didConfirm = false
+
+    /// 이탈 계측은 버튼 핸들러가 아니라 **화면이 실제로 사라질 때** 한 곳에서 잡는다.
+    /// 백 버튼·[취소] 버튼·스와이프 백이 모두 pop 으로 수렴하므로 여기 하나로 전부 커버되고,
+    /// 나중에 나가는 길이 늘어도 자동으로 따라온다.
+    ///
+    /// `isMovingFromParent`/`isBeingDismissed` 로 거르는 이유: 후보 세부정보·이미지 비교 뷰어를
+    /// push 할 때도 viewDidDisappear 는 불리는데, 그건 이탈이 아니라 잠시 가려지는 것뿐이다.
+    /// (앱 강제 종료·백그라운드 이탈은 여기로 안 들어온다 — 그건 원래도 못 잡던 경로다)
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        guard isMovingFromParent || isBeingDismissed else { return }
+        guard !didConfirm else { return }
+        trackFlowExit()
+    }
 
     private func trackFlowExit() {
         guard !viewModel.isManual else { return }   // 수동 추가 알약은 집계 제외
