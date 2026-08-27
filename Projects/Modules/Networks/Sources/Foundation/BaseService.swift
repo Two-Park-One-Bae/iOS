@@ -177,6 +177,50 @@ extension BaseService {
         }
     }
 
+    /// 바디 없는 성공(204) 요청. 성공이면 아무것도 돌려주지 않고, 4xx/5xx는 APIError.network로 throw.
+    ///
+    /// 탈퇴(DELETE /users/me)가 이걸 쓴다 — 500 과 204 를 반드시 갈라야 하기 때문이다.
+    /// 500 이면 계정이 남아 있을 수 있어 **클라이언트는 로그아웃하지 않고 재시도**한다
+    /// (spec: domains/auth.md §탈퇴). 아래 `requestObjectInCombineNoResult` 는 상태코드를 그대로
+    /// 흘려보내 이 구분을 상위에 떠넘기므로 여기서는 쓰지 않는다.
+    func requestNoContentAsync(_ target: API) async throws {
+        try await withUnsafeThrowingContinuation { (continuation: UnsafeContinuation<Void, Error>) in
+            self.provider.request(target) { response in
+                switch response {
+                case .success(let value):
+                    guard let httpResponse = value.response else {
+                        continuation.resume(throwing: APIError.unknown)
+                        return
+                    }
+
+                    switch httpResponse.statusCode {
+                    case 200...399:
+                        continuation.resume()
+                    case 400...599:
+                        // 성공(204)은 바디가 비지만 에러 응답에는 ProblemDetail 이 실려 온다.
+                        if var problem = try? JSONDecoder().decode(NetworkError.self, from: value.data) {
+                            problem.rawBody = value.data
+                            continuation.resume(throwing: APIError.network(statusCode: httpResponse.statusCode, error: problem))
+                        } else {
+                            continuation.resume(throwing: APIError.unknown)
+                        }
+                    default:
+                        continuation.resume(throwing: APIError.unknown)
+                    }
+                case .failure(let error):
+                    if case MoyaError.underlying(let error, _) = error,
+                       case AFError.requestRetryFailed(let retryError, _) = error,
+                       let retryError = retryError as? APIError,
+                       retryError == .tokenReissuanceFailed {
+                        continuation.resume(throwing: retryError)
+                    } else {
+                        continuation.resume(throwing: error)
+                    }
+                }
+            }
+        }
+    }
+
     /// 응답 바디가 없는 요청 (DELETE 등). statusCode만 반환
     func requestObjectInCombineNoResult(_ target: API) -> AnyPublisher<Int, Error> {
         Future { promise in
