@@ -7,6 +7,15 @@ public enum FirebaseService {
         FirebaseApp.configure()
     }
 
+    /// 구글 로그인용 OAuth 클라이언트 ID (NM-410).
+    ///
+    /// Firebase 콘솔에서 Google 공급자를 켜야 `GoogleService-Info.plist` 에 생긴다 — 없으면 nil.
+    /// GoogleSignIn SDK 가 이 값을 요구하는데, 그것만을 위해 상위 모듈이 FirebaseCore 를 직접
+    /// import 하게 두지 않으려고 여기서 노출한다.
+    public static var googleClientID: String? {
+        FirebaseApp.app()?.options.clientID
+    }
+
     /// Firebase Analytics 자동 수집 on/off. 내부 빌드에선 꺼서 SaaS에 내부 트래픽이 안 잡히게 한다.
     /// (App Check·Remote Config·Crashlytics는 그대로 — Analytics 수집만 제어)
     public static func setAnalyticsCollectionEnabled(_ enabled: Bool) {
