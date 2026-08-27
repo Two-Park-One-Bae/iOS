@@ -35,6 +35,9 @@ public protocol PillUseCase {
     // 잔여 식별 횟수 조회 (NM-331). 조회 전용 — 카운트가 늘지 않는다
     func fetchPillUsage()
 
+    // 계정에 딸린 캐시를 버린다. 로그아웃·탈퇴 시 조립 지점이 호출한다 (NM-410).
+    func resetAccountScopedState()
+
     var pillAttributes: PassthroughSubject<[PillAttributeModel], Never> { get }
     var pillCandidates: PassthroughSubject<PillCandidatePageModel, Never> { get }
     var pillDetail:     PassthroughSubject<PillDetailModel, Never> { get }
@@ -99,6 +102,12 @@ public final class DefaultPillUseCase: PillUseCase {
         repository.uploadOriginalImage(jpegData)
             .sink(receiveCompletion: { _ in }, receiveValue: { _ in })
             .store(in: &cancellables)
+    }
+
+    /// 잔여 횟수는 계정 단위 값이라, 로그아웃하면 다음 로그인 후 다시 받기 전까지 화면에 그리지 않는다.
+    /// 병동 공용 기기에서 앞사람의 잔여가 보이면 안 된다(spec: feature/auth/README.md §계정 스코프 캐시 폐기).
+    public func resetAccountScopedState() {
+        pillUsage.send(nil)
     }
 
     public func fetchPillUsage() {
