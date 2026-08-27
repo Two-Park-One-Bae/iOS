@@ -5,7 +5,6 @@
 //  Created by 바견규 on 7/2/26.
 //
 
-import Core
 import Foundation
 import Moya
 
@@ -56,21 +55,8 @@ extension PillAPI: BaseAPI {
         }
     }
 
-    // 식별 한도(NM-322)는 기기별로 센다. 카운트 키인 X-Device-Id를 한도 대상 엔드포인트에 붙인다.
-    // 후보·세부정보 조회는 Gemini를 쓰지 않아 카운트 대상이 아니므로 붙이지 않는다.
-    // TODO: App Check 도입 시 X-Firebase-AppCheck 추가 — 토큰 발급이 async라 RequestInterceptor로 붙여야 한다.
-    public var headers: [String: String]? {
-        var headers = ["Content-Type": "application/json"]
-
-        switch self {
-        case .pillAttributes, .pillAttributesUsage:
-            // Keychain 불가 시 nil — 식별 진입에서 이미 막으므로(fail-closed) 여기선 헤더만 생략.
-            if let deviceId = DeviceIdentifier.current { headers["X-Device-Id"] = deviceId }
-        case .pillCandidates, .pillDetails, .pillImagesUploadUrl:
-            // upload-url은 App Check(인터셉터)만 필요 — usage와 무관해 X-Device-Id를 붙이지 않는다 (NM-348).
-            break
-        }
-
-        return headers
-    }
+    // X-Device-Id 는 폐기됐다 (NM-410 클린 컷오버). 식별 한도 카운트 키가 기기 UUID 에서
+    // 안정 소셜 식별자 해시로 바뀌었고, 신원은 Bearer(Firebase ID 토큰)로만 판정한다
+    // (spec: domains/auth.md §클린 컷오버). Authorization·X-Firebase-AppCheck 는
+    // 둘 다 발급이 async 라 APIRequestInterceptor 가 붙이므로 여기서는 BaseAPI 기본 헤더를 그대로 쓴다.
 }
