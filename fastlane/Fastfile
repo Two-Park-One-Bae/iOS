@@ -3,6 +3,12 @@ default_platform(:ios)
 API_KEY_PATH = "/tmp/AuthKey.p8"
 API_KEY_RAW_PATH = "/tmp/AuthKey_raw.p8"
 
+# 레인이 쓰는 Firebase 구성(= Projects/App/Firebase/<값>/GoogleService-Info.plist).
+# 빌드(xcargs FIREBASE_ENV)와 dSYM 업로드 대상(gsp_path)이 반드시 같은 값을 봐야 한다 —
+# 어긋나면 크래시는 한쪽 프로젝트로 오는데 심볼은 다른 쪽에 올라가 심볼화가 조용히 깨진다.
+FIREBASE_ENV_DEV = "Debug".freeze
+FIREBASE_ENV_PROD = "Release".freeze
+
 platform :ios do
   before_all do
     setup_ci if ENV["CI"]
@@ -31,7 +37,10 @@ platform :ios do
   # Firebase Crashlytics 심볼 업로드 — 릴리즈 크래시를 심볼화(함수·줄번호)하려면 dSYM을 올려야 한다.
   # 비트코드가 꺼져 있어 아카이브의 로컬 dSYM이 최종본이므로, App Store Connect 처리 대기 없이 바로 올린다.
   # 경로/바이너리를 못 찾아도 배포는 막지 않고 경고만 남긴다(심볼 업로드는 부가 작업).
-  def upload_dsyms_to_crashlytics
+  #
+  # firebase_env: 이 레인이 빌드에 쓴 FIREBASE_ENV 와 **같은 값**을 넘겨야 한다.
+  # dSYM 은 크래시가 보고된 그 프로젝트에 올라가야 매칭되므로, 내부(dev)와 외부·운영(prod)이 갈린다.
+  def upload_dsyms_to_crashlytics(firebase_env)
     dsym = lane_context[SharedValues::DSYM_OUTPUT_PATH]
     unless dsym && File.exist?(dsym)
       UI.important("dSYM을 찾지 못해 Crashlytics 심볼 업로드를 건너뜁니다 (DSYM_OUTPUT_PATH 없음).")
@@ -42,9 +51,18 @@ platform :ios do
       UI.important("upload-symbols 바이너리를 찾지 못해 Crashlytics 심볼 업로드를 건너뜁니다.")
       return
     end
+    # upload_symbols_to_crashlytics 는 gsp_path 존재를 검사하지 않고, 업로드 실패도 내부에서
+    # rescue 해 에러 한 줄만 남긴다 — 경로가 어긋나면 배포는 성공하고 심볼만 조용히 빠진다.
+    # 그래서 여기서 먼저 검사해 위 둘과 같은 형태로 드러낸다.
+    gsp = "#{repo_root}/Projects/App/Firebase/#{firebase_env}/GoogleService-Info.plist"
+    unless File.exist?(gsp)
+      UI.important("GoogleService-Info.plist를 찾지 못해 Crashlytics 심볼 업로드를 건너뜁니다 (#{gsp}).")
+      return
+    end
+    UI.message("Crashlytics 심볼 업로드 대상 Firebase 구성: #{firebase_env}")
     upload_symbols_to_crashlytics(
       dsym_path: dsym,
-      gsp_path: "#{repo_root}/Projects/App/Resources/GoogleService-Info.plist",
+      gsp_path: gsp,
       binary_path: binary
     )
   end
@@ -161,7 +179,7 @@ platform :ios do
       # 서명 때문에 Release 구성으로 빌드하지만 환경은 dev 로 돌린다 —
       # FIREBASE_ENV=Debug(dev 프로젝트) + BASE_URL(dev 서버). 둘은 항상 같은 편이어야 한다.
       # App Check 토큰의 aud 는 Firebase 프로젝트에 묶여 있어, 한쪽만 바꾸면 서버가 401 을 낸다.
-      xcargs: "DEVELOPMENT_TEAM=#{ENV.fetch('DEVELOPMENT_TEAM', '')} CODE_SIGN_IDENTITY='Apple Distribution' CODE_SIGN_STYLE=Manual SWIFT_ACTIVE_COMPILATION_CONDITIONS='$(inherited) INTERNAL' FIREBASE_ANALYTICS_ENABLED=YES FIREBASE_ENV=Debug BASE_URL='$(BASE_URL_DEBUG)'",
+      xcargs: "DEVELOPMENT_TEAM=#{ENV.fetch('DEVELOPMENT_TEAM', '')} CODE_SIGN_IDENTITY='Apple Distribution' CODE_SIGN_STYLE=Manual SWIFT_ACTIVE_COMPILATION_CONDITIONS='$(inherited) INTERNAL' FIREBASE_ANALYTICS_ENABLED=YES FIREBASE_ENV=#{FIREBASE_ENV_DEV} BASE_URL='$(BASE_URL_DEBUG)'",
       export_options: {
         method: "app-store",
         signingStyle: "manual",
@@ -169,7 +187,7 @@ platform :ios do
       }
     )
 
-    upload_dsyms_to_crashlytics
+    upload_dsyms_to_crashlytics(FIREBASE_ENV_DEV)
 
     upload_to_testflight(
       api_key: app_store_connect_api_key(
@@ -235,7 +253,7 @@ platform :ios do
       }
     )
 
-    upload_dsyms_to_crashlytics
+    upload_dsyms_to_crashlytics(FIREBASE_ENV_PROD)
 
     # 외부 테스터 그룹에 배포. 내부와 달리 distribute_external·groups·changelog 가 필수이고,
     # 빌드 처리 완료를 기다려야 한다(skip_waiting=false). 첫 외부 빌드는 애플 Beta App Review 통과 후 노출.
@@ -313,7 +331,7 @@ platform :ios do
       }
     )
 
-    upload_dsyms_to_crashlytics
+    upload_dsyms_to_crashlytics(FIREBASE_ENV_PROD)
 
     upload_to_testflight(
       api_key: app_store_connect_api_key(
