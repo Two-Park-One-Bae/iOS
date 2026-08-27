@@ -379,7 +379,10 @@ final class PillEditVC: UIViewController {
         if !viewModel.isManual {
             AppAnalytics.track(.pillConfirm(
                 pillIndex: viewModel.pillIndex,
-                candidateIndex: currentResults.firstIndex(where: { $0.pillCode == selectedPillCode }) ?? -1,
+                // firstIndex 는 0 기반이라 +1 — 리포트에서 "1번째 후보"로 읽히게 맞춘다.
+                // (바로 위 guard 가 같은 술어로 통과했으므로 nil 은 실제로 나오지 않는다.
+                //  그래도 0 으로 떨어뜨려 두면 AnalyticsEvent 가 "unknown" 으로 드러내 준다)
+                candidateIndex: currentResults.firstIndex(where: { $0.pillCode == selectedPillCode }).map { $0 + 1 } ?? 0,
                 editCount: viewModel.editCount,
                 editedAttrs: viewModel.editedAttrsJoined,
                 dwellMs: dwellMs()
