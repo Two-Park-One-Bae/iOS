@@ -64,6 +64,16 @@ public struct Dep {
                 path: .relativeToRoot("Projects/Features/BaseFeatureDependency")
             )
         }
+        public struct Auth {
+            public static let Feature = TargetDependency.project(
+                target: "AuthFeature",
+                path: .relativeToRoot("Projects/Features/AuthFeature")
+            )
+            public static let Interface = TargetDependency.project(
+                target: "AuthFeatureInterface",
+                path: .relativeToRoot("Projects/Features/AuthFeature")
+            )
+        }
         public struct Home {
             public static let Feature = TargetDependency.project(
                 target: "HomeFeature",

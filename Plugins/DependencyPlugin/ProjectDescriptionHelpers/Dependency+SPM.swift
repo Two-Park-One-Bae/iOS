@@ -12,7 +12,15 @@ public extension TargetDependency {
         public static let FirebaseCrashlytics = TargetDependency.external(name: "FirebaseCrashlytics")
         public static let FirebaseRemoteConfig = TargetDependency.external(name: "FirebaseRemoteConfig")
         public static let FirebaseAppCheck = TargetDependency.external(name: "FirebaseAppCheck")
+        public static let FirebaseAuth = TargetDependency.external(name: "FirebaseAuth")
         public static let Lottie = TargetDependency.external(name: "Lottie")
         public static let Then = TargetDependency.external(name: "Then")
+
+        // MARK: - 소셜 로그인 (NM-410)
+
+        public static let GoogleSignIn = TargetDependency.external(name: "GoogleSignIn")
+        public static let KakaoSDKCommon = TargetDependency.external(name: "KakaoSDKCommon")
+        public static let KakaoSDKAuth = TargetDependency.external(name: "KakaoSDKAuth")
+        public static let KakaoSDKUser = TargetDependency.external(name: "KakaoSDKUser")
     }
 }
