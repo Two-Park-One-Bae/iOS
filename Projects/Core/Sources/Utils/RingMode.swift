@@ -16,7 +16,7 @@ public final class RingModeStore {
     private let chosenKey = "timer.ringMode.chosen"
 
     // 앱·위젯·익스텐션 공유를 위해 앱 그룹 suite 사용.
-    public init(defaults: UserDefaults = UserDefaults(suiteName: "group.app.nursemate.timer") ?? .standard) {
+    public init(defaults: UserDefaults = UserDefaults(suiteName: "group.app.nursemate.care.timer") ?? .standard) {
         self.defaults = defaults
     }
 

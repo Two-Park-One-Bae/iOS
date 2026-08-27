@@ -39,6 +39,7 @@ jobs:
         env:
           AMPLITUDE_API_KEY: ${{ secrets.AMPLITUDE_API_KEY }}
           BASE_URL: ${{ secrets.BASE_URL }}
+          BASE_URL_DEV: ${{ secrets.BASE_URL_DEV }}
           CLARITY_PROJECT_ID: ${{ secrets.CLARITY_PROJECT_ID }}
           DEVELOPMENT_TEAM: ${{ secrets.DEVELOPMENT_TEAM }}
         run: |
@@ -46,9 +47,11 @@ jobs:
           # xcconfig 은 값 안의 "//" 를 주석 처리하므로 스킴의 "://" 에 $() 를 끼워 회피.
           # (이미 회피형이면 "://" 가 없어 그대로 통과 — 멱등)
           BASE_URL_ESC=$(printf '%s' "${BASE_URL}" | sed 's#://#:/$()/#')
+          # 개발 서버(infra locals.tf: dev.api_domain). 시크릿 미등록 시 기본값.
+          BASE_URL_DEV_ESC=$(printf '%s' "${BASE_URL_DEV:-https://dev.nursemate.app}" | sed 's#://#:/$()/#')
           cat > XCConfig/Secrets.xcconfig << EOF
           AMPLITUDE_API_KEY = ${AMPLITUDE_API_KEY}
-          BASE_URL_DEBUG = ${BASE_URL_ESC}
+          BASE_URL_DEBUG = ${BASE_URL_DEV_ESC}
           BASE_URL_RELEASE = ${BASE_URL_ESC}
           CLARITY_PROJECT_ID = ${CLARITY_PROJECT_ID}
           DEVELOPMENT_TEAM = ${DEVELOPMENT_TEAM}
@@ -57,8 +60,19 @@ jobs:
       - name: Write GoogleService-Info.plist
         env:
           GOOGLE_SERVICE_INFO_PLIST: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST }}
+          GOOGLE_SERVICE_INFO_PLIST_DEV: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST_DEV }}
         run: |
-          echo "$GOOGLE_SERVICE_INFO_PLIST" | base64 --decode > Projects/App/Resources/GoogleService-Info.plist
+          # plist 는 빌드 구성별로 Firebase/<구성>/ 에 둔다.
+          # Project.swift 의 "Firebase 구성 선택" 스크립트가 FIREBASE_ENV 를 보고 번들로 복사한다.
+          mkdir -p Projects/App/Firebase/Release Projects/App/Firebase/Debug
+          echo "$GOOGLE_SERVICE_INFO_PLIST" | base64 --decode > Projects/App/Firebase/Release/GoogleService-Info.plist
+          if [ -n "$GOOGLE_SERVICE_INFO_PLIST_DEV" ]; then
+            echo "$GOOGLE_SERVICE_INFO_PLIST_DEV" | base64 --decode > Projects/App/Firebase/Debug/GoogleService-Info.plist
+          else
+            # dev 시크릿 미등록이면 Release 것으로 채워 빌드 실패를 막는다
+            # (FIREBASE_ENV=Release 인 동안은 어차피 쓰이지 않는다).
+            cp Projects/App/Firebase/Release/GoogleService-Info.plist Projects/App/Firebase/Debug/GoogleService-Info.plist
+          fi
 
       - name: Cache SPM packages
         uses: actions/cache@v4
