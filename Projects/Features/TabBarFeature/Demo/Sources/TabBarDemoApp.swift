@@ -1,7 +1,9 @@
 import UIKit
 import TabBarFeature
-import HomeFeatureInterface
 import BaseFeatureDependency
+import DrugIdentificationFeatureInterface
+import HomeFeatureInterface
+import TimerFeatureInterface
 
 @main
 final class TabBarDemoAppDelegate: UIResponder, UIApplicationDelegate {
@@ -14,9 +16,12 @@ final class TabBarDemoAppDelegate: UIResponder, UIApplicationDelegate {
         let window = UIWindow(frame: UIScreen.main.bounds)
         let nav = UINavigationController()
 
+        // 데모는 탭 구성만 확인하는 용도라 각 탭을 빈 화면 스텁으로 채운다.
         let coordinator = TabBarCoordinator(
             navigationController: nav,
-            homeBuilder: StubHomeFeatureBuilder()
+            homeBuilder: StubHomeFeatureBuilder(),
+            timerBuilder: StubTimerFeatureBuilder(),
+            drugBuilder: StubDrugIdentificationFeatureBuilder()
         )
         coordinator.start()
 
@@ -31,11 +36,23 @@ final class TabBarDemoAppDelegate: UIResponder, UIApplicationDelegate {
 
 final class StubHomeFeatureBuilder: HomeFeatureBuildable {
     func makeHomeCoordinator(navigationController: UINavigationController) -> CoordinatorProtocol {
-        let vc = UIViewController()
-        vc.view.backgroundColor = .systemBackground
-        vc.title = "홈 (Stub)"
-        navigationController.setViewControllers([vc], animated: false)
-        return StubCoordinator(navigationController: navigationController)
+        StubCoordinator.pushing("홈 (Stub)", into: navigationController)
+    }
+}
+
+final class StubTimerFeatureBuilder: TimerFeatureBuildable {
+    func makeTimerCoordinator(navigationController: UINavigationController) -> CoordinatorProtocol {
+        StubCoordinator.pushing("타이머 (Stub)", into: navigationController)
+    }
+
+    func makeSettingsViewController() -> UIViewController {
+        StubCoordinator.makeViewController("설정 (Stub)")
+    }
+}
+
+final class StubDrugIdentificationFeatureBuilder: DrugIdentificationFeatureBuildable {
+    func makeDrugIdentificationCoordinator(navigationController: UINavigationController) -> CoordinatorProtocol {
+        StubCoordinator.pushing("알약 (Stub)", into: navigationController)
     }
 }
 
@@ -48,4 +65,16 @@ final class StubCoordinator: CoordinatorProtocol {
     }
 
     func start() {}
+
+    static func makeViewController(_ title: String) -> UIViewController {
+        let viewController = UIViewController()
+        viewController.view.backgroundColor = .systemBackground
+        viewController.title = title
+        return viewController
+    }
+
+    static func pushing(_ title: String, into navigationController: UINavigationController) -> CoordinatorProtocol {
+        navigationController.setViewControllers([makeViewController(title)], animated: false)
+        return StubCoordinator(navigationController: navigationController)
+    }
 }
