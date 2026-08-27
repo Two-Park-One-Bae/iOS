@@ -15,6 +15,8 @@ final class MockPillUseCase: PillUseCase {
     let errorMessage   = PassthroughSubject<String, Never>()
     let pillUsage      = CurrentValueSubject<PillUsageModel?, Never>(nil)
     let limitExceeded  = PassthroughSubject<PillUsageModel?, Never>()
+    let pillDetailNotFound = PassthroughSubject<Void, Never>()
+    let pillDetailFailure  = PassthroughSubject<String, Never>()
 
     private let remaining: Int
 
@@ -30,6 +32,10 @@ final class MockPillUseCase: PillUseCase {
                 resetAt:   Calendar.current.startOfDay(for: Date().addingTimeInterval(86_400))
             )
         )
+    }
+
+    func resetAccountScopedState() {
+        pillUsage.send(nil)
     }
 
     func fetchPillAttributes(
