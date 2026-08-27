@@ -10,7 +10,13 @@ public final class TimerBuilder: TimerFeatureBuildable {
         TimerCoordinator(navigationController: navigationController)
     }
 
-    public func makeSettingsViewController() -> UIViewController {
-        SettingsViewController()
+    public func makeSettingsViewController(
+        onLogout: @escaping () -> Void,
+        onDeleteAccount: @escaping () -> Void
+    ) -> UIViewController {
+        let viewController = SettingsViewController()
+        viewController.onLogoutTapped = onLogout
+        viewController.onDeleteAccountTapped = onDeleteAccount
+        return viewController
     }
 }

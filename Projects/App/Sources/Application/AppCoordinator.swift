@@ -3,6 +3,7 @@ import Combine
 import AuthFeatureInterface
 import BaseFeatureDependency
 import Core
+import DSKit
 import Domain
 import TabBarFeature
 import TimerFeature
@@ -148,7 +149,9 @@ final class AppCoordinator: BaseCoordinator {
             navigationController: navigationController,
             homeBuilder: HomeFeatureBuilder(),
             timerBuilder: TimerBuilder(),
-            drugBuilder: DrugIdentificationBuilder()
+            drugBuilder: DrugIdentificationBuilder(),
+            onLogout: { [weak self] in self?.confirmSignOut() },
+            onDeleteAccount: { [weak self] in self?.confirmAccountDeletion() }
         )
         self.tabBarCoordinator = tabBarCoordinator
         addChild(tabBarCoordinator)
@@ -213,5 +216,59 @@ final class AppCoordinator: BaseCoordinator {
                 self.showAuth(startAt: .login)
             }
         }
+    }
+
+    // MARK: - 설정 · 계정
+
+    /// 로그아웃 확인 (디자인: DESIGN.pen `zFi8P`).
+    /// 실제 화면 전환은 `.authDidSignOut` 옵저버가 처리한다 — 로그아웃 경로가 하나로 모인다.
+    private func confirmSignOut() {
+        guard let host = topMostView() else { return }
+        DSConfirmDialogView.present(
+            on: host,
+            title: "로그아웃할까요?",
+            confirmTitle: "로그아웃",
+            confirmed: { [weak self] in self?.authUseCase.signOut() }
+        )
+    }
+
+    /// 계정 삭제 확인 (디자인: DESIGN.pen `jdS6i`). Apple 심사 필수 요건.
+    private func confirmAccountDeletion() {
+        guard let host = topMostView() else { return }
+        DSConfirmDialogView.present(
+            on: host,
+            title: "계정을 삭제할까요?",
+            message: "삭제하면 되돌릴 수 없어요",
+            confirmTitle: "삭제",
+            confirmStyle: .destructive,
+            confirmed: { [weak self] in self?.deleteAccount() }
+        )
+    }
+
+    private func deleteAccount() {
+        Task { @MainActor in
+            do {
+                try await authUseCase.deleteAccount()
+                // 성공하면 .authDidSignOut 이 로그인 화면으로 되돌린다.
+            } catch {
+                // 실패하면 로그아웃하지 않고 설정에 머문다 — 계정이 남아 있는데 삭제됐다고 안내하지 않기 위함.
+                // 서버가 멱등이라 다시 눌러도 안전하다(spec: domains/auth.md §탈퇴).
+                guard let host = topMostView() else { return }
+                DSAlertCardView.present(
+                    on: host,
+                    title: "계정 삭제 실패",
+                    message: "잠시 후 다시 시도해 주세요."
+                )
+            }
+        }
+    }
+
+    /// 다이얼로그를 붙일 최상단 뷰. 모달이 떠 있어도 그 위에 뜨도록 체인을 끝까지 탄다.
+    private func topMostView() -> UIView? {
+        var top: UIViewController? = navigationController
+        while let presented = top?.presentedViewController {
+            top = presented
+        }
+        return top?.view
     }
 }
