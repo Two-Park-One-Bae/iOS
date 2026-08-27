@@ -55,8 +55,43 @@ public enum AppCheckService {
             #if DEBUG
             print("⚠️ AppCheck token() 실패: \(error)")
             #endif
+            // 내부 TestFlight(INTERNAL)는 콘솔 로그를 볼 수 없어 위 print 가 닿지 않는다.
+            // 토큰 미발급과 서버측 거절은 둘 다 401 로만 보여 앱에서 구분이 안 되므로,
+            // 발급 실패를 Crashlytics 비치명적으로 남겨 원인을 가른다.
+            // (Crashlytics 는 내부 빌드에서도 유지되고 dev 프로젝트로 분리돼 있어 운영 지표와 섞이지 않는다)
+            if await FailureReportGate.shared.claim() {
+                FirebaseService.log("AppCheck 토큰 발급 실패 — provider: \(providerKind)")
+                FirebaseService.recordError(error)
+            }
             return nil
         }
+    }
+
+    /// 현재 빌드가 쓰는 프로바이더 — 실패 원인이 디버그 토큰 미등록인지 App Attest 쪽인지 가르는 단서.
+    /// `configure()` 의 분기와 같은 조건이어야 한다.
+    private static var providerKind: String {
+        #if DEBUG
+        return "debug"
+        #else
+        return "app_attest"
+        #endif
+    }
+}
+
+/// 토큰 발급 실패 보고를 앱 실행당 1회로 제한한다.
+///
+/// `AppCheckInterceptor` 가 **요청마다** `token()` 을 부르므로, 실패를 그대로 기록하면
+/// App Check 가 깨진 동안 Crashlytics 비치명적 이슈가 폭주한다.
+/// 원인 파악에는 첫 실패 하나면 충분하다.
+private actor FailureReportGate {
+    static let shared = FailureReportGate()
+    private var reported = false
+
+    /// 아직 보고 전이면 `true` 를 한 번만 돌려준다.
+    func claim() -> Bool {
+        guard !reported else { return false }
+        reported = true
+        return true
     }
 }
 
