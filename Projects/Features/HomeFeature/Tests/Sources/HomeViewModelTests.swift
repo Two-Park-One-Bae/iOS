@@ -8,6 +8,8 @@ final class HomeViewModelTests: XCTestCase {
 
     override func setUp() {
         super.setUp()
+        // HomeViewModel 이 init 시점에 @Injected 로 UseCase 를 꺼내므로 생성 전에 등록해야 한다.
+        HomeTestDependencies.register()
         sut = HomeViewModel()
     }
 
@@ -24,6 +26,7 @@ final class HomeViewModelTests: XCTestCase {
         let tap = PassthroughSubject<Void, Never>()
         _ = sut.transform(input: HomeViewModel.Input(
             viewDidLoad: Empty().eraseToAnyPublisher(),
+            viewWillAppear: Empty().eraseToAnyPublisher(),
             drugIdentifyTapped: tap.eraseToAnyPublisher(),
             treatmentTimerTapped: Empty().eraseToAnyPublisher()
         ))
@@ -39,6 +42,7 @@ final class HomeViewModelTests: XCTestCase {
         let tap = PassthroughSubject<Void, Never>()
         _ = sut.transform(input: HomeViewModel.Input(
             viewDidLoad: Empty().eraseToAnyPublisher(),
+            viewWillAppear: Empty().eraseToAnyPublisher(),
             drugIdentifyTapped: Empty().eraseToAnyPublisher(),
             treatmentTimerTapped: tap.eraseToAnyPublisher()
         ))
