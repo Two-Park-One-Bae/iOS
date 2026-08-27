@@ -117,8 +117,13 @@ final class PillEditViewModel {
 
     private(set) var editCount = 0
     private var editedAttrs: Set<String> = []
-    /// 확정까지 수정한 속성 종류 (pill_confirm.edited_attrs).
-    var editedAttrsJoined: String { editedAttrs.sorted().joined(separator: ",") }
+    /// 확정까지 수정한 속성 종류 (pill_confirm.edited_attrs, ≤100자).
+    /// 수정 없이 확정하는 게 다수 케이스인데 빈 문자열을 보내면 GA4 에서 (not set) 으로 보여
+    /// "파라미터가 안 왔다"와 구분이 안 된다 — enteredValuesSummary 와 같이 "none" 으로 명시한다.
+    var editedAttrsJoined: String {
+        let joined = editedAttrs.isEmpty ? "none" : editedAttrs.sorted().joined(separator: ",")
+        return String(joined.prefix(100))
+    }
     /// 이탈 시 지금까지 입력된 속성 요약 (pill_flow_exit.entered_values, ≤100자).
     var enteredValuesSummary: String {
         var parts: [String] = []

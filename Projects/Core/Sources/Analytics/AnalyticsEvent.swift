@@ -24,6 +24,7 @@ public enum AnalyticsEvent {
     /// 속성 수정 1회.
     case pillAttrEdit(attribute: String, pillIndex: Int)
     /// 알약 1개 확정(후보 선택) — 몇 번째 후보·수정 횟수·수정한 속성·확정까지 체류시간.
+    /// `candidateIndex` 는 **1 기반**으로 넘긴다(리포트에서 "1번째 후보"로 읽히게).
     case pillConfirm(pillIndex: Int, candidateIndex: Int, editCount: Int, editedAttrs: String, dwellMs: Int)
     /// 확정 없이 알약 수정 화면을 이탈 — 어떤 알약·어떤 속성 입력 중이었나.
     case pillFlowExit(pillIndex: Int, editingAttribute: String, enteredValues: String, editCount: Int)
@@ -80,13 +81,18 @@ public enum AnalyticsEvent {
         case let .pillIdentifyResult(outcome, pillCount):
             return ["outcome": outcome, "pill_count": pillCount]
         case let .pillAttrEdit(attribute, pillIndex):
-            return ["attribute": attribute, "pill_index": pillIndex]
+            return ["attribute": attribute,
+                    "pill_index": pillIndex, "pill_index_label": Self.pillIndexLabel(pillIndex)]
         case let .pillConfirm(pillIndex, candidateIndex, editCount, editedAttrs, dwellMs):
-            return ["pill_index": pillIndex, "candidate_index": candidateIndex,
-                    "edit_count": editCount, "edited_attrs": editedAttrs, "dwell_ms": dwellMs]
+            return ["pill_index": pillIndex, "pill_index_label": Self.pillIndexLabel(pillIndex),
+                    "candidate_index": candidateIndex,
+                    "candidate_index_label": Self.candidateIndexLabel(candidateIndex),
+                    "edit_count": editCount, "edit_count_bucket": Self.editCountBucket(editCount),
+                    "edited_attrs": editedAttrs, "dwell_ms": dwellMs]
         case let .pillFlowExit(pillIndex, editingAttribute, enteredValues, editCount):
-            return ["pill_index": pillIndex, "editing_attribute": editingAttribute,
-                    "entered_values": enteredValues, "edit_count": editCount]
+            return ["pill_index": pillIndex, "pill_index_label": Self.pillIndexLabel(pillIndex),
+                    "editing_attribute": editingAttribute, "entered_values": enteredValues,
+                    "edit_count": editCount, "edit_count_bucket": Self.editCountBucket(editCount)]
         case let .pillLimitReached(source):
             // timer_start.source(iphone/watch/widget)와 겹치지 않게 별도 키 사용.
             return ["limit_source": source]
@@ -111,6 +117,54 @@ public enum AnalyticsEvent {
             return ["preset_label": label, "category": category, "duration_sec": durationSec]
         case let .presetDelete(label, category, durationSec):
             return ["preset_label": label, "category": category, "duration_sec": durationSec]
+        }
+    }
+
+    // MARK: - GA4 인코딩
+
+    /*
+     순번·횟수는 **숫자와 문자열 두 벌**로 보낸다. GA4 는 파라미터 하나를 측정기준 또는 측정항목
+     한쪽으로만 등록할 수 있는데, 두 쓰임이 다 필요하기 때문이다.
+
+     - `pill_index`·`candidate_index`·`edit_count`(Int) → **측정항목**. 평균을 본다.
+     - `*_label`·`edit_count_bucket`(String) → **측정기준**. 분포를 보거나 다른 지표를 쪼갠다.
+
+     측정기준이 문자열이어야 하는 건 GA4 가 값을 `string_value`/`int_value` 에 따로 담고
+     측정기준은 `string_value` 만 읽기 때문 — Int 로 보내면 분류 축에서 전부 `(not set)` 이 된다.
+
+     라벨 규칙:
+     - **두 자리 제로 패딩** — 문자열은 사전순 정렬이라("10" < "2") 패딩해야 리포트 축이 숫자 순서로 선다
+     - **상한 초과는 한 칸에**("21+"/"16+") — 카디널리티를 닫아 (other) 버킷을 막는다.
+       라벨 숫자가 곧 "여기부터 묶임"이라 20·15 는 제 라벨을 갖는다
+     - **1 미만은 "unknown"** — 계측 오류를 정상값에 뭉개지 않는다
+     */
+
+    /// 1 기반 순번을 제로 패딩 문자열로.
+    ///
+    /// `lastLabeled` 까지는 개별 라벨(`01`·`02` …), **그 위**는 `"<lastLabeled+1>+"` 한 칸에 모은다.
+    /// 오버플로 라벨이 `lastLabeled+1` 인 건 경계를 값 그대로 읽히게 하려는 것 —
+    /// `lastLabeled: 20` 이면 `20` 은 제 라벨을 갖고 21 이상만 `21+` 로 묶인다.
+    /// (`20+` 로 쓰면 20 이 어느 쪽인지 리포트만 보고는 알 수 없다)
+    private static func indexLabel(_ value: Int, lastLabeled: Int) -> String {
+        guard value >= 1 else { return "unknown" }
+        return value > lastLabeled ? "\(lastLabeled + 1)+" : String(format: "%02d", value)
+    }
+
+    /// 알약 순번 — 수동 추가로 늘어날 수 있어 20 까지 개별, 21 부터 묶는다.
+    private static func pillIndexLabel(_ value: Int) -> String { indexLabel(value, lastLabeled: 20) }
+
+    /// 후보 순번 — 호출부에서 1 기반으로 맞춰 넘긴다(`firstIndex` 는 0 기반).
+    private static func candidateIndexLabel(_ value: Int) -> String { indexLabel(value, lastLabeled: 15) }
+
+    /// 수정 횟수 분포용 구간. 라벨이 전부 숫자로 시작해 사전순 정렬이 곧 구간 순서가 된다.
+    private static func editCountBucket(_ count: Int) -> String {
+        switch count {
+        case ..<0:  return "unknown"
+        case 0:     return "0회"
+        case 1:     return "1회"
+        case 2...3: return "2-3회"
+        case 4...5: return "4-5회"
+        default:    return "6회+"
         }
     }
 }
