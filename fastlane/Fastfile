@@ -153,9 +153,15 @@ platform :ios do
       # 인증서만으로 서명되고, 앱·익스텐션은 export_options 의 프로파일을 그대로 사용한다.
       # (Manual 없이 identity 만 강제하면 자동 서명 프레임워크와 "conflicting settings" 충돌)
       # 내부 TestFlight 빌드에만 INTERNAL 컴파일 조건 주입 → AppEnvironment.isInternal=true
-      # → Amplitude·Clarity·Firebase Analytics·S3 원본업로드 OFF(내부 테스트로 지표·데이터셋 오염 방지).
-      # external/release 레인은 주입 안 함 → 외부 테스터·프로덕션은 정상 수집.
-      xcargs: "DEVELOPMENT_TEAM=#{ENV.fetch('DEVELOPMENT_TEAM', '')} CODE_SIGN_IDENTITY='Apple Distribution' CODE_SIGN_STYLE=Manual SWIFT_ACTIVE_COMPILATION_CONDITIONS='$(inherited) INTERNAL' FIREBASE_ANALYTICS_ENABLED=NO",
+      # → Amplitude·S3 원본업로드 OFF. 둘은 환경이 갈려 있지 않아(단일 프로젝트·단일 버킷)
+      #   내부 테스트 데이터가 그대로 운영 지표·데이터셋을 오염시킨다.
+      # Firebase Analytics 는 dev 프로젝트로 수집한다(YES) — 운영 속성과 분리돼 있다.
+      # external/release 레인은 주입 안 함 → 외부 테스터·프로덕션은 prod 로 정상 수집.
+      #
+      # 서명 때문에 Release 구성으로 빌드하지만 환경은 dev 로 돌린다 —
+      # FIREBASE_ENV=Debug(dev 프로젝트) + BASE_URL(dev 서버). 둘은 항상 같은 편이어야 한다.
+      # App Check 토큰의 aud 는 Firebase 프로젝트에 묶여 있어, 한쪽만 바꾸면 서버가 401 을 낸다.
+      xcargs: "DEVELOPMENT_TEAM=#{ENV.fetch('DEVELOPMENT_TEAM', '')} CODE_SIGN_IDENTITY='Apple Distribution' CODE_SIGN_STYLE=Manual SWIFT_ACTIVE_COMPILATION_CONDITIONS='$(inherited) INTERNAL' FIREBASE_ANALYTICS_ENABLED=YES FIREBASE_ENV=Debug BASE_URL='$(BASE_URL_DEBUG)'",
       export_options: {
         method: "app-store",
         signingStyle: "manual",

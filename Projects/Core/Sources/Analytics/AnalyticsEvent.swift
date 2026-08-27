@@ -5,7 +5,7 @@ import Foundation
 
  - 이름은 snake_case·40자 이내, 문자열 파라미터 값은 100자 이내(GA4 제약)로 맞춘다.
  - 리포트에서 파라미터를 보려면 GA4 콘솔에서 "커스텀 측정기준"으로 등록해야 한다(이벤트범위 최대 50개).
- - 내부 빌드에선 FirebaseService.setAnalyticsCollectionEnabled(false)로 수집이 꺼져 있어 track()이 no-op이 된다(NM-364).
+ - 내부 빌드(DEBUG·beta_internal)는 dev Firebase 프로젝트로 수집된다 — 운영 속성은 오염되지 않는다.
  */
 public enum AnalyticsEvent {
 
