@@ -64,6 +64,7 @@ public enum DSIcon: String {
     case userPlus = "Icons/ic_user_plus"
     case smile = "Icons/ic_smile"
     case userCircle = "Icons/ic_user_circle"
+    case userX = "Icons/ic_user_x"
 
     // MARK: - Form
 
