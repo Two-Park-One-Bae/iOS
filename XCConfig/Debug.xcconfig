@@ -4,6 +4,8 @@ CODE_SIGN_STYLE = Automatic
 ENABLE_USER_SCRIPT_SANDBOXING = NO
 SWIFT_EMIT_LOC_STRINGS = YES
 BASE_URL = $(BASE_URL_DEBUG)
+// 구글 로그인 복귀 URL 스킴 (NM-410). dev/prod Firebase 프로젝트마다 값이 다르다.
+GOOGLE_REVERSED_CLIENT_ID = $(GOOGLE_REVERSED_CLIENT_ID_DEBUG)
 // Firebase Analytics 자동수집 ON — dev 프로젝트로 수집되므로 운영 속성은 오염되지 않는다.
 // DebugView·실시간 보고서로 계측을 출시 전에 검증하기 위함 (NM-364 의 전제였던 단일 프로젝트 구성이 해소됨).
 FIREBASE_ANALYTICS_ENABLED = YES

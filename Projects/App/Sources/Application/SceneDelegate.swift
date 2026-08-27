@@ -2,6 +2,7 @@ import UIKit
 import Combine
 import BaseFeatureDependency
 import Core
+import Data
 import Domain
 import TimerFeature
 
@@ -76,6 +77,7 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         appGate = AppGate(windowScene: windowScene)
 
         // 콜드런치 딥링크는 저장만 — 탭바가 뜬 뒤(onTabBarReady) 처리한다.
+        // 미로그인 상태면 로그인·동의를 마치고 탭바가 뜰 때 실행된다 (NM-410).
         pendingURL = connectionOptions.urlContexts.first?.url
     }
 
@@ -87,7 +89,11 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
      두 경로를 모두 받아 handle(url:) 하나로 합류시킨다.
      */
     func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
-        handle(url: URLContexts.first?.url)
+        guard let url = URLContexts.first?.url else { return }
+        // 소셜 로그인 복귀 URL(카카오톡·구글)을 먼저 본다 — 스킴이 nursemate 가 아니라
+        // 아래 딥링크 라우팅에서는 어차피 걸러진다. 처리했으면 여기서 끝낸다 (NM-410).
+        guard !SocialLoginSDK.handle(url: url) else { return }
+        handle(url: url)
     }
 
     /*
@@ -98,8 +104,8 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
        그 외                          → 타이머 탭으로 이동
      scheme·host가 다르면 무시 — 외부에서 임의 URL이 들어올 수 있으므로 반드시 검증한다.
      */
-    private func handle(url: URL?) {
-        guard let url, url.scheme == "nursemate", url.host == "timer" else { return }
+    private func handle(url: URL) {
+        guard url.scheme == "nursemate", url.host == "timer" else { return }
         if url.path.contains("howto") {
             presentWidgetOnboarding()
         } else if url.path.contains("quickstart") {

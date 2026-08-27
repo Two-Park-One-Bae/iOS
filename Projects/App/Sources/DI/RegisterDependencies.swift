@@ -1,8 +1,12 @@
 import Combine
+import Foundation
+
 import Core
 import Domain
 import Data
 import Networks
+import AuthFeatureInterface
+import AuthFeature
 import DrugIdentificationFeatureInterface
 import DrugIdentificationFeature
 import TimerFeatureInterface
@@ -51,6 +55,7 @@ enum RegisterDependencies {
         // MARK: - Network Services
         // 네트워크 계층. Repository 가 주입받아 쓰므로 가장 먼저 준비한다.
         let pillService = DefaultPillService.standard
+        let authService = DefaultAuthService.standard
 
         // MARK: - Repositories
         // 데이터 출처(서버·로컬)를 감추는 계층. UseCase 는 프로토콜만 보고 구현을 모른다.
@@ -59,6 +64,9 @@ enum RegisterDependencies {
         }
         container.register(TimerRepositoryProtocol.self) {
             TimerRepository()
+        }
+        container.register(AuthRepositoryProtocol.self) {
+            AuthRepository(service: authService)
         }
 
         /*
@@ -83,6 +91,10 @@ enum RegisterDependencies {
         // 비즈니스 로직 계층. resolve 결과가 캐싱(싱글톤)되어 앱 전체가 같은 인스턴스를 공유한다.
         container.register(PillUseCase.self) {
             DefaultPillUseCase(repository: container.resolve(PillRepositoryProtocol.self))
+        }
+
+        container.register(AuthUseCase.self) {
+            DefaultAuthUseCase(repository: container.resolve(AuthRepositoryProtocol.self))
         }
 
         /*
@@ -192,6 +204,31 @@ enum RegisterDependencies {
         }
         container.register(TimerFeatureBuildable.self) {
             TimerBuilder()
+        }
+        container.register(AuthFeatureBuildable.self) {
+            AuthBuilder()
+        }
+
+        observeSignOut(container: container)
+    }
+
+    /*
+     계정 스코프 캐시 폐기 (NM-410).
+
+     로그아웃·탈퇴 시 계정에 딸린 값은 전부 버린다 — 병동 공용 기기에서 앞사람의 잔여 식별 횟수가
+     다음 사람에게 보이면 안 된다(spec: feature/auth/README.md §계정 스코프 캐시 폐기).
+
+     AuthUseCase 가 다른 UseCase 를 직접 부르지 않는 이유: Domain 안에서 UseCase 끼리 엮이면
+     "로그아웃이 알약 화면을 안다"가 되어 의존이 뒤엉킨다. 신호만 던지고, 무엇을 지울지는
+     전체를 아는 조립 지점인 여기가 정한다.
+     */
+    private static func observeSignOut(container: DIContainer) {
+        NotificationCenter.default.addObserver(
+            forName: .authDidSignOut,
+            object: nil,
+            queue: .main
+        ) { _ in
+            container.resolve(PillUseCase.self).resetAccountScopedState()
         }
     }
 }
