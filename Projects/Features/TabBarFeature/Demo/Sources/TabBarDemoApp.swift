@@ -21,7 +21,9 @@ final class TabBarDemoAppDelegate: UIResponder, UIApplicationDelegate {
             navigationController: nav,
             homeBuilder: StubHomeFeatureBuilder(),
             timerBuilder: StubTimerFeatureBuilder(),
-            drugBuilder: StubDrugIdentificationFeatureBuilder()
+            drugBuilder: StubDrugIdentificationFeatureBuilder(),
+            onLogout: {},
+            onDeleteAccount: {}
         )
         coordinator.start()
 
@@ -45,7 +47,10 @@ final class StubTimerFeatureBuilder: TimerFeatureBuildable {
         StubCoordinator.pushing("타이머 (Stub)", into: navigationController)
     }
 
-    func makeSettingsViewController() -> UIViewController {
+    func makeSettingsViewController(
+        onLogout: @escaping () -> Void,
+        onDeleteAccount: @escaping () -> Void
+    ) -> UIViewController {
         StubCoordinator.makeViewController("설정 (Stub)")
     }
 }

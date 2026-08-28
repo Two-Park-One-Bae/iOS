@@ -96,6 +96,8 @@ let project = Project(
                 Dep.Features.DrugIdentification.Feature,
                 Dep.Features.Timer.Feature,
                 Dep.Core.Core,
+                // AppCoordinator 가 로그아웃·탈퇴 확인 다이얼로그를 직접 띄운다 (NM-410)
+                Dep.Modules.DSKit.DSKit,
                 .target(name: "TimerWidget"),
                 // 워치 앱 embed — 폰 설치 시 워치에 자동 설치(별도 다운 X),
                 // 폰↔워치 companion 쌍으로 인식돼 WCSession 동기화가 성립한다.
