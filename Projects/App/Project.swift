@@ -26,11 +26,24 @@ let project = Project(
                 "FIREBASE_ANALYTICS_COLLECTION_ENABLED": "$(FIREBASE_ANALYTICS_ENABLED)",
                 "NSCameraUsageDescription": "알약 사진 촬영을 위해 카메라 접근이 필요합니다.",
                 "NSPhotoLibraryUsageDescription": "앨범에서 알약 사진을 선택하기 위해 접근이 필요합니다.",
-                // 위젯 "+" 딥링크(nursemate://timer/preset/pick) 로 앱을 여는 URL 스킴 (NM-302)
+                // 카카오 SDK 초기화 키 (NM-410). 값은 gitignore 된 Secrets.xcconfig 에만 둔다.
+                "KAKAO_NATIVE_APP_KEY": "$(KAKAO_NATIVE_APP_KEY)",
+                // 앱을 여는 URL 스킴 세 갈래.
+                //   nursemate                 위젯 "+" 딥링크 (NM-302)
+                //   kakao{네이티브앱키}         카카오톡 로그인 후 복귀 (NM-410)
+                //   $(GOOGLE_REVERSED_CLIENT_ID)  구글 로그인 후 복귀 — Firebase 콘솔에서 구글 공급자를
+                //                             켜야 GoogleService-Info.plist 에 REVERSED_CLIENT_ID 가 생긴다.
                 "CFBundleURLTypes": [[
                     "CFBundleURLName": "\(Environment.bundlePrefix).app",
-                    "CFBundleURLSchemes": ["nursemate"],
+                    "CFBundleURLSchemes": [
+                        "nursemate",
+                        "kakao$(KAKAO_NATIVE_APP_KEY)",
+                        "$(GOOGLE_REVERSED_CLIENT_ID)",
+                    ],
                 ]],
+                // 카카오톡 앱이 설치돼 있는지 조회하려면 스킴을 미리 선언해야 한다.
+                // 없으면 isKakaoTalkLoginAvailable() 이 항상 false 가 되어 웹 로그인으로만 흐른다.
+                "LSApplicationQueriesSchemes": ["kakaokompassauth", "kakaolink"],
                 "NSSupportsLiveActivities": true,
                 // UIBackgroundModes: audio 는 선언하지 않는다 (App Store 2.5.4).
                 // 무음 루프로 앱을 백그라운드에 살려두던 방식이 리젝 사유였고, 타이머를
@@ -52,7 +65,9 @@ let project = Project(
             resources: ["Resources/**"],
             entitlements: .dictionary([
                 "com.apple.developer.usernotifications.time-sensitive": .boolean(true),
-                "com.apple.security.application-groups": .array([.string("group.app.nursemate.care.timer")])
+                "com.apple.security.application-groups": .array([.string("group.app.nursemate.care.timer")]),
+                // Apple 로그인 (NM-410). Apple Developer 의 App ID 에서도 함께 켜야 한다.
+                "com.apple.developer.applesignin": .array([.string("Default")]),
             ]),
             // GoogleService-Info.plist 는 Resources 가 아니라 Firebase/<구성>/ 에 둔다.
             // 두 벌을 다 번들에 넣으면 Firebase 가 루트에서 못 찾으므로, 빌드 후 하나만 복사한다.
@@ -75,6 +90,7 @@ let project = Project(
                 )
             ],
             dependencies: [
+                Dep.Features.Auth.Feature,
                 Dep.Features.Home.Feature,
                 Dep.Features.TabBar.Feature,
                 Dep.Features.DrugIdentification.Feature,

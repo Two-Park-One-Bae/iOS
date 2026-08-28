@@ -42,6 +42,7 @@ jobs:
           BASE_URL_DEV: ${{ secrets.BASE_URL_DEV }}
           CLARITY_PROJECT_ID: ${{ secrets.CLARITY_PROJECT_ID }}
           DEVELOPMENT_TEAM: ${{ secrets.DEVELOPMENT_TEAM }}
+          KAKAO_NATIVE_APP_KEY: ${{ secrets.KAKAO_NATIVE_APP_KEY }}
         run: |
           mkdir -p XCConfig
           # xcconfig 은 값 안의 "//" 를 주석 처리하므로 스킴의 "://" 에 $() 를 끼워 회피.
@@ -49,13 +50,23 @@ jobs:
           BASE_URL_ESC=$(printf '%s' "${BASE_URL}" | sed 's#://#:/$()/#')
           # 개발 서버(infra locals.tf: dev.api_domain). 시크릿 미등록 시 기본값.
           BASE_URL_DEV_ESC=$(printf '%s' "${BASE_URL_DEV:-https://dev.nursemate.app}" | sed 's#://#:/$()/#')
+          # 카카오 키가 비면 URL 스킴이 "kakao" 한 단어로 들어간다. 앱은 멀쩡히 빌드·실행되고
+          # 카카오 로그인만 복귀하지 못해서, TestFlight 에 올린 뒤에야 드러나는 조용한 실패다.
+          if [ -z "${KAKAO_NATIVE_APP_KEY}" ]; then
+            echo "::error::KAKAO_NATIVE_APP_KEY 시크릿이 없습니다 — 카카오 로그인 복귀 URL 스킴이 'kakao' 로만 들어갑니다."
+            exit 1
+          fi
           cat > XCConfig/Secrets.xcconfig << EOF
           AMPLITUDE_API_KEY = ${AMPLITUDE_API_KEY}
           BASE_URL_DEBUG = ${BASE_URL_DEV_ESC}
           BASE_URL_RELEASE = ${BASE_URL_ESC}
           CLARITY_PROJECT_ID = ${CLARITY_PROJECT_ID}
           DEVELOPMENT_TEAM = ${DEVELOPMENT_TEAM}
+          KAKAO_NATIVE_APP_KEY = ${KAKAO_NATIVE_APP_KEY}
           EOF
+
+          # GOOGLE_REVERSED_CLIENT_ID_* 는 여기서 쓰지 않는다 —
+          # 아래 "Write GoogleService-Info.plist" 단계가 plist 에서 직접 뽑아 덧붙인다.
 
       - name: Write GoogleService-Info.plist
         env:
@@ -75,6 +86,28 @@ jobs:
             exit 1
           fi
           echo "$GOOGLE_SERVICE_INFO_PLIST_DEV" | base64 --decode > Projects/App/Firebase/Debug/GoogleService-Info.plist
+
+          # 구글 로그인 복귀 URL 스킴(NM-410)은 plist 의 REVERSED_CLIENT_ID 와 반드시 같아야 한다.
+          # 별도 시크릿으로 두면 plist 만 갱신했을 때 한쪽이 옛 값으로 남아 조용히 어긋나므로,
+          # 방금 쓴 plist 에서 직접 뽑아 Secrets.xcconfig 에 덧붙인다(단일 출처).
+          # Firebase 콘솔에서 Google 공급자가 꺼져 있으면 plist 에 이 키가 없다 —
+          # 그때는 빈 값이 들어가고 구글 버튼만 실패한다(카카오·애플은 영향 없음).
+          reversed_client_id() {
+            plutil -extract REVERSED_CLIENT_ID raw -o - "$1" 2>/dev/null || true
+          }
+          {
+            echo "GOOGLE_REVERSED_CLIENT_ID_DEBUG = $(reversed_client_id Projects/App/Firebase/Debug/GoogleService-Info.plist)"
+            echo "GOOGLE_REVERSED_CLIENT_ID_RELEASE = $(reversed_client_id Projects/App/Firebase/Release/GoogleService-Info.plist)"
+          } >> XCConfig/Secrets.xcconfig
+
+          # 같은 종류의 조용한 실패 — plist 에 REVERSED_CLIENT_ID 가 없으면(콘솔에서 Google 공급자가
+          # 꺼진 프로젝트의 plist) 구글 로그인만 복귀하지 못한다. 빌드는 성공하므로 여기서 막는다.
+          for config in Debug Release; do
+            if [ -z "$(reversed_client_id "Projects/App/Firebase/$config/GoogleService-Info.plist")" ]; then
+              echo "::error::$config 의 GoogleService-Info.plist 에 REVERSED_CLIENT_ID 가 없습니다 — Firebase 콘솔에서 Google 공급자를 켜고 plist 를 다시 받아 시크릿을 갱신하세요."
+              exit 1
+            fi
+          done
 
       - name: Write API Key
         env:

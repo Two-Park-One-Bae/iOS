@@ -1,13 +1,45 @@
 import UIKit
 
 // MARK: - List Row
-// 배경 white, cornerRadius 20, shadow(#1E293B 7%, y:2, blur:12)
-// padding 20, gap 16, horizontal center
-// 좌: 56x56 iconBg(Info50, r16) + icon 28x28(Info500)
-// 중: Title SemiBold 16 textPrimary + Subtitle Regular 13 textSecondary(줄바꿈, lineHeight 1.1) + Caption SemiBold 12
-// 우: chevron-right 16 Neutral400
+// 아이콘 + 제목/부제 + chevron 한 줄. 두 가지 크기가 있다.
+//
+// .default (홈 카드)   r20 · padding 20 · gap 16 · iconBg 56(r16)/icon 28 · 제목 16 · 부제 13
+// .compact (설정 행)   r14 · padding 14/16 · gap 12 · iconBg 40(r10)/icon 20 · 제목 14 · 부제 12
+//   — 디자인: DESIGN.pen `Xoc5z` 계정 섹션
 
 public final class DSListRow: UIView {
+
+    public enum Style {
+        case `default`
+        case compact
+
+        var cornerRadius: CGFloat { self == .default ? 20 : 14 }
+        var verticalPadding: CGFloat { self == .default ? 20 : 14 }
+        var horizontalPadding: CGFloat { self == .default ? 20 : 16 }
+        var spacing: CGFloat { self == .default ? 16 : 12 }
+        var iconBackgroundLength: CGFloat { self == .default ? 56 : 40 }
+        var iconBackgroundRadius: CGFloat { self == .default ? 16 : 10 }
+        var iconLength: CGFloat { self == .default ? 28 : 20 }
+        var chevronSize: CGFloat { self == .default ? 16 : 18 }
+        var shadowOpacity: Float { self == .default ? 0.07 : 0.04 }
+        var shadowOffset: CGSize { self == .default ? CGSize(width: 0, height: 2) : CGSize(width: 0, height: 1) }
+
+        var titleFont: UIFont {
+            DSKitFontFamily.Pretendard.semiBold.font(size: self == .default ? 16 : 14)
+        }
+
+        var subtitleFont: UIFont {
+            DSKitFontFamily.Pretendard.regular.font(size: self == .default ? 13 : 12)
+        }
+
+        var subtitleColor: UIColor {
+            self == .default ? DSColor.textSecondary : DSColor.textTertiary
+        }
+    }
+
+    // MARK: - Properties
+
+    private let style: Style
 
     // MARK: - UI
 
@@ -16,36 +48,20 @@ public final class DSListRow: UIView {
         iv.tintColor = DSColor.Info._500
         iv.contentMode = .scaleAspectFit
         iv.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            iv.widthAnchor.constraint(equalToConstant: 28),
-            iv.heightAnchor.constraint(equalToConstant: 28)
-        ])
         return iv
     }()
 
     private let iconBackground: UIView = {
         let view = UIView()
         view.backgroundColor = DSColor.Info._50
-        view.layer.cornerRadius = 16
         view.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            view.widthAnchor.constraint(equalToConstant: 56),
-            view.heightAnchor.constraint(equalToConstant: 56)
-        ])
         return view
     }()
 
-    private let titleLabel: UILabel = {
-        let label = UILabel()
-        label.font = DSKitFontFamily.Pretendard.semiBold.font(size: 16)
-        label.textColor = DSColor.textPrimary
-        return label
-    }()
+    private let titleLabel = UILabel()
 
     private let subtitleLabel: UILabel = {
         let label = UILabel()
-        label.font = DSKitFontFamily.Pretendard.regular.font(size: 13)
-        label.textColor = DSColor.textSecondary
         // 말줄임(...) 대신 줄바꿈 — 디자인의 설명 문구는 카드 폭에서 여러 줄로 흐른다.
         label.numberOfLines = 0
         return label
@@ -62,8 +78,6 @@ public final class DSListRow: UIView {
 
     private let chevronView: UIImageView = {
         let iv = UIImageView()
-        let config = UIImage.SymbolConfiguration(pointSize: 16, weight: .medium)
-        iv.image = UIImage(systemName: "chevron.right", withConfiguration: config)
         iv.tintColor = DSColor.Neutral._400
         iv.contentMode = .scaleAspectFit
         iv.translatesAutoresizingMaskIntoConstraints = false
@@ -72,9 +86,12 @@ public final class DSListRow: UIView {
 
     // MARK: - Init
 
-    public init(icon: DSIcon, title: String, subtitle: String) {
+    public init(style: Style = .default, icon: DSIcon, title: String, subtitle: String) {
+        self.style = style
         super.init(frame: .zero)
         iconImageView.image = icon.uiImage
+        titleLabel.font = style.titleFont
+        titleLabel.textColor = DSColor.textPrimary
         titleLabel.text = title
         setSubtitle(subtitle)
         setupUI()
@@ -88,21 +105,31 @@ public final class DSListRow: UIView {
 
     private func setupUI() {
         backgroundColor = .white
-        layer.cornerRadius = 20
+        layer.cornerRadius = style.cornerRadius
         layer.shadowColor = DSColor.textPrimary.cgColor
-        layer.shadowOpacity = 0.07
-        layer.shadowOffset = CGSize(width: 0, height: 2)
+        layer.shadowOpacity = style.shadowOpacity
+        layer.shadowOffset = style.shadowOffset
         layer.shadowRadius = 6
+
+        iconBackground.layer.cornerRadius = style.iconBackgroundRadius
+        chevronView.image = UIImage(
+            systemName: "chevron.right",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: style.chevronSize, weight: .medium)
+        )
 
         iconBackground.addSubview(iconImageView)
         NSLayoutConstraint.activate([
+            iconBackground.widthAnchor.constraint(equalToConstant: style.iconBackgroundLength),
+            iconBackground.heightAnchor.constraint(equalToConstant: style.iconBackgroundLength),
+            iconImageView.widthAnchor.constraint(equalToConstant: style.iconLength),
+            iconImageView.heightAnchor.constraint(equalToConstant: style.iconLength),
             iconImageView.centerXAnchor.constraint(equalTo: iconBackground.centerXAnchor),
             iconImageView.centerYAnchor.constraint(equalTo: iconBackground.centerYAnchor)
         ])
 
         let textStack = UIStackView(arrangedSubviews: [titleLabel, subtitleLabel, captionLabel])
         textStack.axis = .vertical
-        textStack.spacing = 4
+        textStack.spacing = style == .default ? 4 : 2
         textStack.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
         chevronView.setContentHuggingPriority(.required, for: .horizontal)
@@ -110,17 +137,17 @@ public final class DSListRow: UIView {
 
         let rowStack = UIStackView(arrangedSubviews: [iconBackground, textStack, chevronView])
         rowStack.axis = .horizontal
-        rowStack.spacing = 16
+        rowStack.spacing = style.spacing
         rowStack.alignment = .center
         rowStack.distribution = .fill
         rowStack.translatesAutoresizingMaskIntoConstraints = false
 
         addSubview(rowStack)
         NSLayoutConstraint.activate([
-            rowStack.topAnchor.constraint(equalTo: topAnchor, constant: 20),
-            rowStack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 20),
-            rowStack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -20),
-            rowStack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -20)
+            rowStack.topAnchor.constraint(equalTo: topAnchor, constant: style.verticalPadding),
+            rowStack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: style.horizontalPadding),
+            rowStack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -style.horizontalPadding),
+            rowStack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -style.verticalPadding)
         ])
     }
 }
@@ -133,15 +160,27 @@ extension DSListRow {
         titleLabel.text = title
     }
 
+    /// 제목 색. 파괴적 액션(계정 삭제)만 Error 계열로 바꾼다.
+    public func setTitleColor(_ color: UIColor) {
+        titleLabel.textColor = color
+    }
+
+    /// 빈 문자열이면 줄 자체를 숨긴다 — 부제 없는 행(계정 삭제)에서 빈 줄이 생기지 않게.
     public func setSubtitle(_ subtitle: String) {
-        let style = NSMutableParagraphStyle()
-        style.lineHeightMultiple = 1.1
+        guard !subtitle.isEmpty else {
+            subtitleLabel.isHidden = true
+            return
+        }
+
+        subtitleLabel.isHidden = false
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.lineHeightMultiple = 1.1
         subtitleLabel.attributedText = NSAttributedString(
             string: subtitle,
             attributes: [
-                .paragraphStyle: style,
-                .font: DSKitFontFamily.Pretendard.regular.font(size: 13),
-                .foregroundColor: DSColor.textSecondary
+                .paragraphStyle: paragraph,
+                .font: style.subtitleFont,
+                .foregroundColor: style.subtitleColor
             ]
         )
     }
@@ -191,8 +230,13 @@ private final class DSListRowTapRecognizer: UITapGestureRecognizer {
 
 #if DEBUG
 #Preview("DSListRow") {
-    let row = DSListRow(icon: .heart, title: "항목 제목", subtitle: "부가 설명")
-    row.widthAnchor.constraint(equalToConstant: 340).isActive = true
-    return row
+    let stack = UIStackView(arrangedSubviews: [
+        DSListRow(icon: .heart, title: "항목 제목", subtitle: "부가 설명"),
+        DSListRow(style: .compact, icon: .user, title: "로그아웃", subtitle: "언제든 다시 로그인할 수 있어요"),
+    ])
+    stack.axis = .vertical
+    stack.spacing = 12
+    stack.widthAnchor.constraint(equalToConstant: 350).isActive = true
+    return stack
 }
 #endif
