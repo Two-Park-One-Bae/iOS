@@ -244,7 +244,8 @@ public final class ConsentOnboardingVC: UIViewController {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] message in
                 guard let self else { return }
-                DSAlertCardView.present(on: self.view, title: "알림", message: message)
+                // 다이얼로그와 같은 이유로 시트가 아니라 창에 띄운다.
+                DSAlertCardView.present(on: self.view.window ?? self.view, title: "알림", message: message)
             }
             .store(in: &cancelBag)
     }
@@ -288,8 +289,8 @@ public final class ConsentOnboardingVC: UIViewController {
 
     /// 취소는 곧 로그아웃이라 한 번 되묻는다 (디자인: DESIGN.pen `Kf67G`).
     @objc private func cancelTapped() {
-        DSConfirmDialogView.present(
-            on: view,
+        // 시트가 아니라 창에 띄운다 — 시트에 붙이면 dim 이 시트만 덮는다.
+        DSConfirmDialogView.presentOverWindow(
             title: "로그인 화면으로 돌아갈까요?",
             message: "동의하지 않으면 이용이 제한돼요",
             confirmTitle: "로그아웃",

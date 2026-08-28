@@ -174,6 +174,38 @@ public final class DSConfirmDialogView: UIView {
 
         return dialog
     }
+
+    /// 키 윈도우에 직접 붙인다 — **바텀시트 위에서 물을 때** 쓴다.
+    ///
+    /// 시트의 뷰에 붙이면 dim 이 시트만 덮고 다이얼로그도 시트 한가운데에 뜬다.
+    /// 디자인(`Kf67G`)은 화면 전체를 덮는 dim 에 화면 한가운데다.
+    @discardableResult
+    public static func presentOverWindow(
+        title: String,
+        message: String? = nil,
+        confirmTitle: String,
+        cancelTitle: String = "취소",
+        confirmStyle: ConfirmStyle = .primary,
+        confirmed: @escaping () -> Void,
+        cancelled: (() -> Void)? = nil
+    ) -> DSConfirmDialogView? {
+        let window = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first { $0.isKeyWindow }
+        guard let window else { return nil }
+
+        return present(
+            on: window,
+            title: title,
+            message: message,
+            confirmTitle: confirmTitle,
+            cancelTitle: cancelTitle,
+            confirmStyle: confirmStyle,
+            confirmed: confirmed,
+            cancelled: cancelled
+        )
+    }
 }
 
 // MARK: - Preview
