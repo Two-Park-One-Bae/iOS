@@ -70,8 +70,7 @@ public final class AuthCoordinator: BaseCoordinator {
 
         let consentVC = ConsentOnboardingVC(viewModel: viewModel)
         if let sheet = consentVC.sheetPresentationController {
-            // 내용 높이에 맞춘 시트. 항목 수가 늘어도 잘리지 않도록 medium 을 함께 둔다.
-            sheet.detents = [.medium(), .large()]
+            // 높이(detent)는 내용에 맞춰 화면 쪽에서 잡는다 — 항목 수를 아는 건 저쪽뿐이다.
             sheet.prefersGrabberVisible = false
             sheet.preferredCornerRadius = DSRadius.xl
         }
