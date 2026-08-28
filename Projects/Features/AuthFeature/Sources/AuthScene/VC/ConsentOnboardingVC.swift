@@ -61,6 +61,13 @@ public final class ConsentOnboardingVC: UIViewController {
         $0.spacing = 2
     }
 
+    /// 시트 높이를 이 스택의 실제 높이로 잡는다 — 아래 여백이 남지 않게.
+    private let rootStack = UIStackView().then {
+        $0.axis = .vertical
+        $0.spacing = 24
+        $0.alignment = .fill
+    }
+
     private let agreeButton = PrimaryButton(title: "동의하고 계속")
 
     private let cancelButton = UIButton(type: .system).then {
@@ -91,6 +98,16 @@ public final class ConsentOnboardingVC: UIViewController {
         setLayout()
         bind()
         viewModel.load()
+    }
+
+    public override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        // rootStack 은 위에서 고정이라 시트 높이와 무관하게 자기 높이가 정해진다 —
+        // 그래서 한 번 재고 detent 를 갱신하면 그대로 수렴한다.
+        let height = rootStack.frame.maxY + bottomPadding
+        guard height > 0, abs(height - measuredHeight) > 0.5 else { return }
+        measuredHeight = height
+        applyContentDetent()
     }
 
     // MARK: - Setup
@@ -128,18 +145,61 @@ public final class ConsentOnboardingVC: UIViewController {
             $0.alignment = .fill
         }
 
-        let rootStack = UIStackView(arrangedSubviews: [textStack, consentStack, buttonStack]).then {
-            $0.axis = .vertical
-            $0.spacing = 24
-            $0.alignment = .fill
-        }
+        [textStack, consentStack, buttonStack].forEach(rootStack.addArrangedSubview)
 
         view.addSubview(rootStack)
         rootStack.snp.makeConstraints {
-            $0.top.equalToSuperview().inset(28)
-            $0.leading.trailing.equalToSuperview().inset(24)
-            $0.bottom.lessThanOrEqualTo(view.safeAreaLayoutGuide).inset(16)
+            $0.top.equalToSuperview().inset(Layout.top)
+            $0.leading.trailing.equalToSuperview().inset(Layout.side)
         }
+    }
+
+    // MARK: - Sheet height
+
+    private enum Layout {
+        static let top: CGFloat = 28
+        static let side: CGFloat = 24
+        /// 디자인의 아래 여백. 홈 인디케이터가 있으면 그쪽이 더 크므로 둘 중 큰 값을 쓴다
+        /// (더하면 취소 아래가 두 배로 벌어진다).
+        static let bottom: CGFloat = 28
+    }
+
+    /// detent 값에는 시스템이 하단 세이프에어리어를 **따로 더한다**.
+    /// 그래서 홈 인디케이터가 있는 기기에서는 여기서 더 얹을 게 없다 —
+    /// 더하면 취소 아래가 디자인의 두 배로 벌어진다.
+    private var bottomPadding: CGFloat { max(0, Layout.bottom - view.safeAreaInsets.bottom) }
+
+    /// 배치가 끝난 뒤 잰 실제 높이. 추정값(systemLayoutSizeFitting)은 버튼·라벨에서 몇 십 pt 씩 어긋난다.
+    private var measuredHeight: CGFloat = 0
+
+    /// 시트를 내용 높이에 딱 맞춘다.
+    ///
+    /// `.medium()` 은 화면의 절반을 고정으로 잡아 '취소' 아래가 크게 비었다.
+    /// 항목 수·글자 크기에 따라 높이가 달라지므로, 약관이 도착해 화면을 다시 그린 뒤에도
+    /// 한 번 더 계산한다(`invalidateDetents`).
+    private func applyContentDetent() {
+        guard let sheet = sheetPresentationController else { return }
+        sheet.detents = [.custom(identifier: .consentContent) { [weak self] context in
+            guard let self else { return nil }
+            return min(self.contentHeight(), context.maximumDetentValue)
+        }]
+        sheet.selectedDetentIdentifier = .consentContent
+        sheet.animateChanges { sheet.invalidateDetents() }
+    }
+
+    private func contentHeight() -> CGFloat {
+        if measuredHeight > 0 { return measuredHeight }
+
+        // 배치 전(첫 detent 계산)에는 추정으로 시작하고, 배치가 끝나면 실측으로 교체한다.
+        let width = view.bounds.width > 0
+            ? view.bounds.width
+            : (presentingViewController?.view.bounds.width ?? 390)
+        let fitted = rootStack.systemLayoutSizeFitting(
+            CGSize(width: width - Layout.side * 2, height: 0),
+            withHorizontalFittingPriority: .required,
+            verticalFittingPriority: .fittingSizeLevel
+        ).height
+        return Layout.top + fitted + bottomPadding
     }
 
     private func bind() {
@@ -184,7 +244,8 @@ public final class ConsentOnboardingVC: UIViewController {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] message in
                 guard let self else { return }
-                DSAlertCardView.present(on: self.view, title: "알림", message: message)
+                // 다이얼로그와 같은 이유로 시트가 아니라 창에 띄운다.
+                DSAlertCardView.present(on: self.view.window ?? self.view, title: "알림", message: message)
             }
             .store(in: &cancelBag)
     }
@@ -202,6 +263,8 @@ public final class ConsentOnboardingVC: UIViewController {
             itemRows[definition.type] = row
             itemStack.addArrangedSubview(row)
         }
+
+        applyContentDetent()
     }
 
     /// 약관 전문은 웹 게시분을 그대로 띄운다 — 앱에 복사해두면 개정 때마다 어긋난다.
@@ -226,12 +289,16 @@ public final class ConsentOnboardingVC: UIViewController {
 
     /// 취소는 곧 로그아웃이라 한 번 되묻는다 (디자인: DESIGN.pen `Kf67G`).
     @objc private func cancelTapped() {
-        DSConfirmDialogView.present(
-            on: view,
+        // 시트가 아니라 창에 띄운다 — 시트에 붙이면 dim 이 시트만 덮는다.
+        DSConfirmDialogView.presentOverWindow(
             title: "로그인 화면으로 돌아갈까요?",
             message: "동의하지 않으면 이용이 제한돼요",
             confirmTitle: "로그아웃",
             confirmed: { [weak self] in self?.viewModel.cancelAndSignOut() }
         )
     }
+}
+
+private extension UISheetPresentationController.Detent.Identifier {
+    static let consentContent = Self("consentContent")
 }
