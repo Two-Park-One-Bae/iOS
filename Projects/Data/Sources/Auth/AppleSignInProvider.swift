@@ -51,15 +51,27 @@ struct AppleSignInProvider: SocialSignInProviding {
 
         let controller = ASAuthorizationController(authorizationRequests: [request])
 
+        // 표시할 창은 **지금 여기서**(메인 액터) 찾아 델리게이트에 넘긴다.
+        // presentationAnchor(for:) 안에서 찾으면 AuthenticationServices 가 어느 스레드로
+        // 부르느냐에 따라 UIApplication.connectedScenes 를 메인 밖에서 만지게 된다.
+        let anchor = Self.presentationAnchor()
+
         return try await withCheckedThrowingContinuation { continuation in
             // 델리게이트는 weak 참조라 지역 변수로 두면 즉시 해제돼 콜백이 오지 않는다.
             // 콜백 클로저가 자기 자신을 강하게 잡고, 완료 시점에 놓아준다.
-            let delegate = AppleSignInDelegate(continuation: continuation)
+            let delegate = AppleSignInDelegate(continuation: continuation, anchor: anchor)
             delegate.retain()
             controller.delegate = delegate
             controller.presentationContextProvider = delegate
             controller.performRequests()
         }
+    }
+
+    @MainActor
+    private static func presentationAnchor() -> ASPresentationAnchor {
+        PresentationAnchor.topMostViewController()?.view.window
+            ?? PresentationAnchor.keyWindow()
+            ?? ASPresentationAnchor()
     }
 
     // MARK: - Nonce
@@ -100,9 +112,13 @@ private final class AppleSignInDelegate: NSObject {
 
     private var continuation: CheckedContinuation<ASAuthorizationAppleIDCredential, Error>?
     private var selfReference: AppleSignInDelegate?
+    /// 요청을 시작한 시점에 메인에서 찾아둔 창. 콜백에서 UIKit 을 다시 뒤지지 않기 위해 들고 있는다.
+    private let anchor: ASPresentationAnchor
 
-    init(continuation: CheckedContinuation<ASAuthorizationAppleIDCredential, Error>) {
+    init(continuation: CheckedContinuation<ASAuthorizationAppleIDCredential, Error>,
+         anchor: ASPresentationAnchor) {
         self.continuation = continuation
+        self.anchor = anchor
     }
 
     func retain() {
@@ -142,8 +158,6 @@ extension AppleSignInDelegate: ASAuthorizationControllerDelegate {
 extension AppleSignInDelegate: ASAuthorizationControllerPresentationContextProviding {
 
     func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
-        MainActor.assumeIsolated {
-            PresentationAnchor.topMostViewController()?.view.window ?? ASPresentationAnchor()
-        }
+        anchor
     }
 }

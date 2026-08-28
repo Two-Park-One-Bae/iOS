@@ -24,13 +24,15 @@ protocol SocialSignInProviding {
 @MainActor
 enum PresentationAnchor {
 
-    static func topMostViewController() -> UIViewController? {
-        let window = UIApplication.shared.connectedScenes
+    static func keyWindow() -> UIWindow? {
+        UIApplication.shared.connectedScenes
             .compactMap { $0 as? UIWindowScene }
             .flatMap(\.windows)
             .first { $0.isKeyWindow }
+    }
 
-        var top = window?.rootViewController
+    static func topMostViewController() -> UIViewController? {
+        var top = keyWindow()?.rootViewController
         while let presented = top?.presentedViewController {
             top = presented
         }
