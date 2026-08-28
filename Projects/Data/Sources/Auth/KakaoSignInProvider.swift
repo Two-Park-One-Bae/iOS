@@ -58,6 +58,10 @@ struct KakaoSignInProvider: SocialSignInProviding {
         return try await login { UserApi.shared.loginWithKakaoAccount(completion: $0) }
     }
 
+    /// **반드시 메인 액터에 머물러야 한다.** `nonisolated` 로 두면 호출부가 `@MainActor` 여도
+    /// async 함수가 메인을 벗어나 실행돼, 카카오 SDK 가 백그라운드에서 키 윈도우를 찾고
+    /// `UIApplication.open` 을 부른다(Main Thread Checker 경고).
+    @MainActor
     private func login(
         _ perform: (@escaping (OAuthToken?, Error?) -> Void) -> Void
     ) async throws -> String {
