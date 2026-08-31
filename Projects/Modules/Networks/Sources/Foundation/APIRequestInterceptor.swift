@@ -82,6 +82,19 @@ public final class APIRequestInterceptor: RequestInterceptor {
             return
         }
 
+        // 같은 401 이라도 **원인이 다르면 처리가 달라야 한다.**
+        //
+        // `APP_CHECK_FAILED` 는 앱 무결성(App Check) 검증이 막힌 것이라 **사용자 세션과 무관하다.**
+        // ID 토큰을 갱신해도 절대 풀리지 않고, 세션 만료로 처리하면 멀쩡히 로그인한 사용자를
+        // 로그아웃시킨다 — 실제로 백엔드가 다른 Firebase 프로젝트를 보고 있을 때, 로그인·동의를
+        // 마치고 홈에 들어간 직후 아무 안내 없이 로그인 화면으로 튕기는 증상이 났다.
+        //
+        // 재시도도 하지 않는다. 앱이 고칠 수 있는 게 없으므로 그대로 에러를 올려 화면에서 안내한다.
+        guard Self.serverCode(of: request) != "APP_CHECK_FAILED" else {
+            completion(.doNotRetry)
+            return
+        }
+
         // 이미 한 번 갱신해봤는데 또 401 → 탈퇴·토큰 폐기·공급자 불일치 등 갱신으로 풀 수 없는 상태다.
         guard request.retryCount == 0 else {
             Self.notifySessionExpired()
@@ -111,6 +124,15 @@ public final class APIRequestInterceptor: RequestInterceptor {
     static func requiresAuthorization(_ request: URLRequest) -> Bool {
         guard let path = request.url?.path else { return true }
         return !publicPaths.contains(path)
+    }
+
+    /// 응답 본문(RFC 9457)의 `code`. 같은 401 의 원인을 가르는 데 쓴다.
+    ///
+    /// 본문은 이미 받아 둔 것이라 여기서 네트워크를 더 타지 않는다. 디코딩에 실패하면 `nil` —
+    /// 원인을 모르는 401 은 기존 경로(갱신 1회 → 세션 만료)로 보낸다.
+    private static func serverCode(of request: Request) -> String? {
+        guard let data = (request as? DataRequest)?.data else { return nil }
+        return try? JSONDecoder().decode(NetworkError.self, from: data).code
     }
 
     private static func notifySessionExpired() {

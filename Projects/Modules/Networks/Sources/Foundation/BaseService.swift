@@ -76,16 +76,7 @@ extension BaseService {
                         promise(.failure(error))
                     }
                 case .failure(let error):
-                    // Interceptor가 토큰 재발급에 실패한 경우 tokenReissuanceFailed로 전파
-                    // 패턴 매칭으로 에러 체인을 역으로 추적: MoyaError → AFError → APIError
-                    if case MoyaError.underlying(let error, _) = error,
-                       case AFError.requestRetryFailed(let retryError, _) = error,
-                       let retryError = retryError as? APIError,
-                       retryError == .tokenReissuanceFailed {
-                        promise(.failure(retryError))
-                    } else {
-                        promise(.failure(error))
-                    }
+                    promise(.failure(Self.interpret(error)))
                 }
             }
         }.eraseToAnyPublisher() // Future<T, Error> → AnyPublisher<T, Error> 타입 지우기
@@ -123,14 +114,7 @@ extension BaseService {
                         promise(.failure(error))
                     }
                 case .failure(let error):
-                    if case MoyaError.underlying(let error, _) = error,
-                       case AFError.requestRetryFailed(let retryError, _) = error,
-                       let retryError = retryError as? APIError,
-                       retryError == .tokenReissuanceFailed {
-                        promise(.failure(retryError))
-                    } else {
-                        promise(.failure(error))
-                    }
+                    promise(.failure(Self.interpret(error)))
                 }
             }
         }.eraseToAnyPublisher()
@@ -164,14 +148,7 @@ extension BaseService {
                         continuation.resume(throwing: error)
                     }
                 case .failure(let error):
-                    if case MoyaError.underlying(let error, _) = error,
-                       case AFError.requestRetryFailed(let retryError, _) = error,
-                       let retryError = retryError as? APIError,
-                       retryError == .tokenReissuanceFailed {
-                        continuation.resume(throwing: retryError)
-                    } else {
-                        continuation.resume(throwing: error)
-                    }
+                    continuation.resume(throwing: Self.interpret(error))
                 }
             }
         }
@@ -208,14 +185,7 @@ extension BaseService {
                         continuation.resume(throwing: APIError.unknown)
                     }
                 case .failure(let error):
-                    if case MoyaError.underlying(let error, _) = error,
-                       case AFError.requestRetryFailed(let retryError, _) = error,
-                       let retryError = retryError as? APIError,
-                       retryError == .tokenReissuanceFailed {
-                        continuation.resume(throwing: retryError)
-                    } else {
-                        continuation.resume(throwing: error)
-                    }
+                    continuation.resume(throwing: Self.interpret(error))
                 }
             }
         }
@@ -230,9 +200,39 @@ extension BaseService {
                     // 바디 decode 없이 HTTP 상태 코드만 반환
                     promise(.success(value.statusCode))
                 case .failure(let error):
-                    promise(.failure(error))
+                    promise(.failure(Self.interpret(error)))
                 }
             }
         }.eraseToAnyPublisher()
+    }
+
+    // MARK: - 에러 해석
+
+    /// Moya 가 실패로 떨군 에러를 앱이 쓰는 타입으로 되돌린다.
+    ///
+    /// **401 이 여기로 오는 이유가 핵심이다.** `BaseAPI.validationType` 이 401만 일부러 검증
+    /// 실패로 떨어뜨린다 — 인터셉터가 토큰 갱신·재시도를 잡게 하려는 것이다. 그 대가로 401 은
+    /// 위쪽 `400...599 → APIError.network` 분기를 **절대 타지 않는다.** 그대로 올리면 화면에
+    /// Moya 기본 문구("response status code was unacceptable: 401")가 사용자에게 노출된다.
+    ///
+    /// 그래서 응답 본문이 남아 있으면 여기서 `APIError.network` 로 되살린다. 그래야 `code` 로
+    /// 분기하는 상위 계층(`AuthErrorMapper`·`PillRepository`)과 사용자 문구가 401 에서도 동작한다.
+    static func interpret(_ error: Error) -> Error {
+        // 인터셉터가 토큰 재발급에 실패한 경우. 에러 체인을 역으로 탄다: MoyaError → AFError → APIError
+        if case MoyaError.underlying(let underlying, _) = error,
+           case AFError.requestRetryFailed(let retryError, _) = underlying,
+           let apiError = retryError as? APIError,
+           apiError == .tokenReissuanceFailed {
+            return apiError
+        }
+
+        guard let moya = error as? MoyaError,
+              let response = moya.response,
+              var problem = try? JSONDecoder().decode(NetworkError.self, from: response.data) else {
+            return error
+        }
+        // 확장 멤버(예: 429 의 usage)를 상위 계층이 decode 할 수 있도록 원문을 보존한다.
+        problem.rawBody = response.data
+        return APIError.network(statusCode: response.statusCode, error: problem)
     }
 }

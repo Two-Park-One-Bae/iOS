@@ -44,7 +44,7 @@ public struct PendingWidgetTimerComplete: Codable, Sendable {
 public enum WidgetAnalyticsQueue {
 
     // 앱·위젯·워치 공유 App Group (Data/TimerRepository.appGroupSuiteName 과 동일 값).
-    private static let suiteName = "group.app.nursemate.care.timer"
+    private static let suiteName = "group.app.nursemate.timer"
     private static let startKey = "care.timer.pendingAnalytics"          // timer_start 큐
     private static let completeKey = "care.timer.pendingCompletes"       // timer_complete 큐
 
