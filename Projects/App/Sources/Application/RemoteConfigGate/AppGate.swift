@@ -35,7 +35,7 @@ final class AppGate {
 
     /// 최신 Remote Config 값으로 게이트 상태를 갱신한다.
     ///
-    /// 여러 경로(앱 시작·포그라운드 복귀·실시간 리스너·주기 갱신)에서 반복 호출되므로
+    /// 여러 경로(앱 시작·포그라운드 복귀·실시간 리스너·장애 감지)에서 반복 호출되므로
     /// **몇 번을 불러도 안전해야 한다.** 상태가 그대로면 아무 일도 하지 않는다.
     func evaluate() {
         let rc = RemoteConfigService.shared
@@ -44,7 +44,7 @@ final class AppGate {
                         : nil
 
         #if DEBUG
-        // 주기 갱신이 60초마다 부르므로 **바뀔 때만** 찍는다. 매번 찍으면 로그가 묻힌다.
+        // 호출 경로가 넷이라 **바뀔 때만** 찍는다. 매번 찍으면 정작 전환이 로그에 묻힌다.
         if next != current {
             print("🚧 AppGate — 강제업데이트 \(rc.isForceUpdateRequired) · 점검 \(rc.isUnderMaintenance)")
         }
