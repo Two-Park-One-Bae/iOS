@@ -22,11 +22,30 @@ public enum FirebaseService {
         Analytics.setAnalyticsCollectionEnabled(enabled)
     }
 
-    /// Crashlytics·Analytics 양쪽에 기기 식별자(Keychain UUID)를 붙인다.
+    /// Crashlytics·Analytics 양쪽에 회원 식별자(**Firebase UID**)를 붙인다.
+    ///
     /// GA4 기본값인 app-instance ID 는 재설치 시 새로 발급돼 같은 사람이 둘로 잡힌다.
+    /// 그래서 예전엔 Keychain UUID 를 썼는데, 그것도 **사람이 아니라 기기를 센다** —
+    /// 한 사람이 두 기기를 쓰면 둘로, 기기를 바꾸면 신규로 잡혔다. 북극성 짝지표가
+    /// "주간 케어 활성 **간호사 수**"라 그 차이가 그대로 지표 오차가 된다.
+    ///
+    /// 로그인이 들어오면서(NM-410) 사람 단위 식별자가 생겼고, 서버도 회원을 같은 값으로
+    /// 저장하므로(`AppUserEntity.userId`) 크래시·지표·서버 로그가 한 값으로 이어진다.
+    ///
+    /// GA4 는 보고 ID 가 `User-ID(Blended)` 로 설정돼 있어야 이 값이 집계에 쓰인다
+    /// (docs/NurseMate-Analytics-GSM-Notion.md).
     public static func setUserID(_ userID: String) {
         Crashlytics.crashlytics().setUserID(userID)
         Analytics.setUserID(userID)
+    }
+
+    /// 로그아웃 — 사용자 결합을 끊는다.
+    ///
+    /// Crashlytics 는 빈 문자열이 해제 규약이다(문서 명시). 다만 **이미 올라간 리포트에서는
+    /// 지워지지 않는다** — 탈퇴 사용자의 기록 삭제가 필요하면 Firebase 지원에 문의해야 한다.
+    public static func clearUserID() {
+        Crashlytics.crashlytics().setUserID("")
+        Analytics.setUserID(nil)
     }
 
     /// GA4 커스텀 이벤트 전송. 내부 빌드는 setAnalyticsCollectionEnabled(false)라 실제 전송이 no-op이 된다.
