@@ -160,7 +160,7 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
         }
         loadingVC.onFailure = { [weak self, weak loadingVC] message in
             guard let loadingVC else { return }
-            self?.showFailure(replacing: loadingVC)
+            self?.showFailure(message: message, replacing: loadingVC)
         }
         // 한도 도달은 실패가 아니다 — 미리보기로 되돌리고 안내 팝업만 띄운다.
         loadingVC.onLimitExceeded = { [weak self] usage in
@@ -347,8 +347,10 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
 
     // MARK: - ⑦ 분석 실패
 
-    private func showFailure(replacing loadingVC: UIViewController) {
-        let vc = AnalysisFailedVC()
+    /// - Parameter message: 서버가 준 실패 사유. 화면이 그대로 띄운다 — 예전엔 여기서 버려져
+    ///   네트워크와 무관한 오류(App Check 실패 등)도 "네트워크 연결을 확인하라"고 안내됐다.
+    private func showFailure(message: String?, replacing loadingVC: UIViewController) {
+        let vc = AnalysisFailedVC(message: message)
         // 네비바 뒤로·푸터 '뒤로' 모두 홈으로 — 이 화면엔 돌아갈 이전 단계가 없다.
         vc.onBackTapped = { [weak self] in self?.exitToHome() }
         vc.onBack = { [weak self] in self?.exitToHome() }

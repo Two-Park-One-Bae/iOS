@@ -204,18 +204,42 @@ final class AppCoordinator: BaseCoordinator {
        .authSessionExpired ← 토큰 강제 갱신 후에도 401 (Networks 인터셉터, NM-410)
        .authDidSignOut     ← 로그아웃·탈퇴 완료 (AuthUseCase)
 
-     둘 다 "지금 화면을 계속 보여줄 수 없다"는 같은 결론이라 한 곳으로 합류시킨다.
+     결론("로그인 화면으로 보낸다")은 같지만 **사용자에게는 전혀 다른 사건이라 안내를 갈랐다.**
+     로그아웃은 내가 누른 결과라 설명이 필요 없고, 세션 만료는 내 의사와 무관하게 끊긴 것이라
+     이유를 말해 주지 않으면 앱이 고장난 것으로 읽힌다. 예전엔 둘을 한 옵저버로 합쳐 화면만
+     갈아끼웠고, 홈에 들어갔다가 아무 안내 없이 로그인 화면으로 돌아오는 증상이 났다.
+
      이미 인증 화면이라면 아무것도 하지 않는다 — 동의 취소로 로그아웃하면 AuthCoordinator 가
      이미 로그인 화면을 들고 있어서, 여기서 또 갈아끼우면 시트가 닫히는 도중에 화면이 통째로 바뀐다.
      */
     private func observeSessionEnd() {
         let nc = NotificationCenter.default
-        for name in [Notification.Name.authSessionExpired, .authDidSignOut] {
-            nc.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
-                guard let self, self.tabBarCoordinator != nil else { return }
-                self.showAuth(startAt: .login)
+
+        // 내가 누른 로그아웃·탈퇴 — 의도한 행동이라 조용히 전환한다.
+        nc.addObserver(forName: .authDidSignOut, object: nil, queue: .main) { [weak self] _ in
+            self?.returnToAuth()
+        }
+
+        // 내 의사와 무관하게 끊긴 것 — 왜 로그인 화면에 와 있는지 반드시 알린다.
+        nc.addObserver(forName: .authSessionExpired, object: nil, queue: .main) { [weak self] _ in
+            guard self?.returnToAuth() == true else { return }
+            // 화면을 갈아끼운 **뒤에** 띄운다. presentOverWindow 는 최상단 뷰컨트롤러를 찾는데
+            // 같은 런루프에서 부르면 아직 옛 화면이 최상단이라, 전환과 함께 안내가 사라진다.
+            DispatchQueue.main.async {
+                DSAlertCardView.presentOverWindow(
+                    title: "다시 로그인해 주세요",
+                    message: "로그인 정보가 만료되어 로그아웃했어요."
+                )
             }
         }
+    }
+
+    /// 로그인 화면으로 되돌린다. 이미 인증 화면이면 아무것도 하지 않고 `false` 를 준다.
+    @discardableResult
+    private func returnToAuth() -> Bool {
+        guard tabBarCoordinator != nil else { return false }
+        showAuth(startAt: .login)
+        return true
     }
 
     // MARK: - 설정 · 계정
