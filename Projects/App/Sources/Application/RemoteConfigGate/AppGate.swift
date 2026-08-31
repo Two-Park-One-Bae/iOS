@@ -14,8 +14,23 @@ final class AppGate {
     private enum Kind: Equatable { case forceUpdate, maintenance }
     private var current: Kind?
 
+    private var updateObserver: NSObjectProtocol?
+
     init(windowScene: UIWindowScene?) {
         self.windowScene = windowScene
+
+        // 게이트는 **떠 있는 동안에도** 값을 따라가야 한다. 점검을 끝냈는데 화면이 안 내려가거나,
+        // 앱을 켜 둔 사용자에게 점검이 안 뜨면 원격 제어의 의미가 없다.
+        // `evaluate()` 가 켜기·끄기 양방향을 처리하므로 갱신 때 그대로 다시 부르면 된다.
+        updateObserver = NotificationCenter.default.addObserver(
+            forName: .remoteConfigDidUpdate, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.evaluate() }
+        }
+    }
+
+    deinit {
+        if let updateObserver { NotificationCenter.default.removeObserver(updateObserver) }
     }
 
     /// 최신 Remote Config 값으로 게이트 상태를 갱신한다.
