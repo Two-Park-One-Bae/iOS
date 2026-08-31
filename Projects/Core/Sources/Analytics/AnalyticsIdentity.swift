@@ -39,7 +39,7 @@ public enum AnalyticsIdentity {
     public static func start(includeAmplitude: Bool) {
         guard handle == nil else { return }
         handle = Auth.auth().addStateDidChangeListener { _, user in
-            apply(uid: user?.uid, email: user?.email, includeAmplitude: includeAmplitude)
+            apply(uid: user?.uid, email: user.flatMap(signInEmail), includeAmplitude: includeAmplitude)
         }
     }
 
@@ -58,6 +58,20 @@ public enum AnalyticsIdentity {
         if includeAmplitude, let flag {
             AmplitudeService.identify(key: testAccountProperty, value: flag)
         }
+    }
+
+    /// 로그인에 쓰인 이메일.
+    ///
+    /// **최상위 `user.email` 만 보면 안 된다.** 페더레이션 전용 계정(구글·애플)은 그 필드가
+    /// 비어 있고 이메일이 `providerData` 안에만 들어오는 경우가 있다 — Firebase 콘솔에는
+    /// 이메일이 멀쩡히 보여서 눈으로는 안 잡힌다. 실제로 구글 로그인 계정에서
+    /// `email=nil`, `providerData=[google.com=…]` 인 것을 확인했고, 그래서
+    /// `is_test_account` 가 어떤 계정에서도 `true` 가 되지 않았다.
+    ///
+    /// 카카오(커스텀 토큰)는 공급자 정보에도 이메일이 없을 수 있다 — 그 경우는 nil 이 맞고,
+    /// 판별은 서버가 내려주는 회원 정보로 옮겨야 한다(별도 과제).
+    private static func signInEmail(_ user: User) -> String? {
+        user.email ?? user.providerData.compactMap(\.email).first
     }
 
     // MARK: - 심사·QA 계정 표시
