@@ -24,7 +24,6 @@ final class AnalysisFailedVC: UIViewController {
     }
 
     private let iconView = UIImageView().then {
-        $0.image = DSIcon.wifiOff.uiImage
         $0.tintColor = DSColor.Error._500
         $0.contentMode = .scaleAspectFit
     }
@@ -37,7 +36,6 @@ final class AnalysisFailedVC: UIViewController {
     }
 
     private let descLabel = UILabel().then {
-        $0.text = "네트워크 연결을 확인하고\n다시 시도해 주세요"
         $0.font = DSKitFontFamily.Pretendard.regular.font(size: 15)
         $0.textColor = DSColor.textSecondary
         $0.textAlignment = .center
@@ -47,9 +45,18 @@ final class AnalysisFailedVC: UIViewController {
     private let retryButton = PrimaryButton(title: "다시 시도")
     private let backButton = SecondaryButton(title: "뒤로")
 
+    /// 서버가 준 사유. 없으면 네트워크 문제로 본다.
+    private let message: String?
+
     // MARK: - Init
 
-    init() {
+    /// - Parameter message: 실패 사유(`APIError.errorDescription`). `nil` 이면 네트워크 안내로 떨어진다.
+    ///
+    /// 예전엔 문구·아이콘이 "네트워크 연결을 확인하고" + wifi-off 로 **고정**이라, 서버가 준 사유가
+    /// 화면까지 왔는데도 버려졌다. App Check 실패처럼 네트워크와 무관한 오류까지 "연결을 확인하라"고
+    /// 안내해 사용자를 엉뚱한 곳으로 보냈다.
+    init(message: String? = nil) {
+        self.message = message
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -70,6 +77,11 @@ final class AnalysisFailedVC: UIViewController {
     private func setUI() {
         view.backgroundColor = DSColor.bgApp
         navBar.onBackTapped = { [weak self] in self?.onBackTapped?() }
+
+        // 사유를 받았으면 그대로 보여 주고 아이콘도 일반 경고로 바꾼다.
+        // wifi-off 는 "연결을 확인하라"는 뜻이라, 네트워크가 멀쩡한 오류에 붙으면 문구와 어긋난다.
+        descLabel.text = message ?? "네트워크 연결을 확인하고\n다시 시도해 주세요"
+        iconView.image = (message == nil ? DSIcon.wifiOff : DSIcon.alertTriangle).uiImage
     }
 
     private func setLayout() {
