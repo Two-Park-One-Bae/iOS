@@ -69,6 +69,17 @@ public final class RemoteConfigService {
         }
     }
 
+    /// 이미 fetch 된 값을 활성화한다. **네트워크를 타지 않는다.**
+    @discardableResult
+    public func activate() async -> Bool {
+        do {
+            return try await remoteConfig.activate()
+        } catch {
+            FirebaseService.recordError(error)
+            return false
+        }
+    }
+
     // MARK: - 실시간 갱신
 
     private var updateListener: ConfigUpdateListenerRegistration?
@@ -103,11 +114,14 @@ public final class RemoteConfigService {
             print("🔔 RemoteConfig 실시간 갱신 — 변경된 키: \(update?.updatedKeys ?? [])")
             #endif
 
-            // 포그라운드 복귀 경로와 **같은 함수**를 쓴다. 두 경로가 갈리면 어느 쪽이
-            // 화면을 갱신했는지 추적이 안 된다. fetch 가 캐시에 막혀도 activate 는
-            // 수행되므로 여기서 불러도 손해가 없다.
+            // **여기서는 activate 만 한다.** 실시간 경로는 이미 fetch 를 끝냈고 activate 만
+            // 안 한 상태다 — SDK 가 `getConfigUpdateForNamespace` 로 fetched 와 active 를
+            // 비교해 변경 키를 뽑아 이 콜백을 부르기 때문이다(RCNConfigFetch.m).
+            //
+            // 그래서 `fetchAndActivate()` 를 부르면 손에 든 값을 두고 네트워크 왕복을 한 번
+            // 더 하게 된다. 반영이 그만큼 늦어진다.
             Task { @MainActor in
-                await self?.fetchAndActivate()
+                await self?.activate()
                 NotificationCenter.default.post(name: .remoteConfigDidUpdate, object: nil)
             }
         }
