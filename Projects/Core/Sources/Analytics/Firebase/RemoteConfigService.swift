@@ -43,12 +43,19 @@ public final class RemoteConfigService {
         #if DEBUG
         settings.minimumFetchInterval = 0
         #else
-        // Firebase 권장 프로덕션 기본값. 짧게 잡는 건 문서상 **개발용**이고, 낮은 값으로
-        // 배포하면 시간당 서버 쿼터에 걸린다.
+        // Firebase 권장값은 12시간이지만 **그건 거의 안 바뀌는 설정값을 전제한 숫자다.**
+        // 여기엔 점검 스위치가 들어 있어 성격이 다르다.
         //
-        // 이 값이 길어도 긴급 상황은 `checkForOutage()` 가 캐시를 무시하고 즉시 받아온다.
-        // 평상시 비용(하루 2회)과 장애 시 반영 속도를 둘 다 챙기는 게 그 조합이다.
-        settings.minimumFetchInterval = 43_200
+        // 12시간으로 두면 다음이 전부 막힌다 — 앱 시작·포그라운드 복귀·강제종료 후 재실행
+        // (fetch 시각이 UserDefaults 에 남아 재실행으로도 안 풀린다). 뚫리는 경로는 실시간
+        // 리스너와 `checkForOutage()` 뿐인데, 전자는 SDK 결함으로 자주 멈추고
+        // (firebase-ios-sdk#15490, 5회 중 1회꼴) 후자는 서버가 실제로 실패해야 걸린다.
+        // 즉 **리스너가 죽고 서버는 멀쩡하면 12시간 동안 아무 경로도 열리지 않는다.**
+        //
+        // 1시간이면 최악이 1시간이다. 비용은 사용자당 하루 최대 24회 — Spark 무료 한도가
+        // 하루 10만이므로 4,000명이 종일 앱을 켜 두어도 들어간다. 문서가 말리는 "very low"
+        // 는 개발용 0~15초 같은 값이지 이 구간이 아니다.
+        settings.minimumFetchInterval = 3_600
         #endif
         remoteConfig.configSettings = settings
 
