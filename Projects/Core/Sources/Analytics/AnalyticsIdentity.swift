@@ -39,11 +39,11 @@ public enum AnalyticsIdentity {
     public static func start(includeAmplitude: Bool) {
         guard handle == nil else { return }
         handle = Auth.auth().addStateDidChangeListener { _, user in
-            apply(uid: user?.uid, includeAmplitude: includeAmplitude)
+            apply(uid: user?.uid, email: user?.email, includeAmplitude: includeAmplitude)
         }
     }
 
-    private static func apply(uid: String?, includeAmplitude: Bool) {
+    private static func apply(uid: String?, email: String?, includeAmplitude: Bool) {
         if let uid {
             FirebaseService.setUserID(uid)
             if includeAmplitude { AmplitudeService.setUserID(uid) }
@@ -51,5 +51,42 @@ public enum AnalyticsIdentity {
             FirebaseService.clearUserID()
             if includeAmplitude { AmplitudeService.clearUserID() }
         }
+
+        // 로그아웃 상태에서는 값을 지운다. 남겨 두면 다음 사용자에게 이전 사람의 꼬리표가 붙는다.
+        let flag = uid == nil ? nil : String(isTestAccount(email))
+        FirebaseService.setUserProperty(flag, forName: testAccountProperty)
+        if includeAmplitude, let flag {
+            AmplitudeService.identify(key: testAccountProperty, value: flag)
+        }
+    }
+
+    // MARK: - 심사·QA 계정 표시
+
+    /// 앱 심사자와 QA 가 만든 지표를 분석에서 걸러내기 위한 사용자 속성.
+    ///
+    /// **수집을 끄지 않고 꼬리표만 붙인다.** 끄는 방식은 두 가지로 실패한다 — `first_open` 은
+    /// `FirebaseApp.configure()` 시점에 나가므로 로그인 전에 이미 늦고, 잘못 걸러 실사용자를
+    /// 막으면 그 데이터는 되돌릴 수 없다. 값을 남겨 두면 판단을 나중에 바꿀 수 있다.
+    ///
+    /// 심사자는 애플에 제공한 계정으로 로그인하므로 로그인 이후 이벤트는 이 값으로 갈린다.
+    /// 로그인 전 이벤트(로그인 화면)는 GA4 의 국가 측정기준으로 거른다 — 심사는 미국에서 돈다.
+    private static let testAccountProperty = "is_test_account"
+
+    /// 기본 목록. Remote Config `test_account_emails`(콤마 구분)로 덮어쓸 수 있다 —
+    /// 애플이 다른 계정을 요구하거나 QA 계정이 늘어도 **배포 없이** 바꾸기 위해서다.
+    ///
+    /// 앱 시작 직후에는 Remote Config fetch 가 아직 안 끝났을 수 있어 이 기본값이 쓰인다.
+    /// 심사 계정은 여기 들어 있으므로 그 경우에도 판별된다.
+    private static let defaultTestAccounts = ["nursematetest@gmail.com"]
+
+    private static func isTestAccount(_ email: String?) -> Bool {
+        guard let email = email?.lowercased() else { return false }
+        let configured = RemoteConfigService.shared.string("test_account_emails")
+        let list = configured.isEmpty
+            ? defaultTestAccounts
+            : configured.split(separator: ",").map {
+                $0.trimmingCharacters(in: .whitespaces).lowercased()
+            }
+        return list.contains(email)
     }
 }
