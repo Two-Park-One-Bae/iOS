@@ -43,9 +43,12 @@ public final class RemoteConfigService {
         #if DEBUG
         settings.minimumFetchInterval = 0
         #else
-        // 주기 갱신(startPeriodicRefresh, 60초)보다 **짧아야** 한다. 같거나 길면 타이머가
-        // 깨어나도 fetch 가 캐시에 막혀 폴링이 무의미해진다. 여유를 두고 절반으로 잡는다.
-        settings.minimumFetchInterval = 30
+        // Firebase 권장 프로덕션 기본값. 짧게 잡는 건 문서상 **개발용**이고, 낮은 값으로
+        // 배포하면 시간당 서버 쿼터에 걸린다.
+        //
+        // 이 값이 길어도 긴급 상황은 `checkForOutage()` 가 캐시를 무시하고 즉시 받아온다.
+        // 평상시 비용(하루 2회)과 장애 시 반영 속도를 둘 다 챙기는 게 그 조합이다.
+        settings.minimumFetchInterval = 43_200
         #endif
         remoteConfig.configSettings = settings
 
@@ -129,44 +132,47 @@ public final class RemoteConfigService {
         }
     }
 
-    // MARK: - 주기적 갱신 (포그라운드)
+    // MARK: - 장애 감지 시 즉시 확인
 
-    private var refreshTimer: Timer?
+    private var lastOutageCheck: Date?
 
-    /// 포그라운드에 있는 동안 주기적으로 최신값을 확인한다.
+    /// 네트워크 실패가 감지됐을 때 **캐시를 무시하고** 최신 설정을 받아온다.
     ///
-    /// **실시간 리스너만으로는 반영이 보장되지 않아 둔 안전망이다.** SDK 를 거치지 않고
-    /// 스트림 엔드포인트에 직접 붙어 측정한 결과:
+    /// **`minimumFetchInterval` 이 12시간이어도 이 경로는 뚫린다.** 만료 시간 0 을 넘기면
+    /// `hasMinimumFetchIntervalElapsed` 가 항상 통과하기 때문이다(RCNConfigFetch.m).
     ///
-    ///  - 새로 **연결하면** 최신 템플릿 버전을 즉시 받는다(2.5초).
-    ///  - 연결을 **열어 둔 채** 값을 게시하면 끝내 아무것도 오지 않는다. 게시 후에도
-    ///    연결은 190초 더 열려 있었지만 빈 응답 `[]` 으로 종료됐다.
-    ///  - 서버가 연결을 **약 225초**만 유지한다(2회 측정: 224.3s / 228.6s). 클라이언트
-    ///    타임아웃 `gTimeoutSeconds = 330` 보다 짧으므로 재연결 주기는 서버가 정한다.
+    /// 시간이 아니라 **실패를 트리거로 삼는 이유**는, 서버가 죽었을 때 그 사실을 앱이 가장
+    /// 먼저 알기 때문이다. 평상시엔 아무것도 하지 않다가 실제로 문제가 생긴 순간에만 움직여
+    /// 폴링 비용 없이 즉시성을 얻는다.
     ///
-    /// 즉 앱에서의 반영 시점은 사실상 **다음 재연결**이라 최악 약 4분이다. 점검 모드를
-    /// 켜야 하는 순간에 그만큼 걸리면 원격 제어를 둔 의미가 없다.
+    /// 그리고 이 경로는 **서버가 완전히 죽어도 동작한다.** Remote Config 는 구글이 호스팅하므로
+    /// 우리 백엔드와 독립이다. 백엔드가 점검 응답(503)을 내려주는 방식은 서버가 살아 있어야만
+    /// 쓸 수 있어서, 정작 장애 때 못 쓴다.
     ///
-    /// 이 타이머가 그 상한을 `interval` 로 낮춘다. 리스너가 살아 있을 땐 그쪽이 더 빠르고,
-    /// 이 타이머는 값이 그대로면 아무 일도 하지 않는다(게이트가 상태를 비교해 무시).
-    public func startPeriodicRefresh(every interval: TimeInterval = 60) {
-        stopPeriodicRefresh()
-        let timer = Timer(timeInterval: interval, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                await self?.fetchAndActivate()
-                NotificationCenter.default.post(name: .remoteConfigDidUpdate, object: nil)
+    /// 요청이 무더기로 실패해도 fetch 가 폭주하지 않도록 60초로 디바운스한다.
+    public func checkForOutage() {
+        Task { @MainActor in
+            let now = Date()
+            if let last = lastOutageCheck, now.timeIntervalSince(last) < Self.outageCheckDebounce {
+                return
             }
+            lastOutageCheck = now
+
+            do {
+                _ = try await remoteConfig.fetch(withExpirationDuration: 0)
+                _ = try await remoteConfig.activate()
+            } catch {
+                FirebaseService.recordError(error)
+                return
+            }
+            #if DEBUG
+            print("🩺 장애 감지 — Remote Config 즉시 확인: 점검 \(isUnderMaintenance)")
+            #endif
+            NotificationCenter.default.post(name: .remoteConfigDidUpdate, object: nil)
         }
-        // 스크롤 중에도 멈추지 않도록 common 모드.
-        RunLoop.main.add(timer, forMode: .common)
-        refreshTimer = timer
     }
 
-    /// 백그라운드에서는 멈춘다 — 어차피 실행되지 않고, 복귀 시 `fetchAndActivate()` 가 돈다.
-    public func stopPeriodicRefresh() {
-        refreshTimer?.invalidate()
-        refreshTimer = nil
-    }
+    private static let outageCheckDebounce: TimeInterval = 60
 
     // MARK: - 강제 업데이트
 
