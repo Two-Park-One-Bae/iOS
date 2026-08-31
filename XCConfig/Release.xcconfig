@@ -5,7 +5,11 @@ ENABLE_USER_SCRIPT_SANDBOXING = NO
 SWIFT_EMIT_LOC_STRINGS = YES
 BASE_URL = $(BASE_URL_RELEASE)
 // 구글 로그인 복귀 URL 스킴 (NM-410). dev/prod Firebase 프로젝트마다 값이 다르다.
-GOOGLE_REVERSED_CLIENT_ID = $(GOOGLE_REVERSED_CLIENT_ID_RELEASE)
+//
+// **빌드 구성이 아니라 `FIREBASE_ENV` 를 따라간다.** 이유는 Debug.xcconfig 의 같은 줄 참고 —
+// 요약하면 이 스킴은 번들의 GoogleService-Info.plist 와 짝이어야 하는데, 그 plist 를 고르는
+// 값이 `FIREBASE_ENV` 라 구성에 묶으면 둘이 어긋날 수 있다(NM-422).
+GOOGLE_REVERSED_CLIENT_ID = $(GOOGLE_REVERSED_CLIENT_ID_$(FIREBASE_ENV:upper))
 // 외부 테스터·프로덕션은 Firebase Analytics 자동수집 ON (NM-364). 내부 TestFlight는 beta_internal 레인이 NO로 덮어씀.
 FIREBASE_ANALYTICS_ENABLED = YES
 
