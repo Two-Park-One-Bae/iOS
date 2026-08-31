@@ -109,9 +109,14 @@ public final class RemoteConfigService {
     ///  - 콜백은 서버가 알린 templateVersion 이 **클라이언트 보유 버전보다 클 때만** 돈다.
     ///    포그라운드 복귀 시 `fetchAndActivate()` 가 먼저 버전을 올리면 리스너는 조용해진다.
     ///
-    /// 따라서 실제 반영을 책임지는 건 **포그라운드 복귀 때 도는 `fetchAndActivate()`** 이고,
-    /// 이 리스너는 그 위에 얹는 빠른 경로다. `minimumFetchInterval` 을 15분으로 낮춰 둔 이유도
-    /// 같다 — 리스너가 놓쳐도 그 안에는 반영되게 하는 하한선이다.
+    /// 따라서 반영을 책임지는 건 `fetchAndActivate()`(앱 시작·포그라운드 복귀)이고
+    /// 이 리스너는 그 위에 얹는 빠른 경로다. `minimumFetchInterval` 1시간이 그 하한선이다.
+    ///
+    /// **한 가지 반직관적인 상호작용이 있다 — 캐시가 길수록 리스너가 잘 뜬다.** 위의 네 번째
+    /// 항목 때문이다. 캐시가 짧으면 복귀 시 `fetchAndActivate()` 가 서버에 가서 클라이언트
+    /// 버전을 먼저 올려버리고, 뒤이어 재연결한 리스너는 같은 버전을 받아 조용해진다.
+    /// 캐시에 막히면 버전이 그대로라 리스너가 정상 발화한다. 기기에서 확인했다 —
+    /// Debug 는 간격이 0 이라 리스너가 늘 가려져 있었고, 그래서 "리스너가 죽었다"고 보였다.
     public func startListening() {
         guard updateListener == nil else { return }
         updateListener = remoteConfig.addOnConfigUpdateListener { [weak self] update, error in
@@ -145,7 +150,7 @@ public final class RemoteConfigService {
 
     /// 네트워크 실패가 감지됐을 때 **캐시를 무시하고** 최신 설정을 받아온다.
     ///
-    /// **`minimumFetchInterval` 이 12시간이어도 이 경로는 뚫린다.** 만료 시간 0 을 넘기면
+    /// **`minimumFetchInterval` 이 얼마든 이 경로는 뚫린다.** 만료 시간 0 을 넘기면
     /// `hasMinimumFetchIntervalElapsed` 가 항상 통과하기 때문이다(RCNConfigFetch.m).
     ///
     /// 시간이 아니라 **실패를 트리거로 삼는 이유**는, 서버가 죽었을 때 그 사실을 앱이 가장
