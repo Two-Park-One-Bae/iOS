@@ -9,7 +9,7 @@ import WidgetKit
 // 프리셋 데이터는 앱이 소유하고, 위젯은 id 로 조회 + 원탭 시작(러닝 타이머 추가)만 한다.
 enum TimerPresetStore {
 
-    static let appGroup = "group.app.nursemate.care.timer"
+    static let appGroup = "group.app.nursemate.timer"
 
     private enum Keys {
         static let presets = "care.timer.presets"     // [TimerPresetModel]
