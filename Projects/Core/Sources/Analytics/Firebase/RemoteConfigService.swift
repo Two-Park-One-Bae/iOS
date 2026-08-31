@@ -73,19 +73,22 @@ public final class RemoteConfigService {
 
     private var updateListener: ConfigUpdateListenerRegistration?
 
-    /// 서버가 값을 게시하면 **즉시** 받아 반영한다. 반영되면 `.remoteConfigDidUpdate` 를 던진다.
+    /// 서버가 값을 게시하면 받아서 반영하고 `.remoteConfigDidUpdate` 를 던진다.
     ///
-    /// **이게 없으면 점검 모드가 실전에서 동작하지 않는다.** 릴리즈 빌드는
-    /// `minimumFetchInterval` 이 12시간이라 `fetchAndActivate()` 가 그 안에는 서버로 가지 않고
-    /// 캐시만 돌려준다. 점검 모드를 켜야 하는 순간은 **이미 앱을 쓰고 있는 사용자**에게 알릴
-    /// 때인데, 그 사람들은 전부 캐시를 갖고 있어 최대 12시간 동안 옛 값을 본다.
+    /// **best-effort 다. 이것만 믿으면 안 된다.** 실기기에서 콜백이 한 번도 오지 않는 경우를
+    /// 확인했다(NM-423). 원인 후보를 SDK 소스(`RCNConfigRealtime.m`)에서 확인한 바:
     ///
-    /// 테스트에서 안 걸리는 이유도 같다 — Xcode 빌드는 간격이 0 이고, 새로 설치한 직후는
-    /// 캐시가 없어 첫 fetch 가 서버로 간다. **이미 깔린 릴리즈 앱에서만** 재현된다.
+    ///  - 스트림은 일반 fetch 와 **다른 호스트**(`firebaseremoteconfigrealtime.googleapis.com`)를
+    ///    쓴다. 여기만 막혀도 fetch 는 멀쩡해 증상이 "가끔 안 된다"로 보인다.
+    ///  - **실패가 조용하다.** 403 은 물론 다른 상태코드도 `FIRLogError` 로만 남기고
+    ///    리스너에는 전파하지 않는다. 그래서 아래 `⚠️` 로그로도 안 잡힌다.
+    ///  - 연결 수명이 330초라 끊기면 재연결하는데, 그 사이 변경은 재연결 시점에야 반영된다.
+    ///  - 콜백은 서버가 알린 templateVersion 이 **클라이언트 보유 버전보다 클 때만** 돈다.
+    ///    포그라운드 복귀 시 `fetchAndActivate()` 가 먼저 버전을 올리면 리스너는 조용해진다.
     ///
-    /// Firebase 권장 구조가 "시작 시 fetch + 사용 중 실시간 청취" 다. 실시간은 폴링을 대체하지
-    /// 않는다 — 연결이 **포그라운드에서만** 유지되므로 앱을 새로 켤 때의 최신화는 여전히
-    /// `fetchAndActivate()` 몫이다. 그래서 `minimumFetchInterval` 은 12시간 그대로 둔다.
+    /// 따라서 실제 반영을 책임지는 건 **포그라운드 복귀 때 도는 `fetchAndActivate()`** 이고,
+    /// 이 리스너는 그 위에 얹는 빠른 경로다. `minimumFetchInterval` 을 15분으로 낮춰 둔 이유도
+    /// 같다 — 리스너가 놓쳐도 그 안에는 반영되게 하는 하한선이다.
     public func startListening() {
         guard updateListener == nil else { return }
         updateListener = remoteConfig.addOnConfigUpdateListener { [weak self] update, error in
@@ -100,13 +103,9 @@ public final class RemoteConfigService {
             print("🔔 RemoteConfig 실시간 갱신 — 변경된 키: \(update?.updatedKeys ?? [])")
             #endif
 
-            // **포그라운드 복귀 경로와 같은 함수를 쓴다.** 예전엔 여기서 activate 를 직접
-            // 불렀는데, 값은 받아 왔지만 화면에 반영되지 않았다 — 앱을 백그라운드에 보냈다
-            // 돌아와야 그제서야 점검창이 떴다. 복귀 시 도는 fetchAndActivate() 가 그때
-            // activate 를 대신 해준 것이다.
-            //
-            // 두 경로가 같은 코드를 타면 한쪽만 동작하는 상황이 생길 수 없다.
-            // fetch 가 캐시에 막혀도 activate 는 수행되므로 여기서도 안전하다.
+            // 포그라운드 복귀 경로와 **같은 함수**를 쓴다. 두 경로가 갈리면 어느 쪽이
+            // 화면을 갱신했는지 추적이 안 된다. fetch 가 캐시에 막혀도 activate 는
+            // 수행되므로 여기서 불러도 손해가 없다.
             Task { @MainActor in
                 await self?.fetchAndActivate()
                 NotificationCenter.default.post(name: .remoteConfigDidUpdate, object: nil)
