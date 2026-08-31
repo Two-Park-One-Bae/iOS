@@ -43,19 +43,18 @@ public final class RemoteConfigService {
         #if DEBUG
         settings.minimumFetchInterval = 0
         #else
-        // Firebase 권장값은 12시간이지만 **그건 거의 안 바뀌는 설정값을 전제한 숫자다.**
-        // 여기엔 점검 스위치가 들어 있어 성격이 다르다.
+        // Firebase 권장 프로덕션 값. 짧게 잡는 건 문서상 **개발용**이고, 낮은 값으로 배포하면
+        // 시간당 서버 쿼터에 걸린다.
         //
-        // 12시간으로 두면 다음이 전부 막힌다 — 앱 시작·포그라운드 복귀·강제종료 후 재실행
-        // (fetch 시각이 UserDefaults 에 남아 재실행으로도 안 풀린다). 뚫리는 경로는 실시간
-        // 리스너와 `checkForOutage()` 뿐인데, 전자는 SDK 결함으로 자주 멈추고
-        // (firebase-ios-sdk#15490, 5회 중 1회꼴) 후자는 서버가 실제로 실패해야 걸린다.
-        // 즉 **리스너가 죽고 서버는 멀쩡하면 12시간 동안 아무 경로도 열리지 않는다.**
+        // **이 값이 길어도 긴급 반영은 따로 뚫린다.** `checkForOutage()` 가 서버 장애를 감지하면
+        // 만료 0 으로 fetch 해 캐시를 우회하고, 실시간 리스너도 이 간격에 걸리지 않는다.
+        // 즉 이 값은 "급할 때의 반영 속도"가 아니라 **평상시 갱신 주기**를 정한다.
         //
-        // 1시간이면 최악이 1시간이다. 비용은 사용자당 하루 최대 24회 — Spark 무료 한도가
-        // 하루 10만이므로 4,000명이 종일 앱을 켜 두어도 들어간다. 문서가 말리는 "very low"
-        // 는 개발용 0~15초 같은 값이지 이 구간이 아니다.
-        settings.minimumFetchInterval = 3_600
+        // 알려진 한계: **리스너가 죽고 서버는 정상 응답하는 상태**에서 점검을 걸면 최대 12시간이
+        // 걸린다(무중단 배포 중 API 는 200 인데 앱만 막고 싶은 경우). 이 상황이 실제로 문제가
+        // 되면 간격을 낮추는 것보다 백엔드가 점검 시 503 + `MAINTENANCE_MODE` 를 내려주게 하는
+        // 편이 낫다 — 그러면 `OutageDetectionPlugin` 이 잡아 즉시 반영된다.
+        settings.minimumFetchInterval = 43_200
         #endif
         remoteConfig.configSettings = settings
 
@@ -110,7 +109,7 @@ public final class RemoteConfigService {
     ///    포그라운드 복귀 시 `fetchAndActivate()` 가 먼저 버전을 올리면 리스너는 조용해진다.
     ///
     /// 따라서 반영을 책임지는 건 `fetchAndActivate()`(앱 시작·포그라운드 복귀)이고
-    /// 이 리스너는 그 위에 얹는 빠른 경로다. `minimumFetchInterval` 1시간이 그 하한선이다.
+    /// 이 리스너는 그 위에 얹는 빠른 경로다.
     ///
     /// **한 가지 반직관적인 상호작용이 있다 — 캐시가 길수록 리스너가 잘 뜬다.** 위의 네 번째
     /// 항목 때문이다. 캐시가 짧으면 복귀 시 `fetchAndActivate()` 가 서버에 가서 클라이언트
