@@ -292,9 +292,14 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         }
 
         // Remote Config 최신값 fetch 후 강제 업데이트/점검 게이트 갱신(포그라운드 복귀 포함).
+        //
+        // fetch 만으로는 부족하다 — 릴리즈는 캐시가 12시간이라 그 안에는 서버로 가지 않는다.
+        // 점검 모드를 켜야 하는 순간의 사용자들은 전부 캐시를 갖고 있어 옛 값을 본다.
+        // 그래서 **사용 중 실시간 청취**를 함께 켠다(Firebase 권장 구조).
         Task { @MainActor in
             await RemoteConfigService.shared.fetchAndActivate()
             appGate?.evaluate()
+            RemoteConfigService.shared.startListening()
         }
     }
 

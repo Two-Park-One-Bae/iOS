@@ -61,6 +61,39 @@ public final class RemoteConfigService {
         }
     }
 
+    // MARK: - 실시간 갱신
+
+    private var updateListener: ConfigUpdateListenerRegistration?
+
+    /// 서버가 값을 게시하면 **즉시** 받아 반영한다. 반영되면 `.remoteConfigDidUpdate` 를 던진다.
+    ///
+    /// **이게 없으면 점검 모드가 실전에서 동작하지 않는다.** 릴리즈 빌드는
+    /// `minimumFetchInterval` 이 12시간이라 `fetchAndActivate()` 가 그 안에는 서버로 가지 않고
+    /// 캐시만 돌려준다. 점검 모드를 켜야 하는 순간은 **이미 앱을 쓰고 있는 사용자**에게 알릴
+    /// 때인데, 그 사람들은 전부 캐시를 갖고 있어 최대 12시간 동안 옛 값을 본다.
+    ///
+    /// 테스트에서 안 걸리는 이유도 같다 — Xcode 빌드는 간격이 0 이고, 새로 설치한 직후는
+    /// 캐시가 없어 첫 fetch 가 서버로 간다. **이미 깔린 릴리즈 앱에서만** 재현된다.
+    ///
+    /// Firebase 권장 구조가 "시작 시 fetch + 사용 중 실시간 청취" 다. 실시간은 폴링을 대체하지
+    /// 않는다 — 연결이 **포그라운드에서만** 유지되므로 앱을 새로 켤 때의 최신화는 여전히
+    /// `fetchAndActivate()` 몫이다. 그래서 `minimumFetchInterval` 은 12시간 그대로 둔다.
+    public func startListening() {
+        guard updateListener == nil else { return }
+        updateListener = remoteConfig.addOnConfigUpdateListener { [weak self] _, error in
+            if let error {
+                FirebaseService.recordError(error)
+                return
+            }
+            // 받아온 값은 activate 해야 조회에 반영된다.
+            self?.remoteConfig.activate { _, _ in
+                Task { @MainActor in
+                    NotificationCenter.default.post(name: .remoteConfigDidUpdate, object: nil)
+                }
+            }
+        }
+    }
+
     // MARK: - 강제 업데이트
 
     /// 서버가 요구하는 최소 지원 버전.
@@ -128,4 +161,13 @@ public final class RemoteConfigService {
         }
         return false
     }
+}
+
+public extension Notification.Name {
+
+    /// Remote Config 값이 **실시간으로** 갱신됐다 (`RemoteConfigService.startListening`).
+    ///
+    /// 게이트 화면처럼 **떠 있는 동안에도 값이 바뀌면 따라가야 하는** 곳이 받는다.
+    /// 앱 시작 시점의 최신화는 `fetchAndActivate()` 가 담당하므로 이 알림과 무관하다.
+    static let remoteConfigDidUpdate = Notification.Name("nursemate.remoteConfig.didUpdate")
 }
