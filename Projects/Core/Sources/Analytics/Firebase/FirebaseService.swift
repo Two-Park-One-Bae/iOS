@@ -39,6 +39,15 @@ public enum FirebaseService {
         Analytics.setUserID(userID)
     }
 
+    /// GA4 사용자 속성. `nil` 이면 해제한다.
+    ///
+    /// **보고서에 쓰려면 GA4 콘솔에서 맞춤 측정기준으로 등록해야 한다** — 등록 전 데이터는
+    /// 소급 적용되지 않으므로, 값을 보내기 시작하기 전에 등록해 두는 편이 낫다.
+    /// 이름은 소문자·언더스코어 규약을 따른다(GA4 제한: 24자).
+    public static func setUserProperty(_ value: String?, forName name: String) {
+        Analytics.setUserProperty(value, forName: name)
+    }
+
     /// 로그아웃 — 사용자 결합을 끊는다.
     ///
     /// Crashlytics 는 빈 문자열이 해제 규약이다(문서 명시). 다만 **이미 올라간 리포트에서는
