@@ -31,11 +31,19 @@ public final class RemoteConfigService {
         remoteConfig = RemoteConfig.remoteConfig()
 
         let settings = RemoteConfigSettings()
-        // Debug: 즉시 반영(캐시 0). Release: 12시간 캐시(서버 호출 최소화).
+        // Debug: 즉시 반영(캐시 0). Release: 15분.
+        //
+        // 12시간이었는데 낮췄다. 이 값은 **원격 제어가 얼마나 늦게 먹히는가**를 그대로 정한다 —
+        // 실시간 리스너는 앱이 포그라운드일 때만 연결이 살아 있어(Firebase 설계) 백그라운드에
+        // 있던 사용자는 복귀 시 fetch 에 의존하는데, 그게 12시간 막혀 있으면 점검 모드가
+        // 사실상 안 듣는다. 급할 때 쓰려고 둔 장치가 급할 때 안 되는 값이었다.
+        //
+        // 15분이면 리스너가 놓쳐도 그 안에 반영된다. Remote Config 는 호출 비용이 없고
+        // 포그라운드 복귀마다 최대 4회/시간 수준이라 부담도 없다.
         #if DEBUG
         settings.minimumFetchInterval = 0
         #else
-        settings.minimumFetchInterval = 43_200
+        settings.minimumFetchInterval = 900
         #endif
         remoteConfig.configSettings = settings
 
@@ -80,16 +88,28 @@ public final class RemoteConfigService {
     /// `fetchAndActivate()` 몫이다. 그래서 `minimumFetchInterval` 은 12시간 그대로 둔다.
     public func startListening() {
         guard updateListener == nil else { return }
-        updateListener = remoteConfig.addOnConfigUpdateListener { [weak self] _, error in
+        updateListener = remoteConfig.addOnConfigUpdateListener { [weak self] update, error in
             if let error {
+                #if DEBUG
+                print("⚠️ RemoteConfig 실시간 수신 실패: \(error)")
+                #endif
                 FirebaseService.recordError(error)
                 return
             }
-            // 받아온 값은 activate 해야 조회에 반영된다.
-            self?.remoteConfig.activate { _, _ in
-                Task { @MainActor in
-                    NotificationCenter.default.post(name: .remoteConfigDidUpdate, object: nil)
-                }
+            #if DEBUG
+            print("🔔 RemoteConfig 실시간 갱신 — 변경된 키: \(update?.updatedKeys ?? [])")
+            #endif
+
+            // **포그라운드 복귀 경로와 같은 함수를 쓴다.** 예전엔 여기서 activate 를 직접
+            // 불렀는데, 값은 받아 왔지만 화면에 반영되지 않았다 — 앱을 백그라운드에 보냈다
+            // 돌아와야 그제서야 점검창이 떴다. 복귀 시 도는 fetchAndActivate() 가 그때
+            // activate 를 대신 해준 것이다.
+            //
+            // 두 경로가 같은 코드를 타면 한쪽만 동작하는 상황이 생길 수 없다.
+            // fetch 가 캐시에 막혀도 activate 는 수행되므로 여기서도 안전하다.
+            Task { @MainActor in
+                await self?.fetchAndActivate()
+                NotificationCenter.default.post(name: .remoteConfigDidUpdate, object: nil)
             }
         }
     }

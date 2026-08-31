@@ -36,6 +36,9 @@ final class AppGate {
     /// 최신 Remote Config 값으로 게이트 상태를 갱신한다.
     func evaluate() {
         let rc = RemoteConfigService.shared
+        #if DEBUG
+        print("🚧 AppGate.evaluate — 강제업데이트 \(rc.isForceUpdateRequired) · 점검 \(rc.isUnderMaintenance)")
+        #endif
         if rc.isForceUpdateRequired {
             show(.forceUpdate) { ForceUpdateViewController(appStoreURL: rc.appStoreURL) }
         } else if rc.isUnderMaintenance {
