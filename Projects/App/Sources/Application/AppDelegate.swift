@@ -83,18 +83,13 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         // Crashlytics(크래시)·App Check·Remote Config는 내부에서도 유지 — dev 프로젝트로 분리돼 있다.
         let isInternal = AppEnvironment.isInternal
 
-        // Crashlytics userID(= 기기 식별자)는 내부에서도 붙인다(크래시 리포트 식별).
-        let deviceID = DeviceIdentifier.current
-        if let deviceID {
-            FirebaseService.setUserID(deviceID)
-        }
+        // 지표·크래시의 사용자 식별자는 **Firebase UID** 다. 로그인·로그아웃·세션 복원을
+        // 한 리스너로 받으므로 여기서는 켜 두기만 한다 (`AnalyticsIdentity` 주석 참고).
+        // 예전엔 기기 UUID 를 여기서 직접 붙였는데, 그건 사람이 아니라 기기를 셌다.
+        AnalyticsIdentity.start(includeAmplitude: !isInternal)
 
         if !isInternal {
             // 외부 TestFlight·프로덕션에서만 Amplitude 수집.
-            // Amplitude·Crashlytics를 같은 device_id로 묶어 서버 로그와 교차 대조 가능하게 한다.
-            if let deviceID {
-                AmplitudeService.setUserID(deviceID)
-            }
             AmplitudeService.track(AppLaunchEvent())
         }
         // Remote Config fetch + 게이팅(강제 업데이트·점검)은 window 를 소유한 SceneDelegate 가

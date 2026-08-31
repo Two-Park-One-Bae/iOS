@@ -99,15 +99,10 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
         vc.onUsePhoto = { [weak self] in
             guard let self else { return }
 
-            // fail-closed: 안정적 기기 식별자를 못 만들면(Keychain 불가) 식별을 막는다.
-            // 매 실행 새 id면 카운트가 리셋돼 한도가 무력화되므로 — 차라리 '잠시 후 다시'.
-            guard DeviceIdentifier.current != nil else {
-                DSAlertCardView.presentOverWindow(
-                    title: "일시적 오류",
-                    message: "기기 확인에 실패했어요.\n잠시 후 다시 시도해 주세요."
-                )
-                return
-            }
+            // 기기 식별자 fail-closed 게이트는 제거했다 (NM-410 클린 컷오버).
+            // 서버가 식별 한도를 기기 UUID 가 아니라 소셜 계정 해시로 세고 `X-Device-Id` 도
+            // 받지 않으므로, Keychain 실패로 식별을 막을 이유가 사라졌다 — 남겨 두면
+            // 아무 효과 없이 식별만 거부하는 게이트가 된다.
 
             // 세션 중 소진 방어: 진입 후 마지막 횟수를 쓰고 돌아온 경우, 요청을 보내지 않는다.
             // 값을 모르면 통과 — 최종 판정은 서버 429다 (NM-323).
