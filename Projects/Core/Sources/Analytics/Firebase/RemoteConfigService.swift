@@ -46,14 +46,12 @@ public final class RemoteConfigService {
         // Firebase 권장 프로덕션 값. 짧게 잡는 건 문서상 **개발용**이고, 낮은 값으로 배포하면
         // 시간당 서버 쿼터에 걸린다.
         //
-        // **이 값이 길어도 긴급 반영은 따로 뚫린다.** `checkForOutage()` 가 서버 장애를 감지하면
-        // 만료 0 으로 fetch 해 캐시를 우회하고, 실시간 리스너도 이 간격에 걸리지 않는다.
-        // 즉 이 값은 "급할 때의 반영 속도"가 아니라 **평상시 갱신 주기**를 정한다.
+        // 이 간격보다 빨리 반영되는 경로는 실시간 리스너뿐이다 — 그건 만료를 보지 않는다.
+        // 다만 리스너는 보장 장치가 아니므로(`startListening` 주석), **점검 모드가 최대 12시간
+        // 늦게 걸릴 수 있다**는 뜻이 된다.
         //
-        // 알려진 한계: **리스너가 죽고 서버는 정상 응답하는 상태**에서 점검을 걸면 최대 12시간이
-        // 걸린다(무중단 배포 중 API 는 200 인데 앱만 막고 싶은 경우). 이 상황이 실제로 문제가
-        // 되면 간격을 낮추는 것보다 백엔드가 점검 시 503 + `MAINTENANCE_MODE` 를 내려주게 하는
-        // 편이 낫다 — 그러면 `OutageDetectionPlugin` 이 잡아 즉시 반영된다.
+        // 그 지연이 문제가 되면 이 값을 낮추는 것보다 **백엔드가 점검 시 503 + `MAINTENANCE_MODE`
+        // 를 내려주고 앱이 그걸 받아 게이트를 띄우는** 편이 낫다. 즉시 반영되고 추가 요청이 없다.
         settings.minimumFetchInterval = 43_200
         #endif
         remoteConfig.configSettings = settings
@@ -142,48 +140,6 @@ public final class RemoteConfigService {
             }
         }
     }
-
-    // MARK: - 장애 감지 시 즉시 확인
-
-    private var lastOutageCheck: Date?
-
-    /// 네트워크 실패가 감지됐을 때 **캐시를 무시하고** 최신 설정을 받아온다.
-    ///
-    /// **`minimumFetchInterval` 이 얼마든 이 경로는 뚫린다.** 만료 시간 0 을 넘기면
-    /// `hasMinimumFetchIntervalElapsed` 가 항상 통과하기 때문이다(RCNConfigFetch.m).
-    ///
-    /// 시간이 아니라 **실패를 트리거로 삼는 이유**는, 서버가 죽었을 때 그 사실을 앱이 가장
-    /// 먼저 알기 때문이다. 평상시엔 아무것도 하지 않다가 실제로 문제가 생긴 순간에만 움직여
-    /// 폴링 비용 없이 즉시성을 얻는다.
-    ///
-    /// 그리고 이 경로는 **서버가 완전히 죽어도 동작한다.** Remote Config 는 구글이 호스팅하므로
-    /// 우리 백엔드와 독립이다. 백엔드가 점검 응답(503)을 내려주는 방식은 서버가 살아 있어야만
-    /// 쓸 수 있어서, 정작 장애 때 못 쓴다.
-    ///
-    /// 요청이 무더기로 실패해도 fetch 가 폭주하지 않도록 60초로 디바운스한다.
-    public func checkForOutage() {
-        Task { @MainActor in
-            let now = Date()
-            if let last = lastOutageCheck, now.timeIntervalSince(last) < Self.outageCheckDebounce {
-                return
-            }
-            lastOutageCheck = now
-
-            do {
-                _ = try await remoteConfig.fetch(withExpirationDuration: 0)
-                _ = try await remoteConfig.activate()
-            } catch {
-                FirebaseService.recordError(error)
-                return
-            }
-            #if DEBUG
-            print("🩺 장애 감지 — Remote Config 즉시 확인: 점검 \(isUnderMaintenance)")
-            #endif
-            NotificationCenter.default.post(name: .remoteConfigDidUpdate, object: nil)
-        }
-    }
-
-    private static let outageCheckDebounce: TimeInterval = 60
 
     // MARK: - 강제 업데이트
 
