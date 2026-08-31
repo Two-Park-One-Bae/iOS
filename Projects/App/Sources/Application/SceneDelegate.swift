@@ -300,7 +300,15 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
             await RemoteConfigService.shared.fetchAndActivate()
             appGate?.evaluate()
             RemoteConfigService.shared.startListening()
+            // 리스너는 보장 장치가 아니다(측정 근거는 startPeriodicRefresh 주석 참고).
+            // 포그라운드에 있는 동안은 이 폴링이 반영 상한을 60초로 묶는다.
+            RemoteConfigService.shared.startPeriodicRefresh()
         }
+    }
+
+    func sceneWillResignActive(_ scene: UIScene) {
+        // 백그라운드에서는 타이머가 어차피 안 돈다. 복귀 시 sceneDidBecomeActive 가 다시 건다.
+        RemoteConfigService.shared.stopPeriodicRefresh()
     }
 
     /*

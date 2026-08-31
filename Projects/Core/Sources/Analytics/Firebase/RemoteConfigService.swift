@@ -43,7 +43,9 @@ public final class RemoteConfigService {
         #if DEBUG
         settings.minimumFetchInterval = 0
         #else
-        settings.minimumFetchInterval = 900
+        // 주기 갱신(startPeriodicRefresh, 60초)보다 **짧아야** 한다. 같거나 길면 타이머가
+        // 깨어나도 fetch 가 캐시에 막혀 폴링이 무의미해진다. 여유를 두고 절반으로 잡는다.
+        settings.minimumFetchInterval = 30
         #endif
         remoteConfig.configSettings = settings
 
@@ -125,6 +127,42 @@ public final class RemoteConfigService {
                 NotificationCenter.default.post(name: .remoteConfigDidUpdate, object: nil)
             }
         }
+    }
+
+    // MARK: - 주기적 갱신 (포그라운드)
+
+    private var refreshTimer: Timer?
+
+    /// 포그라운드에 있는 동안 주기적으로 최신값을 확인한다.
+    ///
+    /// **실시간 리스너만으로는 반영이 보장되지 않아 둔 안전망이다.** 직접 측정한 결과,
+    /// 실시간 스트림은 *연결하는 시점*에 최신 버전을 내려주고 **이미 열려 있는 연결에는
+    /// 밀어주지 않았다** — 연결을 열어 둔 채 값을 게시했더니 100초가 지나도 아무것도
+    /// 오지 않았고, 반면 새로 연결하면 즉시 최신 버전을 받았다.
+    ///
+    /// 그래서 앱에서의 반영 시점은 사실상 **다음 재연결**이고, 그 주기는 SDK 상수
+    /// `gTimeoutSeconds = 330` 이다. 점검 모드를 켜야 하는 순간에 5분 반이 걸리면
+    /// 원격 제어를 둔 의미가 없다.
+    ///
+    /// 이 타이머가 그 상한을 `interval` 로 낮춘다. 리스너가 살아 있을 땐 그쪽이 더 빠르고,
+    /// 이 타이머는 값이 그대로면 아무 일도 하지 않는다(게이트가 상태를 비교해 무시).
+    public func startPeriodicRefresh(every interval: TimeInterval = 60) {
+        stopPeriodicRefresh()
+        let timer = Timer(timeInterval: interval, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                await self?.fetchAndActivate()
+                NotificationCenter.default.post(name: .remoteConfigDidUpdate, object: nil)
+            }
+        }
+        // 스크롤 중에도 멈추지 않도록 common 모드.
+        RunLoop.main.add(timer, forMode: .common)
+        refreshTimer = timer
+    }
+
+    /// 백그라운드에서는 멈춘다 — 어차피 실행되지 않고, 복귀 시 `fetchAndActivate()` 가 돈다.
+    public func stopPeriodicRefresh() {
+        refreshTimer?.invalidate()
+        refreshTimer = nil
     }
 
     // MARK: - 강제 업데이트
