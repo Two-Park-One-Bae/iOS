@@ -18,9 +18,20 @@ public enum AnalyticsEvent {
     case permissionResult(permission: String, result: String, gate: String)
 
     // MARK: 알약 인식
-    /// 분석 시도의 최종 결과 — 식별 성공률(분모)·퍼널 상단. outcome: success/empty/failure.
-    /// (한도초과는 여기 안 들어감 — 별도 pill_limit_reached)
-    case pillIdentifyResult(outcome: String, pillCount: Int)
+    /// 분석 시작 — 사진을 확정해 분석에 들어간 순간. **식별 성공률의 분모.**
+    ///
+    /// 로딩 화면엔 나갈 방법이 없다(`PillLoadingVC` 가 back 버튼을 숨긴다). 그래서 대기 중 이탈은
+    /// 앱 강제 종료뿐인데, 그 순간엔 이벤트 전송이 보장되지 않아 이탈 시점에 직접 찍을 수가 없다.
+    /// 대신 분모를 남겨 **`started` − `result` 로 빼서** 센다.
+    case pillIdentifyStarted
+    /// 분석 시도의 최종 결과 — outcome: success/empty/failure. (한도초과는 별도 `pill_limit_reached`)
+    ///
+    /// **이건 분모가 아니다.** 결과가 나와야 찍히므로 로딩 중 이탈한 시도는 여기 없다.
+    /// 성공률을 낼 땐 `pill_identify_started` 를 분모로 쓸 것.
+    ///
+    /// `analysisMs` 는 로딩 화면 진입부터 이 결과가 나오기까지, 즉 **사용자가 기다린 시간**이다
+    /// (온디바이스 세그멘테이션 + 서버 왕복 포함). 실패에도 붙어 "얼마나 빨리 실패하는가"를 본다.
+    case pillIdentifyResult(outcome: String, pillCount: Int, analysisMs: Int)
     /// 속성 수정 1회.
     case pillAttrEdit(attribute: String, pillIndex: Int)
     /// 알약 1개 확정(후보 선택) — 몇 번째 후보·수정 횟수·수정한 속성·확정까지 체류시간.
@@ -30,11 +41,11 @@ public enum AnalyticsEvent {
     case pillFlowExit(pillIndex: Int, editingAttribute: String, enteredValues: String, editCount: Int)
     /// 사용 한도 **소진** — 마지막 1회를 쓴 요청이 성공으로 돌아온 순간 1회.
     ///
-    /// source: `exhausted`(잔여 0 도달). 과거에는 `gate`(요청 전 게이트)·`server`(429)로
-    /// **막힌 시도**에서 발사했는데, 그러면 소진하고 재시도하지 않은 사용자가 통째로 빠져
-    /// 도달자 수가 과소 집계되고 재시도한 사용자는 횟수만큼 중복으로 잡혔다.
-    /// 값으로 과거 행과 구분되므로 집계 시 `limit_source = exhausted` 로 거른다.
-    case pillLimitReached(source: String)
+    /// 파라미터가 없다. 발화 조건이 "잔여 0 도달" 하나뿐이라 어떤 값을 붙여도 상수가 되고,
+    /// 상수 축은 이벤트 수를 세는 것과 같은 정보를 되풀이할 뿐이다.
+    /// (~2026-09 에는 `limit_source` 로 `gate`·`server` 를 실어 **막힌 시도**마다 발사했는데,
+    /// 그러면 소진 후 재시도하지 않은 사용자가 통째로 빠지고 재시도한 사용자는 중복으로 잡혔다.)
+    case pillLimitReached
     /// 알약 식별 완주 — ⑨ 완료 버튼. (완료 수 / 시작 수). 완주 시 미확정=0.
     case pillIdentifyComplete(detectedCount: Int, confirmedCount: Int, deletedCount: Int, manualAddedCount: Int)
     /// 알약 식별 중도이탈 — ⑤ 인식결과에서 확정 없이 나감. 미확정 개수·경과시간 포함.
@@ -59,6 +70,7 @@ public enum AnalyticsEvent {
         case .buttonTap:        return "button_tap"
         case .share:            return "share"
         case .permissionResult: return "permission_result"
+        case .pillIdentifyStarted: return "pill_identify_started"
         case .pillIdentifyResult: return "pill_identify_result"
         case .pillAttrEdit:     return "pill_attr_edit"
         case .pillConfirm:      return "pill_confirm"
@@ -83,8 +95,11 @@ public enum AnalyticsEvent {
             return ["method": method, "content_type": contentType]
         case let .permissionResult(permission, result, gate):
             return ["permission": permission, "result": result, "gate": gate]
-        case let .pillIdentifyResult(outcome, pillCount):
-            return ["outcome": outcome, "pill_count": pillCount]
+        case .pillIdentifyStarted:
+            return [:]
+        case let .pillIdentifyResult(outcome, pillCount, analysisMs):
+            return ["outcome": outcome, "pill_count": pillCount,
+                    "analysis_ms": analysisMs, "analysis_bucket": Self.analysisBucket(analysisMs)]
         case let .pillAttrEdit(attribute, pillIndex):
             return ["attribute": attribute,
                     "pill_index": pillIndex, "pill_index_label": Self.pillIndexLabel(pillIndex)]
@@ -98,9 +113,8 @@ public enum AnalyticsEvent {
             return ["pill_index": pillIndex, "pill_index_label": Self.pillIndexLabel(pillIndex),
                     "editing_attribute": editingAttribute, "entered_values": enteredValues,
                     "edit_count": editCount, "edit_count_bucket": Self.editCountBucket(editCount)]
-        case let .pillLimitReached(source):
-            // timer_start.source(iphone/watch/widget)와 겹치지 않게 별도 키 사용.
-            return ["limit_source": source]
+        case .pillLimitReached:
+            return [:]
         case let .pillIdentifyComplete(detectedCount, confirmedCount, deletedCount, manualAddedCount):
             return ["detected_count": detectedCount, "confirmed_count": confirmedCount,
                     "deleted_count": deletedCount, "manual_added_count": manualAddedCount]
@@ -170,6 +184,28 @@ public enum AnalyticsEvent {
         case 2...3: return "2-3회"
         case 4...5: return "4-5회"
         default:    return "6회+"
+        }
+    }
+
+    /// 분석 대기시간 구간(`pill_identify_result.analysis_bucket`).
+    ///
+    /// `analysis_ms` 와 짝으로 보낸다 — Int 는 GA4 **측정항목**으로만 등록되어 평균은 보이지만
+    /// 분류 축으로 쓰면 전부 `(not set)` 이 된다. 분포를 보려면 문자열 구간이 필요하다.
+    ///
+    /// 짧은 쪽을 촘촘히 나눈 건 **대기 이탈이 앞쪽에서 갈리기 때문**이다. 3초와 5초의 차이는
+    /// 체감이 크지만 40초와 50초의 차이는 이미 "너무 느림" 한 덩어리다.
+    /// (2026-09-02 시뮬레이터 실측 1건: 알약 25개 인식에 12.9초)
+    private static func analysisBucket(_ ms: Int) -> String {
+        switch ms {
+        case ..<0:       return "unknown"
+        case ..<3_000:   return "00:00-00:03"
+        case ..<5_000:   return "00:03-00:05"
+        case ..<10_000:  return "00:05-00:10"
+        case ..<15_000:  return "00:10-00:15"
+        case ..<20_000:  return "00:15-00:20"
+        case ..<30_000:  return "00:20-00:30"
+        case ..<60_000:  return "00:30-01:00"
+        default:         return "01:00+"
         }
     }
 }
