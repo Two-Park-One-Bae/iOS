@@ -107,7 +107,7 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
             // 세션 중 소진 방어: 진입 후 마지막 횟수를 쓰고 돌아온 경우, 요청을 보내지 않는다.
             // 값을 모르면 통과 — 최종 판정은 서버 429다 (NM-323).
             if let usage = self.pillUseCase.pillUsage.value, usage.isExhausted {
-                self.exitToHomeWithLimitAlert(usage: usage, source: "gate")
+                self.exitToHomeWithLimitAlert(usage: usage)
                 return
             }
 
@@ -124,9 +124,11 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
     /// 미리보기에 남겨두면 재촬영·이 사진 사용 둘 다 다시 막혀 막다른 길이 된다.
     /// 요청 전에 막힌 경우(게이트)와 서버가 거절한 경우(429)를 사용자는 구분할 수 없으므로
     /// 두 경로의 동작을 통일한다.
-    private func exitToHomeWithLimitAlert(usage: PillUsageModel?, source: String) {
-        // source: gate(요청 전 세션 게이트) / server(요청 후 429) — 어디서 막혔는지 구분.
-        AppAnalytics.track(.pillLimitReached(source: source))
+    ///
+    /// **여기서는 계측하지 않는다.** `pill_limit_reached` 는 한도를 실제로 소진하는 순간
+    /// (마지막 1회를 쓴 요청의 성공 응답)에 `DrugIdentificationViewModel` 이 발사한다 —
+    /// 막힌 시도를 세면 재시도하지 않은 사용자가 빠지고 재시도한 사용자는 중복으로 잡힌다.
+    private func exitToHomeWithLimitAlert(usage: PillUsageModel?) {
         navigationController.popToRootViewController(animated: false)
         NotificationCenter.default.post(name: .selectHomeTab, object: nil)
 
@@ -159,7 +161,7 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
         }
         // 한도 도달은 실패가 아니다 — 미리보기로 되돌리고 안내 팝업만 띄운다.
         loadingVC.onLimitExceeded = { [weak self] usage in
-            self?.exitToHomeWithLimitAlert(usage: usage, source: "server")
+            self?.exitToHomeWithLimitAlert(usage: usage)
         }
 
         navigationController.pushViewController(loadingVC, animated: true)
