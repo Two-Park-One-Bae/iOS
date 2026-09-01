@@ -28,7 +28,12 @@ public enum AnalyticsEvent {
     case pillConfirm(pillIndex: Int, candidateIndex: Int, editCount: Int, editedAttrs: String, dwellMs: Int)
     /// 확정 없이 알약 수정 화면을 이탈 — 어떤 알약·어떤 속성 입력 중이었나.
     case pillFlowExit(pillIndex: Int, editingAttribute: String, enteredValues: String, editCount: Int)
-    /// 사용 한도 도달 — source: gate(요청 전 게이트) / server(429).
+    /// 사용 한도 **소진** — 마지막 1회를 쓴 요청이 성공으로 돌아온 순간 1회.
+    ///
+    /// source: `exhausted`(잔여 0 도달). 과거에는 `gate`(요청 전 게이트)·`server`(429)로
+    /// **막힌 시도**에서 발사했는데, 그러면 소진하고 재시도하지 않은 사용자가 통째로 빠져
+    /// 도달자 수가 과소 집계되고 재시도한 사용자는 횟수만큼 중복으로 잡혔다.
+    /// 값으로 과거 행과 구분되므로 집계 시 `limit_source = exhausted` 로 거른다.
     case pillLimitReached(source: String)
     /// 알약 식별 완주 — ⑨ 완료 버튼. (완료 수 / 시작 수). 완주 시 미확정=0.
     case pillIdentifyComplete(detectedCount: Int, confirmedCount: Int, deletedCount: Int, manualAddedCount: Int)

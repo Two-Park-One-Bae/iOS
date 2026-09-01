@@ -151,6 +151,26 @@ public final class DrugIdentificationViewModel {
             .sink { AppAnalytics.track($0) }
             .store(in: &cancelBag)
 
+        // pill_limit_reached — 마지막 1회를 쓴 요청이 성공으로 돌아온 순간(잔여 0) 1회.
+        //
+        // 서버가 이번 요청이 반영된 잔여를 응답에 실어 주므로(API 0.13.0 `{ items, usage }`),
+        // PillUseCase 가 pillAttributes 를 방출하기 직전 pillUsage 를 갱신해 둔다.
+        // 따라서 success/empty 상태가 뜬 시점의 pillUsage 는 곧 '이번 요청 후 잔여'다.
+        // failure 는 서버가 처리하지 못한 것이라 잔여가 갱신되지 않으므로 제외한다.
+        stateSubject
+            .filter { state in
+                switch state {
+                case .success, .empty:                   return true
+                case .loading, .failure, .limitExceeded: return false
+                }
+            }
+            .first()
+            .sink { [weak self] _ in
+                guard self?.pillUseCase.pillUsage.value?.remaining == 0 else { return }
+                AppAnalytics.track(.pillLimitReached(source: "exhausted"))
+            }
+            .store(in: &cancelBag)
+
         pillUseCase.pillAttributes
             .receive(on: DispatchQueue.main)
             .sink { [weak self] attributes in
