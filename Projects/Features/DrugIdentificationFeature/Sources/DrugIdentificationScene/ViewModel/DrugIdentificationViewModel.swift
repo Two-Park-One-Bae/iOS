@@ -37,6 +37,11 @@ public final class DrugIdentificationViewModel {
 
     private let stateSubject = CurrentValueSubject<State, Never>(.loading)
 
+    /// 분석 시작 시각 — `pill_identify_result.analysis_ms` 의 기준.
+    /// 로딩 화면이 떠 있는 동안 사용자가 실제로 기다린 시간을 재므로,
+    /// `dwell_ms` 와 달리 화면 노출 여부를 따지지 않는다(대기는 백그라운드에서도 이어진다).
+    private var startedAt: Date?
+
     // MARK: - Init
 
     init(image: UIImage) {
@@ -53,9 +58,19 @@ public final class DrugIdentificationViewModel {
         return Output(state: stateSubject.eraseToAnyPublisher())
     }
 
+    /// 로딩 화면 진입부터 지금까지 — 사용자가 기다린 시간.
+    private func analysisMs() -> Int {
+        guard let startedAt else { return 0 }
+        return Int(Date().timeIntervalSince(startedAt) * 1000)
+    }
+
     // MARK: - Pipeline
 
     private func identify() {
+        // pill_identify_started — 시도 1건. 결과가 안 나온 시도(대기 중 이탈)를 빼서 세려면
+        // 분모가 여기 남아 있어야 한다.
+        startedAt = Date()
+        AppAnalytics.track(.pillIdentifyStarted)
         bindUseCase()
 
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
@@ -139,11 +154,11 @@ public final class DrugIdentificationViewModel {
         // stateSubject 를 한 곳에서 구독해 '첫' 종료만 발사한다. loading 은 통과,
         // limitExceeded 는 제외(별도 pill_limit_reached).
         stateSubject
-            .compactMap { state -> AnalyticsEvent? in
+            .compactMap { [weak self] state -> AnalyticsEvent? in
                 switch state {
-                case let .success(pills, _): return .pillIdentifyResult(outcome: "success", pillCount: pills.count)
-                case .empty:                 return .pillIdentifyResult(outcome: "empty", pillCount: 0)
-                case .failure:               return .pillIdentifyResult(outcome: "failure", pillCount: 0)
+                case let .success(pills, _): return .pillIdentifyResult(outcome: "success", pillCount: pills.count, analysisMs: self?.analysisMs() ?? 0)
+                case .empty:                 return .pillIdentifyResult(outcome: "empty", pillCount: 0, analysisMs: self?.analysisMs() ?? 0)
+                case .failure:               return .pillIdentifyResult(outcome: "failure", pillCount: 0, analysisMs: self?.analysisMs() ?? 0)
                 case .loading, .limitExceeded: return nil
                 }
             }
@@ -167,7 +182,7 @@ public final class DrugIdentificationViewModel {
             .first()
             .sink { [weak self] _ in
                 guard self?.pillUseCase.pillUsage.value?.remaining == 0 else { return }
-                AppAnalytics.track(.pillLimitReached(source: "exhausted"))
+                AppAnalytics.track(.pillLimitReached)
             }
             .store(in: &cancelBag)
 
