@@ -18,6 +18,11 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
 
     private var pillTabObserver: NSObjectProtocol?
 
+    /// 알약별 체류시간 누적기 — `PillEditVC` 가 매번 새로 만들어져도 값이 이어지도록 여기서 소유한다.
+    /// 이 Coordinator 는 탭당 하나로 앱 수명 내내 살아 있어서, 새 인식 세션마다 `reset()` 해야
+    /// 이전 사진의 알약 순번과 누적값이 섞이지 않는다.
+    private let dwellTracker = PillDwellTracker()
+
     public override func start() {
         setupOverlay()
         setupCameraPickerCallbacks()
@@ -172,6 +177,8 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
     private weak var resultVC: DrugIdentificationVC?
 
     private func showResult(pills: [IdentifiedPill], image: UIImage, replacing loadingVC: UIViewController) {
+        // 새 인식 세션 — 이전 사진의 알약별 누적 체류시간을 비운다.
+        dwellTracker.reset()
         let vc = DrugIdentificationVC(pills: pills, image: image)
         resultVC = vc
         vc.onExitToHome = { [weak self, weak vc] in
@@ -252,6 +259,7 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
             thumbnail: pill.thumbnail
         )
         let vc = PillEditVC(viewModel: viewModel)
+        vc.dwellTracker = dwellTracker
         vc.onBackTapped = { [weak self] in
             self?.navigationController.popViewController(animated: true)
         }

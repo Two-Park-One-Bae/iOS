@@ -215,6 +215,17 @@ let project = Project(
                 arguments: .arguments(
                     environmentVariables: [
                         "FIRAAppCheckDebugToken": "$(APP_CHECK_DEBUG_TOKEN)"
+                    ],
+                    // 분석 QA용 실행 인자 — **꺼진 채로** 스킴에 미리 넣어 둔다.
+                    // -FIRDebugEnabled: Firebase DebugView 에 실시간 표시
+                    // -FIRAnalyticsDebugEnabled: 이벤트·파라미터를 콘솔(os_log)에 상세 출력
+                    //
+                    // 기본을 꺼 두는 이유 — 켜 두면 모든 개발 실행이 DebugView 로 흘러 QA 세션과 섞인다.
+                    // 미리 넣어 두는 이유 — 매번 손으로 타이핑하면 오타가 나고, tuist generate 때마다
+                    // 날아간다. 스킴 편집기에서 체크박스만 켜면 되게 해 둔다.
+                    launchArguments: [
+                        .launchArgument(name: "-FIRDebugEnabled", isEnabled: false),
+                        .launchArgument(name: "-FIRAnalyticsDebugEnabled", isEnabled: false)
                     ]
                 ),
                 // 스킴 env var 의 `$(...)` 를 App 타깃 빌드세팅 기준으로 확장한다.

@@ -40,8 +40,9 @@ final class PillEditVC: UIViewController {
 
     private enum Panel { case none, color, shape, formulation, imprint }
     private var openPanel: Panel = .none
-    /// 체류시간(pill_confirm.dwell_ms) 기준 시각.
-    private var appearedAt: Date?
+    /// 체류시간(`pill_confirm.dwell_ms`) 누적기 — Coordinator 가 소유해 화면이 다시 만들어져도 이어진다.
+    /// 주입되지 않으면(데모 등) 시간은 0 으로 나간다.
+    var dwellTracker: PillDwellTracker?
 
     // MARK: - UI
 
@@ -125,7 +126,6 @@ final class PillEditVC: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        appearedAt = Date()
         navigationController?.setNavigationBarHidden(true, animated: false)
         setUI()
         setLayout()
@@ -405,8 +405,17 @@ final class PillEditVC: UIViewController {
     /// `isMovingFromParent`/`isBeingDismissed` 로 거르는 이유: 후보 세부정보·이미지 비교 뷰어를
     /// push 할 때도 viewDidDisappear 는 불리는데, 그건 이탈이 아니라 잠시 가려지는 것뿐이다.
     /// (앱 강제 종료·백그라운드 이탈은 여기로 안 들어온다 — 그건 원래도 못 잡던 경로다)
+    /// 화면이 실제로 떠 있는 동안만 체류시간을 센다. 세부정보·비교 뷰어를 push 했다 돌아올 때도
+    /// 여기로 다시 들어와 구간이 이어진다.
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        dwellTracker?.resume(pillIndex: viewModel.pillIndex)
+    }
+
     override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
+        // 이탈이든 잠시 가려진 것이든 화면에서 사라지면 시계는 멈춘다.
+        dwellTracker?.pause()
         guard isMovingFromParent || isBeingDismissed else { return }
         guard !didConfirm else { return }
         trackFlowExit()
@@ -433,8 +442,7 @@ final class PillEditVC: UIViewController {
     }
 
     private func dwellMs() -> Int {
-        guard let appearedAt else { return 0 }
-        return Int(Date().timeIntervalSince(appearedAt) * 1000)
+        dwellTracker?.elapsedMs(pillIndex: viewModel.pillIndex) ?? 0
     }
 
     // MARK: - Bind
