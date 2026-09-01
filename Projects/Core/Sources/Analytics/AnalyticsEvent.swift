@@ -108,7 +108,8 @@ public enum AnalyticsEvent {
                     "candidate_index": candidateIndex,
                     "candidate_index_label": Self.candidateIndexLabel(candidateIndex),
                     "edit_count": editCount, "edit_count_bucket": Self.editCountBucket(editCount),
-                    "edited_attrs": editedAttrs, "dwell_ms": dwellMs]
+                    "edited_attrs": editedAttrs,
+                    "dwell_ms": dwellMs, "dwell_bucket": Self.dwellBucket(dwellMs)]
         case let .pillFlowExit(pillIndex, editingAttribute, enteredValues, editCount):
             return ["pill_index": pillIndex, "pill_index_label": Self.pillIndexLabel(pillIndex),
                     "editing_attribute": editingAttribute, "entered_values": enteredValues,
@@ -187,10 +188,46 @@ public enum AnalyticsEvent {
         }
     }
 
+    /// 알약 1개를 확정하기까지 걸린 시간의 분포용 구간(`pill_confirm.dwell_bucket`).
+    ///
+    /// `dwell_ms` 는 Int 라 **측정항목**으로만 등록된다 — 평균은 보이지만 분류 축으로 쓰면
+    /// 전부 `(not set)` 이 된다. 분포를 보거나 다른 지표를 시간대로 쪼개려면 문자열 구간이 필요하다.
+    /// 같은 이벤트의 `edit_count_bucket`·`edited_attrs` 와 교차하면 "많이 고친 알약이 오래
+    /// 걸리는가"를 바로 볼 수 있다.
+    ///
+    /// 30초 안쪽은 10초로 한 번 더 갈라 빠른 확정을 구분하고, 30초부터 5분까지는 30초 단위,
+    /// 그 위는 두 칸으로 닫아 카디널리티를 묶는다 — 개선 대상은 오래 걸린 쪽이다.
+    ///
+    /// 라벨이 `mm:ss` 인 이유 — 초와 분을 섞으면(`30초-1분`·`1-2분`) 사전순 정렬이 구간 순서와
+    /// 어긋난다. 자리수가 고정된 `mm:ss` 는 사전순이 곧 시간순이다.
+    ///
+    /// **값의 성질** — `dwell_ms` 는 수정 화면이 실제로 떠 있던 시간의 **누적**이다(`PillDwellTracker`).
+    /// 백그라운드·탭 전환 시간은 빠지고, 같은 알약을 여러 번 열면 모든 방문이 합산된다.
+    /// 이 구간은 그 값을 나눈 것이라 같은 성질을 물려받는다.
+    /// (~2026-09 에는 마지막 진입 시각부터의 벽시계였다 — 옛 데이터와 같은 축에서 비교하지 말 것.)
+    private static func dwellBucket(_ ms: Int) -> String {
+        switch ms {
+        case ..<0:       return "unknown"
+        case ..<10_000:  return "00:00-00:10"
+        case ..<30_000:  return "00:10-00:30"
+        case ..<60_000:  return "00:30-01:00"
+        case ..<90_000:  return "01:00-01:30"
+        case ..<120_000: return "01:30-02:00"
+        case ..<150_000: return "02:00-02:30"
+        case ..<180_000: return "02:30-03:00"
+        case ..<210_000: return "03:00-03:30"
+        case ..<240_000: return "03:30-04:00"
+        case ..<270_000: return "04:00-04:30"
+        case ..<300_000: return "04:30-05:00"
+        case ..<600_000: return "05:00-10:00"
+        default:         return "10:00+"
+        }
+    }
+
     /// 분석 대기시간 구간(`pill_identify_result.analysis_bucket`).
     ///
-    /// `analysis_ms` 와 짝으로 보낸다 — Int 는 GA4 **측정항목**으로만 등록되어 평균은 보이지만
-    /// 분류 축으로 쓰면 전부 `(not set)` 이 된다. 분포를 보려면 문자열 구간이 필요하다.
+    /// `dwell_bucket` 과 같은 이유로 문자열 구간을 함께 보낸다 — Int 는 측정항목으로만 등록되어
+    /// 분류 축으로 쓰면 `(not set)` 이 된다.
     ///
     /// 짧은 쪽을 촘촘히 나눈 건 **대기 이탈이 앞쪽에서 갈리기 때문**이다. 3초와 5초의 차이는
     /// 체감이 크지만 40초와 50초의 차이는 이미 "너무 느림" 한 덩어리다.
