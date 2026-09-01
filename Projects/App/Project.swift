@@ -24,6 +24,20 @@ let project = Project(
                 // Firebase Analytics 자동수집을 빌드 구성으로 제어(NM-364). 내부(Debug·beta_internal)=NO →
                 // FirebaseApp.configure() 전부터 꺼져 first_open 등 'leak 창' 자체가 없다. 외부·프로덕션=YES.
                 "FIREBASE_ANALYTICS_COLLECTION_ENABLED": "$(FIREBASE_ANALYTICS_ENABLED)",
+                // 자동 screen_view 수집을 끈다. 이 앱에선 비용만 크고 얻는 게 없다.
+                //
+                // 무엇을 잃나 — ga_screen_class 는 **뷰컨트롤러 클래스명**이 그대로 들어간다.
+                // 화면 단위 분석은 우리가 직접 찍는 button_tap.screen 과 퍼널 이벤트
+                // (pill_identify_started/result/complete …)로 이미 하고 있고, 그쪽이
+                // 의미 있는 이름을 쓴다. VC 클래스명 축은 리팩터링 때마다 값이 갈라진다.
+                //
+                // 무엇을 아끼나 — QA 주행 로그 기준 screen_view 가 전체 이벤트의 51%
+                // (349/680)로 단일 최대 소스다. 자동수집 전체는 87.5%.
+                //
+                // 활성 사용자 지표에는 영향이 없다 — GA4 의 DAU/WAU/MAU 는 first_open
+                // 또는 user_engagement 로 정의되며 screen_view 는 조건에 없다.
+                // 신규 설치 실측으로도 두 이벤트가 그대로 나가는 것을 확인했다.
+                "FirebaseAutomaticScreenReportingEnabled": false,
                 "NSCameraUsageDescription": "알약 사진 촬영을 위해 카메라 접근이 필요합니다.",
                 "NSPhotoLibraryUsageDescription": "앨범에서 알약 사진을 선택하기 위해 접근이 필요합니다.",
                 // 카카오 SDK 초기화 키 (NM-410). 값은 gitignore 된 Secrets.xcconfig 에만 둔다.
