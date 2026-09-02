@@ -10,7 +10,6 @@ final class APIRequestInterceptorTests: XCTestCase {
     func test_공개엔드포인트는_Bearer를_붙이지_않는다() {
         let publicPaths = [
             "/actuator/health",
-            "/health",
             "/api/v0/auth/kakao/token",
             "/api/v0/consents",
         ]
@@ -25,6 +24,8 @@ final class APIRequestInterceptorTests: XCTestCase {
 
     func test_그외_모든_경로는_Bearer가_필요하다() {
         let authenticatedPaths = [
+            // 서버에서 삭제된 구 헬스 체크 경로(spec 0.25.0) — 공개 목록에 남아 있으면 안 된다.
+            "/health",
             "/api/v0/users/me",
             // 접두가 같아도 별개 경로다 — prefix 매칭으로 느슨하게 열리면 안 된다.
             "/api/v0/users/me/consents",

@@ -124,6 +124,10 @@ public enum AuthError: Error, Equatable {
     case kakaoTokenInvalid
     /// 503 — Firebase·카카오 일시 장애. **세션을 유지**하고 재시도만 안내한다(로그아웃 사유가 아니다).
     case serviceUnavailable
+    /// 500 `INTERNAL_ERROR` — 서버 쪽 상태 문제(공급자 불일치 포함).
+    /// **로그아웃 사유가 아니다** — 토큰 검증은 통과했고, 재로그인해도 같은 응답이 온다
+    /// (spec: feature/auth/README.md §토큰·세션).
+    case serverError
     /// 동의 저장 400(버전 불일치 등) — 오류로 끝내지 않고 `GET /consents` 재조회 후 화면을 다시 그린다.
     case consentVersionMismatch
     /// 탈퇴 500 — 계정이 남아 있을 수 있어 **로그아웃하지 않고** 재시도한다.

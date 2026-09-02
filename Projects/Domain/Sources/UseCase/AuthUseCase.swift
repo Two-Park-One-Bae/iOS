@@ -14,7 +14,10 @@ public protocol AuthUseCase {
     var user: CurrentValueSubject<AuthUser?, Never> { get }
 
     /// 앱 실행·포그라운드 복귀 시 갈 화면을 정한다.
-    func restoreSession() async -> AuthRoute
+    ///
+    /// 서버 문제(500·503)로 판정이 서지 않으면 **화면을 정하지 않고 throw** 한다 — 세션은 살아 있으므로
+    /// 호출부는 지금 화면에 머문 채 재시도한다 (spec: feature/auth/README.md §진입 라우팅).
+    func restoreSession() async throws -> AuthRoute
 
     /// 소셜 로그인 → 회원 조회 → 갈 화면. 취소·실패는 throw.
     func signIn(with provider: AuthProvider) async throws -> AuthRoute
@@ -53,8 +56,13 @@ public final class DefaultAuthUseCase: AuthUseCase {
 
      `/users/me` 조회가 실패하면 로그인으로 되돌린다. 동의 여부를 모르는 채 홈에 들여보내면
      "로그인됐지만 미동의" 라는, spec 이 없다고 못박은 상태가 화면에 생긴다.
+
+     단 **500·503 은 예외로 throw 한다.** 둘 다 로그아웃 사유가 아니다 — 503 은 일시 장애라 잠시 뒤
+     풀리고, 500 의 공급자 불일치는 서버 쪽 상태 문제라 재로그인해도 같은 응답이 온다. 로그인으로
+     되돌리면 사용자가 빠져나갈 방법이 없어, 세션을 든 채 호출부가 재시도하게 넘긴다
+     (spec: feature/auth/README.md §토큰·세션).
      */
-    public func restoreSession() async -> AuthRoute {
+    public func restoreSession() async throws -> AuthRoute {
         guard repository.isSignedIn else {
             user.send(nil)
             return .login
@@ -62,9 +70,19 @@ public final class DefaultAuthUseCase: AuthUseCase {
 
         do {
             return try await refreshUser()
+        } catch let error as AuthError where Self.keepsSession(error) {
+            throw error
         } catch {
             user.send(nil)
             return .login
+        }
+    }
+
+    /// 세션을 버리지 않고 재시도해야 하는 실패인지.
+    private static func keepsSession(_ error: AuthError) -> Bool {
+        switch error {
+        case .serverError, .serviceUnavailable: return true
+        default: return false
         }
     }
 
