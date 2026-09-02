@@ -176,7 +176,7 @@ private final class StubAuthUseCase: AuthUseCase {
     private(set) var fetchCallCount = 0
     private(set) var signOutCallCount = 0
 
-    func restoreSession() async -> AuthRoute { .login }
+    func restoreSession() async throws -> AuthRoute { .login }
 
     func signIn(with provider: AuthProvider) async throws -> AuthRoute { .home }
 

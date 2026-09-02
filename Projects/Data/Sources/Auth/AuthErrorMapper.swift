@@ -30,6 +30,11 @@ enum AuthErrorMapper {
         case (503, _):
             // 일시 장애 — 세션을 유지하고 재시도만 안내한다. 로그아웃 사유가 아니다.
             return .serviceUnavailable
+        case (500, _):
+            // 서버 쪽 상태 문제. 503 과 마찬가지로 로그아웃 사유가 아니다 — 특히 `GET /users/me` 의
+            // 공급자 불일치가 여기로 오는데, 재로그인해도 같은 500 이라 로그인 화면으로 보내면
+            // 사용자가 빠져나갈 방법이 없다 (spec: domains/errors.md §회원).
+            return .serverError
         default:
             return .unknown
         }

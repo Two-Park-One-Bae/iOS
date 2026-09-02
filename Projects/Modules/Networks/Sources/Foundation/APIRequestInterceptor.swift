@@ -20,14 +20,13 @@ import Core
 ///   (spec: feature/auth/README.md §토큰·세션)
 public final class APIRequestInterceptor: RequestInterceptor {
 
-    /// Bearer 를 붙이지 않는 공개 엔드포인트. spec 이 공개로 못박은 넷이 전부다
-    /// (spec: domains/auth.md §방식 — "공개 목록은 이 넷뿐").
+    /// Bearer 를 붙이지 않는 공개 엔드포인트. spec 이 공개로 못박은 셋이 전부다
+    /// (spec: domains/auth.md §방식 — "공개 목록은 이 셋뿐").
     ///
     /// Service 별로 플래그를 두는 대신 경로로 판정한다. 인터셉터는 Session 단위라 어느 API 든 여기를 지나고,
     /// 공개 여부는 서버 설정과 1:1로 맞춰야 하는 값이라 한 곳에 문자열로 두는 편이 대조하기 쉽다.
     private static let publicPaths: Set<String> = [
         "/actuator/health",
-        "/health",
         "/api/v0/auth/kakao/token",
         "/api/v0/consents",
     ]

@@ -30,7 +30,7 @@ final class MockAuthUseCase: AuthUseCase {
         self.scenario = scenario
     }
 
-    func restoreSession() async -> AuthRoute {
+    func restoreSession() async throws -> AuthRoute {
         // 데모는 항상 로그인 화면에서 시작한다.
         .login
     }

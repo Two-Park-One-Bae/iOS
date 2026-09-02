@@ -24,10 +24,10 @@ final class AuthUseCaseTests: XCTestCase {
 
     // MARK: - 진입 라우팅
 
-    func test_restoreSession_세션이없으면_로그인() async {
+    func test_restoreSession_세션이없으면_로그인() async throws {
         repository.isSignedIn = false
 
-        let route = await sut.restoreSession()
+        let route = try await sut.restoreSession()
 
         XCTAssertEqual(route, .login)
         XCTAssertNil(sut.user.value)
@@ -35,34 +35,51 @@ final class AuthUseCaseTests: XCTestCase {
         XCTAssertEqual(repository.fetchMeCallCount, 0)
     }
 
-    func test_restoreSession_동의미충족이면_동의온보딩() async {
+    func test_restoreSession_동의미충족이면_동의온보딩() async throws {
         repository.isSignedIn = true
         repository.meResult = .success(.stub(onboardingRequired: true))
 
-        let route = await sut.restoreSession()
+        let route = try await sut.restoreSession()
 
         XCTAssertEqual(route, .consent)
     }
 
-    func test_restoreSession_동의충족이면_홈() async {
+    func test_restoreSession_동의충족이면_홈() async throws {
         repository.isSignedIn = true
         repository.meResult = .success(.stub(onboardingRequired: false))
 
-        let route = await sut.restoreSession()
+        let route = try await sut.restoreSession()
 
         XCTAssertEqual(route, .home)
         XCTAssertEqual(sut.user.value?.userId, "uid")
     }
 
     /// 동의 여부를 모르는 채 홈에 들여보내면 "로그인됐지만 미동의" 상태가 화면에 생긴다.
-    func test_restoreSession_회원조회실패면_로그인으로_되돌린다() async {
+    func test_restoreSession_회원조회실패면_로그인으로_되돌린다() async throws {
         repository.isSignedIn = true
         repository.meResult = .failure(AuthError.unknown)
 
-        let route = await sut.restoreSession()
+        let route = try await sut.restoreSession()
 
         XCTAssertEqual(route, .login)
         XCTAssertNil(sut.user.value)
+    }
+
+    /// 500·503 은 로그아웃 사유가 아니다 — 공급자 불일치(500)는 재로그인해도 같은 응답이 오고,
+    /// 503 은 일시 장애다. 화면을 정하지 않고 throw 해 호출부가 재시도하게 한다
+    /// (spec: feature/auth/README.md §토큰·세션).
+    func test_restoreSession_서버문제면_로그인으로_되돌리지_않고_throw() async {
+        for expected in [AuthError.serverError, .serviceUnavailable] {
+            repository.isSignedIn = true
+            repository.meResult = .failure(expected)
+
+            do {
+                let route = try await sut.restoreSession()
+                XCTFail("\(expected) 는 화면을 정하지 않고 throw 되어야 한다 (받은 route: \(route))")
+            } catch {
+                XCTAssertEqual(error as? AuthError, expected)
+            }
+        }
     }
 
     // MARK: - 동의
@@ -95,7 +112,7 @@ final class AuthUseCaseTests: XCTestCase {
     func test_signOut_계정정보를_비운다() async {
         repository.isSignedIn = true
         repository.meResult = .success(.stub(onboardingRequired: false))
-        _ = await sut.restoreSession()
+        _ = try? await sut.restoreSession()
         XCTAssertNotNil(sut.user.value)
 
         sut.signOut()
@@ -108,7 +125,7 @@ final class AuthUseCaseTests: XCTestCase {
     func test_deleteAccount_실패하면_로그아웃하지_않는다() async {
         repository.isSignedIn = true
         repository.meResult = .success(.stub(onboardingRequired: false))
-        _ = await sut.restoreSession()
+        _ = try? await sut.restoreSession()
         repository.deleteResult = .failure(AuthError.accountDeletionFailed)
 
         do {
@@ -125,7 +142,7 @@ final class AuthUseCaseTests: XCTestCase {
     func test_deleteAccount_성공하면_로그아웃하고_계정정보를_비운다() async throws {
         repository.isSignedIn = true
         repository.meResult = .success(.stub(onboardingRequired: false))
-        _ = await sut.restoreSession()
+        _ = try await sut.restoreSession()
 
         try await sut.deleteAccount()
 
