@@ -80,7 +80,7 @@ public final class DrugIdentificationViewModel {
             do {
                 segmentor = try RFDetrSegmentor()
             } catch {
-                self.emit(.failure(message: error.localizedDescription))
+                self.reportSegmentationFailure(error, stage: "load")
                 return
             }
 
@@ -99,7 +99,7 @@ public final class DrugIdentificationViewModel {
                 self.pending = (pills, self.buildItems(from: pills))
                 self.requestAttributes(items: self.pending?.items ?? [])
             } catch {
-                self.emit(.failure(message: error.localizedDescription))
+                self.reportSegmentationFailure(error, stage: "inference")
             }
         }
     }
@@ -134,6 +134,28 @@ public final class DrugIdentificationViewModel {
             let base64 = autoreleasepool { pill.thumbnail?.pngData()?.base64EncodedString() ?? "" }
             return (pillId: pill.attribute.pillId, croppedImage: base64)
         }
+    }
+
+    /*
+     온디바이스 세그멘테이션 실패 — 화면엔 우리 문구, 원문은 Crashlytics 로.
+
+     예전엔 `error.localizedDescription` 을 그대로 띄웠다. CoreML 에러는 영문 시스템
+     메시지라 한국어 앱에 이런 문장이 그대로 나갔다:
+
+       Failed to build the model execution plan using a model architecture file
+       .../rfdetr_seg_small_fp32.mlmodelc/model.mil with error code: -5
+
+     실제로 배포 빌드에서 났던 문구다(CI 체크아웃에 `lfs: true` 가 빠져 모델 가중치가
+     포인터 파일로 번들된 사고). 사용자가 읽고 할 수 있는 일이 없는데다, 원인은 원인대로
+     화면에서 휘발됐다 — 로컬 빌드는 멀쩡해서 네트워크 문제로 오인하기 쉬운 부류다.
+
+     그래서 **화면과 로그를 가른다.** 화면은 다음에 뭘 하면 되는지만 말하고, 원문은
+     Crashlytics 비치명적 이슈로 남겨 다음에 같은 사고가 나면 원인이 보이게 한다.
+     */
+    private func reportSegmentationFailure(_ error: Error, stage: String) {
+        FirebaseService.log("pill segmentation failed (stage: \(stage))")
+        FirebaseService.recordError(error)
+        emit(.failure(message: "사진을 분석하지 못했어요. 잠시 후 다시 시도해 주세요."))
     }
 
     private func requestAttributes(
