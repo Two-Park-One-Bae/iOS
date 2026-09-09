@@ -258,21 +258,39 @@ platform :ios do
     # 외부 테스터 그룹에 배포. 내부와 달리 distribute_external·groups·changelog 가 필수이고,
     # 빌드 처리 완료를 기다려야 한다(skip_waiting=false). 첫 외부 빌드는 애플 Beta App Review 통과 후 노출.
     # groups 는 App Store Connect 에 생성한 외부 그룹명과 정확히 일치해야 한다.
-    upload_to_testflight(
-      api_key: app_store_connect_api_key(
-        key_id: ENV["APP_STORE_CONNECT_API_KEY_ID"],
-        issuer_id: ENV["APP_STORE_CONNECT_API_KEY_ISSUER_ID"],
-        key_filepath: API_KEY_RAW_PATH,
-        in_house: false
-      ),
-      distribute_external: true,
-      groups: ["Nurse"],   # App Store Connect 외부 그룹명과 대소문자까지 정확히 일치해야 함
-      # 베타 앱 설명·피드백 이메일·심사 연락처는 App Store Connect(TestFlight 테스트 정보)를 단일 소스로 둔다.
-      # (한 번 설정하면 유지됨. 레인에서 beta_app_description을 넣으면 로케일 불일치로 심사 제출이
-      #  "Beta App Description is missing"로 반려될 수 있어 제외 — NM-217.)
-      changelog: beta_changelog,
-      skip_waiting_for_build_processing: false
-    )
+    #
+    # 업로드는 끝났는데 **Beta App Review 제출만** 막히는 경우를 삼킨다.
+    # App Store Connect 는 같은 버전 트레인(CFBundleShortVersionString)당 심사 중인 빌드를
+    # 하나만 허용한다. 이 레인은 release/** push 마다 도는데 increment_build_number 가 올리는 건
+    # 빌드 번호뿐이라 트레인은 그대로다 — 앞 빌드가 심사 중이면 다음 push 가 구조적으로 여기서 걸린다.
+    #
+    # 그때도 바이너리는 이미 올라가 처리까지 끝나 있고, 앞 빌드가 심사를 통과하면 같은 트레인의
+    # 이후 빌드는 재심사 없이 배포된다. 큐 사정으로 job 을 빨갛게 만들 이유가 없다.
+    # 나머지 에러는 그대로 올린다 — 서명·프로파일·네트워크 같은 진짜 실패를 삼키면 안 된다.
+    begin
+      upload_to_testflight(
+        api_key: app_store_connect_api_key(
+          key_id: ENV["APP_STORE_CONNECT_API_KEY_ID"],
+          issuer_id: ENV["APP_STORE_CONNECT_API_KEY_ISSUER_ID"],
+          key_filepath: API_KEY_RAW_PATH,
+          in_house: false
+        ),
+        distribute_external: true,
+        groups: ["Nurse"],   # App Store Connect 외부 그룹명과 대소문자까지 정확히 일치해야 함
+        # 베타 앱 설명·피드백 이메일·심사 연락처는 App Store Connect(TestFlight 테스트 정보)를 단일 소스로 둔다.
+        # (한 번 설정하면 유지됨. 레인에서 beta_app_description을 넣으면 로케일 불일치로 심사 제출이
+        #  "Beta App Description is missing"로 반려될 수 있어 제외 — NM-217.)
+        changelog: beta_changelog,
+        skip_waiting_for_build_processing: false
+      )
+    rescue => e
+      raise unless e.message =~ /another build is in review|already in beta review/i
+
+      UI.important("⚠️ 빌드 업로드는 성공했지만 Beta App Review 제출은 건너뛴다.")
+      UI.important("   같은 버전 트레인의 앞 빌드가 아직 심사 중이다(App Store Connect 제약).")
+      UI.important("   앞 빌드가 심사를 통과하면 이 빌드는 재심사 없이 외부 그룹에 노출된다.")
+      UI.important("   즉시 내보내야 하면 App Store Connect 에서 직접 그룹에 추가할 것.")
+    end
   end
 
   desc "Build and submit to App Store"
