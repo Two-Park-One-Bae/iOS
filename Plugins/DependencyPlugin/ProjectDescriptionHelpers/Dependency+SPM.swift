@@ -7,7 +7,6 @@ public extension TargetDependency {
         public static let CombineMoya = TargetDependency.external(name: "CombineMoya")
         public static let SnapKit = TargetDependency.external(name: "SnapKit")
         public static let Kingfisher = TargetDependency.external(name: "Kingfisher")
-        public static let AmplitudeSwift = TargetDependency.external(name: "AmplitudeSwift")
         public static let FirebaseAnalytics = TargetDependency.external(name: "FirebaseAnalytics")
         public static let FirebaseCrashlytics = TargetDependency.external(name: "FirebaseCrashlytics")
         public static let FirebaseRemoteConfig = TargetDependency.external(name: "FirebaseRemoteConfig")

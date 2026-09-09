@@ -79,19 +79,17 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         //   아래 호출은 보강 — SDK가 런타임 값을 저장·우선하므로 구성값으로 다시 박는다.
         FirebaseService.setAnalyticsCollectionEnabled(AppEnvironment.isAnalyticsCollectionEnabled)
 
-        // Amplitude·S3 원본 업로드는 환경이 갈려 있지 않아(단일 프로젝트·단일 버킷) 내부 빌드에서 막는다.
-        // Crashlytics(크래시)·App Check·Remote Config는 내부에서도 유지 — dev 프로젝트로 분리돼 있다.
-        let isInternal = AppEnvironment.isInternal
-
         // 지표·크래시의 사용자 식별자는 **Firebase UID** 다. 로그인·로그아웃·세션 복원을
         // 한 리스너로 받으므로 여기서는 켜 두기만 한다 (`AnalyticsIdentity` 주석 참고).
         // 예전엔 기기 UUID 를 여기서 직접 붙였는데, 그건 사람이 아니라 기기를 셌다.
-        AnalyticsIdentity.start(includeAmplitude: !isInternal)
+        //
+        // 빌드별 분기가 없다 — dev/prod Firebase 프로젝트가 갈려 있어 내부 빌드도 그냥 수집한다.
+        // (NM-458 로 Amplitude 를 걷어내기 전에는 여기서 내부 빌드를 막았다. 그건 Amplitude
+        //  프로젝트가 하나뿐이라 내부 데이터가 운영 지표에 그대로 섞였기 때문이다.)
+        AnalyticsIdentity.start()
 
-        if !isInternal {
-            // 외부 TestFlight·프로덕션에서만 Amplitude 수집.
-            AmplitudeService.track(AppLaunchEvent())
-        }
+        // 앱 실행 이벤트는 따로 찍지 않는다 — GA4 가 `first_open`·`session_start` 로 자동 수집한다.
+
         // Remote Config fetch + 게이팅(강제 업데이트·점검)은 window 를 소유한 SceneDelegate 가
         // sceneDidBecomeActive 에서 담당한다(포그라운드 복귀 시에도 최신값 반영).
         // 타이머 알람은 AlarmKit(26.1+)이 단독 담당한다 — 시스템 알람과 카운트다운 위젯까지

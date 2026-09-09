@@ -11,7 +11,6 @@ let packageSettings = PackageSettings(
         "CombineMoya": .framework,
         "SnapKit": .framework,
         "Kingfisher": .framework,
-        "AmplitudeSwift": .framework,
         "Lottie": .framework,
         "Then": .framework,
         // 소셜 로그인 (NM-410).
@@ -34,7 +33,6 @@ let package = Package(
         .package(url: "https://github.com/Moya/Moya", .upToNextMajor(from: "15.0.0")),
         .package(url: "https://github.com/SnapKit/SnapKit", .upToNextMajor(from: "5.7.0")),
         .package(url: "https://github.com/onevcat/Kingfisher", .upToNextMajor(from: "8.0.0")),
-        .package(url: "https://github.com/amplitude/Amplitude-Swift", .upToNextMajor(from: "1.11.0")),
         .package(url: "https://github.com/firebase/firebase-ios-sdk", .upToNextMajor(from: "11.0.0")),
         .package(url: "https://github.com/airbnb/lottie-ios", .upToNextMajor(from: "4.5.0")),
         .package(url: "https://github.com/devxoul/Then", .upToNextMajor(from: "3.0.0")),

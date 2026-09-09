@@ -105,7 +105,7 @@ enum RegisterDependencies {
 
          2·3을 여기서 하는 이유: Domain 계층은 분석 SDK를 알면 안 된다.
          UseCase 는 "타이머가 끝났다"는 순수 신호만 방출하고,
-         그 신호를 Amplitude 이벤트로 바꾸는 책임은 조립 지점인 여기가 진다.
+         그 신호를 분석 이벤트(`AppAnalytics`)로 바꾸는 책임은 조립 지점인 여기가 진다.
          */
         container.register(TimerUseCase.self) {
             let sync = TimerWatchSyncService.shared

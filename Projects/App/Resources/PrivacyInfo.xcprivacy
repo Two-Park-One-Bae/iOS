@@ -9,10 +9,11 @@
     <array/>
 
     <!-- 앱이 수집하는 데이터 유형. App Store Connect '개인정보 영양성분표'와 일치시켜야 함.
-         Amplitude(제품 상호작용)·Crashlytics(크래시)·기기 UUID(분석 userID) 기준. 실제 수집 관행에 맞춰 검증 필요. -->
+         Firebase Analytics(제품 상호작용)·Crashlytics(크래시) 기준 (NM-458: Amplitude 제거, 지표는 Firebase 단독).
+         기기 UUID 항목은 NM-410 잔재로 남아 있다 — 앱은 더 이상 수집하지 않으므로 정리 대상. -->
     <key>NSPrivacyCollectedDataTypes</key>
     <array>
-        <!-- Amplitude 이벤트 = 제품 상호작용(분석) -->
+        <!-- Firebase Analytics 이벤트 = 제품 상호작용(분석) -->
         <dict>
             <key>NSPrivacyCollectedDataType</key>
             <string>NSPrivacyCollectedDataTypeProductInteraction</string>

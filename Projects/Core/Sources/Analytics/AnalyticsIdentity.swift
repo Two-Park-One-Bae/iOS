@@ -34,30 +34,25 @@ public enum AnalyticsIdentity {
 
     private static var handle: AuthStateDidChangeListenerHandle?
 
-    /// - Parameter includeAmplitude: 내부 빌드에서는 Amplitude 수집을 끄므로 `false`.
-    ///   Crashlytics·GA4 는 dev 프로젝트로 분리돼 있어 내부에서도 붙인다.
-    public static func start(includeAmplitude: Bool) {
+    /// 내부 빌드도 그대로 붙인다 — dev/prod Firebase 프로젝트가 분리돼 있어
+    /// 내부 데이터가 운영 속성을 오염시키지 않는다.
+    public static func start() {
         guard handle == nil else { return }
         handle = Auth.auth().addStateDidChangeListener { _, user in
-            apply(uid: user?.uid, email: user.flatMap(signInEmail), includeAmplitude: includeAmplitude)
+            apply(uid: user?.uid, email: user.flatMap(signInEmail))
         }
     }
 
-    private static func apply(uid: String?, email: String?, includeAmplitude: Bool) {
+    private static func apply(uid: String?, email: String?) {
         if let uid {
             FirebaseService.setUserID(uid)
-            if includeAmplitude { AmplitudeService.setUserID(uid) }
         } else {
             FirebaseService.clearUserID()
-            if includeAmplitude { AmplitudeService.clearUserID() }
         }
 
         // 로그아웃 상태에서는 값을 지운다. 남겨 두면 다음 사용자에게 이전 사람의 꼬리표가 붙는다.
-        let flag = uid == nil ? nil : String(isTestAccount(email))
-        FirebaseService.setUserProperty(flag, forName: testAccountProperty)
-        if includeAmplitude, let flag {
-            AmplitudeService.identify(key: testAccountProperty, value: flag)
-        }
+        FirebaseService.setUserProperty(uid == nil ? nil : String(isTestAccount(email)),
+                                        forName: testAccountProperty)
     }
 
     /// 로그인에 쓰인 이메일.

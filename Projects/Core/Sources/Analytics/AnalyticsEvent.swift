@@ -247,7 +247,7 @@ public enum AnalyticsEvent {
     }
 }
 
-/// 분석 전송 파사드 — 현재는 Firebase 단독. (필요 시 여기서 Amplitude 등 다중 라우팅 추가)
+/// 분석 전송 파사드 — Firebase 단독 (NM-458 에서 Amplitude 를 걷어내고 일원화).
 public enum AppAnalytics {
     public static func track(_ event: AnalyticsEvent) {
         FirebaseService.log(event: event.name, event.parameters)
