@@ -37,7 +37,12 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
         pillTabObserver = NotificationCenter.default.addObserver(
             forName: .pillTabSelected, object: nil, queue: .main
         ) { [weak self] _ in
-            self?.presentCameraIfAppropriate()
+            guard let self else { return }
+            // 진입 시 잔여 조회 (spec: §식별 횟수 제한 "첫 실행·재설치·화면 진입 시 표시값의 기준").
+            // 조회 전용이라 카운트는 늘지 않는다(NM-331). 홈이 viewWillAppear 마다 하는 것과 같은
+            // 이유로, 홈을 거치지 않고 탭으로 바로 들어온 경우에도 값을 최신으로 만든다.
+            self.pillUseCase.fetchPillUsage()
+            self.presentCameraIfAppropriate()
         }
     }
 
@@ -49,6 +54,27 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
     private func presentCameraIfAppropriate() {
         guard navigationController.presentedViewController == nil,
               navigationController.viewControllers.count <= 1 else { return }
+
+        /*
+         진입 게이트 (spec: feature/pill-recognition/README.md §식별 횟수 제한 §흐름 규칙
+         "식별 진입 시점(홈 '알약 식별' 카드/탭)에 … 0이면 안내 팝업을 띄우고 진입하지 않는다").
+
+         홈 카드는 HomeViewModel 이 같은 규칙으로 막는데 **탭 경로에만 게이트가 없어서**,
+         탭으로 들어오면 0회여도 촬영까지 그대로 진행됐다.
+
+         값을 모르면 통과한다 — 최종 판정은 서버 429 다(spec: "잔여 미확인 시 통과").
+
+         막을 때는 홈으로 되돌린다. 알약 탭 루트는 **카메라가 덮는 걸 전제로 한 빈 화면**이라
+         그대로 두면 흰 화면만 남는다. spec 흐름도도 팝업 확인 뒤를 홈으로 둔다(P -->|확인| H).
+         (미리보기에서 막힌 경우는 반대로 화면을 유지한다 — 거긴 찍은 사진이 있고, 잔여 0회를
+          경고색으로 보여 주는 자리다.)
+         */
+        if let usage = pillUseCase.pillUsage.value, usage.isExhausted {
+            NotificationCenter.default.post(name: .selectHomeTab, object: nil)
+            presentLimitAlert(usage: usage)
+            return
+        }
+
         cameraPicker.present(from: navigationController, source: .camera)
     }
 
