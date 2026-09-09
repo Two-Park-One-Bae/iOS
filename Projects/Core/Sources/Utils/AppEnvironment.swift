@@ -7,13 +7,14 @@ import Foundation
 ///  - **INTERNAL**: 내부 TestFlight 빌드 — fastlane `beta_internal` 레인이
 ///    `SWIFT_ACTIVE_COMPILATION_CONDITIONS`에 `INTERNAL`을 넣어 컴파일 조건으로 주입한다.
 ///
-/// 이 값이 `true`면 **Amplitude 전송** 과 **학습용 S3 원본 이미지 업로드**를 하지 않는다 —
-/// 둘 다 환경이 갈려 있지 않아(단일 Amplitude 프로젝트·단일 S3 버킷) 내부 테스트 데이터가
-/// 그대로 운영 지표·데이터셋을 오염시키기 때문이다.
-/// (외부 TestFlight·App Store 프로덕션은 `false` → 정상 수집)
+/// 이 값이 `true`면 **학습용 S3 원본 이미지 업로드**를 하지 않는다 — 버킷이 하나뿐이라
+/// 내부 테스트 사진이 그대로 학습 데이터셋에 섞이기 때문이다.
+/// (외부 TestFlight·App Store 프로덕션은 `false` → 정상 업로드)
 ///
-/// **Firebase Analytics는 여기서 갈리지 않는다.** dev/prod Firebase 프로젝트가 분리돼 있어
-/// 내부 빌드는 dev 속성으로 수집한다 — `isAnalyticsCollectionEnabled` 참고.
+/// **분석은 여기서 갈리지 않는다.** dev/prod Firebase 프로젝트가 분리돼 있어 내부 빌드는
+/// dev 속성으로 수집한다 — `isAnalyticsCollectionEnabled` 참고.
+/// (NM-458 이전에는 Amplitude 전송도 이 값으로 막았다. 프로젝트가 하나뿐이라 환경을
+///  가를 방법이 그것뿐이었는데, Firebase 일원화로 그 제약 자체가 없어졌다.)
 ///
 /// Crashlytics(크래시)·App Check·Remote Config는 내부에서도 유지한다(SaaS 지표와 무관, 디버깅에 유용).
 public enum AppEnvironment {
