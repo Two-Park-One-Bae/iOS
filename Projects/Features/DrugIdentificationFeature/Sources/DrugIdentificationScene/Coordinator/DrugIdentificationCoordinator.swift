@@ -112,7 +112,8 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
             // 세션 중 소진 방어: 진입 후 마지막 횟수를 쓰고 돌아온 경우, 요청을 보내지 않는다.
             // 값을 모르면 통과 — 최종 판정은 서버 429다 (NM-323).
             if let usage = self.pillUseCase.pillUsage.value, usage.isExhausted {
-                self.exitToHomeWithLimitAlert(usage: usage)
+                // 이미 미리보기에 서 있다 — 화면을 그대로 두고 팝업만 띄운다.
+                self.presentLimitAlert(usage: usage)
                 return
             }
 
@@ -124,20 +125,19 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
         navigationController.pushViewController(vc, animated: true)
     }
 
-    /// 한도에 걸리면 홈으로 되돌리고 안내 팝업을 띄운다.
+    /// 한도 안내 팝업 — **확인 뒤 미리보기에 머무른다**. 찍은 사진을 잃지 않는다
+    /// (spec: feature/pill-recognition/README.md §식별 횟수 제한 "확인 시 현재 화면에 머무른다").
     ///
-    /// 미리보기에 남겨두면 재촬영·이 사진 사용 둘 다 다시 막혀 막다른 길이 된다.
-    /// 요청 전에 막힌 경우(게이트)와 서버가 거절한 경우(429)를 사용자는 구분할 수 없으므로
-    /// 두 경로의 동작을 통일한다.
+    /// 예전엔 홈으로 내보내 사진이 날아갔다. "미리보기에 남겨두면 재촬영·이 사진 사용 둘 다
+    /// 다시 막혀 막다른 길" 이라는 게 이유였지만, 미리보기는 남은 횟수를 0회·경고색으로
+    /// 표시하므로 막다른 길이 아니라 **왜 막혔는지 보이는 자리**다. 사진을 버리는 대가로
+    /// 얻는 게 없다 — 다시 찍으려면 촬영부터 다시 해야 한다.
     ///
     /// **여기서는 계측하지 않는다.** `pill_limit_reached` 는 한도를 실제로 소진하는 순간
     /// (마지막 1회를 쓴 요청의 성공 응답)에 `DrugIdentificationViewModel` 이 발사한다 —
     /// 막힌 시도를 세면 재시도하지 않은 사용자가 빠지고 재시도한 사용자는 중복으로 잡힌다.
-    private func exitToHomeWithLimitAlert(usage: PillUsageModel?) {
-        navigationController.popToRootViewController(animated: false)
-        NotificationCenter.default.post(name: .selectHomeTab, object: nil)
-
-        // 탭 전환 뒤에도 보이도록 윈도우 위에 띄운다.
+    private func presentLimitAlert(usage: PillUsageModel?) {
+        // 루트(네비게이션 컨트롤러) 뷰에 붙으므로 push·pop 과 무관하게 남는다.
         DSAlertCardView.presentOverWindow(
             title: PillLimitAlertText.title,
             message: PillLimitAlertText.message(resetAt: usage?.resetAt)
@@ -175,7 +175,12 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
         }
         // 한도 도달은 실패가 아니다 — 미리보기로 되돌리고 안내 팝업만 띄운다.
         loadingVC.onLimitExceeded = { [weak self] usage in
-            self?.exitToHomeWithLimitAlert(usage: usage)
+            guard let self else { return }
+            // 로딩 화면은 머무를 수 있는 자리가 아니다 — 나갈 버튼이 없다(PillLoadingVC 가 숨긴다).
+            // 사진을 고른 미리보기로 되돌려, 게이트로 막힌 경우와 같은 자리에서 같은 팝업을 띄운다
+            // (spec: "요청이 429 로 거부된 경우도 같은 팝업으로 처리한다").
+            self.navigationController.popViewController(animated: true)
+            self.presentLimitAlert(usage: usage)
         }
 
         return loadingVC
