@@ -119,8 +119,20 @@ public final class DefaultAuthUseCase: AuthUseCase {
     }
 
     public func deleteAccount() async throws {
-        // 실패하면 여기서 멈춘다 — clear 를 먼저 하면 삭제 실패인데도 로그아웃된 것처럼 보인다.
-        try await repository.deleteAccount()
+        do {
+            // 실패하면 여기서 멈춘다 — clear 를 먼저 하면 삭제 실패인데도 로그아웃된 것처럼 보인다.
+            try await repository.deleteAccount()
+        } catch AuthError.sessionExpired {
+            // 401 은 예외다 (NM-446 ④). 계정은 남아 있지만 이 세션으로는 아무것도 못 하므로
+            // 재시도를 안내할 게 아니라 로그아웃한다 — spec 이 탈퇴를 콕 집어 그렇게 적어뒀다.
+            //
+            // 화면 전환·안내는 인터셉터가 쏜 `.authSessionExpired` 를 AppCoordinator 가 받아 처리한다.
+            // 여기서는 계정 스코프 캐시만 비운다 — 병동 공용 기기에서 앞사람 정보가 남으면 안 된다.
+            try? repository.signOut()
+            clearAccountScopedState()
+            throw AuthError.sessionExpired
+        }
+
         try? repository.signOut()
         clearAccountScopedState()
     }

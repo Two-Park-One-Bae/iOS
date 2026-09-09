@@ -8,6 +8,7 @@
 import UIKit
 
 import BaseFeatureDependency
+import Core
 import DSKit
 import Domain
 
@@ -19,6 +20,9 @@ public final class AuthCoordinator: BaseCoordinator {
 
     private let startRoute: AuthRoute
     private let onFinished: () -> Void
+
+    /// 개정 재동의 여부를 읽기 위해서만 쓴다 (`AuthUser.needsReconsent`).
+    @Injected private var useCase: AuthUseCase
 
     public init(
         navigationController: UINavigationController,
@@ -58,7 +62,33 @@ public final class AuthCoordinator: BaseCoordinator {
         }
     }
 
+    /*
+     동의 온보딩 진입.
+
+     약관이 **개정**되어 다시 묻는 경우에는 시트 앞에 안내를 한 장 세운다. 이미 동의하고 쓰던
+     사람에게 같은 화면이 예고 없이 다시 뜨면 앱이 동의를 잃어버린 것으로 읽히기 때문이다.
+     최초 가입자는 흐름상 동의가 당연한 단계라 안내 없이 곧장 시트로 간다.
+
+     안내를 띄우는 시점은 **앱을 켤 때**다(spec: feature/auth/README.md §동의 온보딩 "다음 진입 때").
+     포그라운드 복귀마다 다시 판정하지 않는다 — 그 시점엔 `restoreSession()` 이 돌지 않으므로
+     `user` 값도 바뀌지 않는다.
+     */
     private func presentConsent() {
+        guard useCase.user.value?.needsReconsent == true else {
+            presentConsentSheet()
+            return
+        }
+
+        DSAlertCardView.presentOverWindow(
+            title: "약관이 변경되었어요",
+            message: "서비스를 계속 이용하려면 변경된 약관에 다시 동의해 주세요.",
+            confirmTitle: "확인"
+        ) { [weak self] in
+            self?.presentConsentSheet()
+        }
+    }
+
+    private func presentConsentSheet() {
         let viewModel = ConsentViewModel()
         viewModel.onCompleted = { [weak self] in
             self?.navigationController.dismiss(animated: true) { self?.onFinished() }

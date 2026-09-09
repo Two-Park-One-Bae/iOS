@@ -139,6 +139,26 @@ final class AuthUseCaseTests: XCTestCase {
         XCTAssertNotNil(sut.user.value)
     }
 
+    /// 401 은 예외 — 삭제 실패가 아니라 세션 만료라 **로그아웃하고 계정 캐시를 비운다**
+    /// (spec: feature/auth/README.md §토큰·세션 "401 이면 세션 만료(탈퇴·폐기 포함)", NM-446 ④).
+    /// 위 테스트의 500 과 정반대로 동작해야 한다.
+    func test_deleteAccount_401이면_로그아웃하고_캐시를_비운다() async {
+        repository.isSignedIn = true
+        repository.meResult = .success(.stub(onboardingRequired: false))
+        _ = try? await sut.restoreSession()
+        repository.deleteResult = .failure(AuthError.sessionExpired)
+
+        do {
+            try await sut.deleteAccount()
+            XCTFail("세션 만료는 throw 되어야 한다")
+        } catch {
+            XCTAssertEqual(error as? AuthError, .sessionExpired)
+        }
+
+        XCTAssertEqual(repository.signOutCallCount, 1)
+        XCTAssertNil(sut.user.value, "앞사람 계정 정보가 남으면 안 된다")
+    }
+
     func test_deleteAccount_성공하면_로그아웃하고_계정정보를_비운다() async throws {
         repository.isSignedIn = true
         repository.meResult = .success(.stub(onboardingRequired: false))
@@ -187,17 +207,74 @@ private final class MockAuthRepository: AuthRepositoryProtocol {
     }
 }
 
+// MARK: - 약관 개정 재동의 판별
+
+/// `needsReconsent` 는 **안내 문구만** 가른다(화면 게이트는 서버의 `onboardingRequired`).
+/// 그래도 틀리면 최초 가입자에게 "약관이 변경되었어요" 가 나가므로 경계를 고정해 둔다.
+final class AuthUserReconsentTests: XCTestCase {
+
+    /// 예전 버전에 동의한 기록이 있는데 지금은 미충족 = 개정.
+    func test_동의했지만_미충족이면_재동의() {
+        let user = AuthUser.stub(
+            onboardingRequired: true,
+            consents: [.stub(type: .terms, agreed: true, version: "2026-09-01", satisfied: false)]
+        )
+        XCTAssertTrue(user.needsReconsent)
+    }
+
+    /// 한 번도 동의한 적 없는 최초 가입자 — 안내 없이 곧장 동의 시트로 가야 한다.
+    func test_동의한적_없으면_재동의_아님() {
+        let user = AuthUser.stub(
+            onboardingRequired: true,
+            consents: [.stub(type: .terms, agreed: false, version: nil, satisfied: false)]
+        )
+        XCTAssertFalse(user.needsReconsent)
+    }
+
+    /// 서버가 consents 를 비워 보내도 최초 가입자로 본다(안내를 띄우지 않는 쪽이 안전).
+    func test_동의목록이_비면_재동의_아님() {
+        XCTAssertFalse(AuthUser.stub(onboardingRequired: true, consents: []).needsReconsent)
+    }
+
+    /// 전부 충족 — 애초에 동의 화면에 오지 않지만, 경계값으로 고정한다.
+    func test_전부_충족이면_재동의_아님() {
+        let user = AuthUser.stub(
+            onboardingRequired: false,
+            consents: [.stub(type: .terms, agreed: true, version: "2027-03-01", satisfied: true)]
+        )
+        XCTAssertFalse(user.needsReconsent)
+    }
+
+    /// 두 항목 중 하나만 개정돼도 재동의다 — 필수 2종을 한 번에 다시 받으므로.
+    func test_한_항목만_미충족이어도_재동의() {
+        let user = AuthUser.stub(
+            onboardingRequired: true,
+            consents: [
+                .stub(type: .terms, agreed: true, version: "2027-03-01", satisfied: true),
+                .stub(type: .privacy, agreed: true, version: "2026-09-01", satisfied: false),
+            ]
+        )
+        XCTAssertTrue(user.needsReconsent)
+    }
+}
+
 // MARK: - Fixtures
 
 private extension AuthUser {
-    static func stub(onboardingRequired: Bool) -> AuthUser {
+    static func stub(onboardingRequired: Bool, consents: [ConsentStatus] = []) -> AuthUser {
         AuthUser(
             userId: "uid",
             provider: .kakao,
             providerUserId: "kakao-1",
-            consents: [],
+            consents: consents,
             onboardingRequired: onboardingRequired
         )
+    }
+}
+
+private extension ConsentStatus {
+    static func stub(type: ConsentType, agreed: Bool, version: String?, satisfied: Bool) -> ConsentStatus {
+        ConsentStatus(type: type, agreed: agreed, version: version, satisfied: satisfied)
     }
 }
 
