@@ -147,6 +147,15 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
     // MARK: - ④ 로딩 → ⑤/⑥/⑦
 
     private func startIdentification(image: UIImage) {
+        navigationController.pushViewController(makeLoadingVC(image: image), animated: true)
+    }
+
+    /// 로딩 화면 + 분석 VM 한 벌.
+    ///
+    /// 최초 진입은 push 로, **실패 후 재시도는 실패 화면과 replace** 해서 쓴다 —
+    /// 재시도가 같은 사진으로 분석을 처음부터(온디바이스 탐지 + 서버 왕복) 다시 돌려야 하는데,
+    /// VM 은 이미 종료 상태를 방출한 뒤라 재사용할 수 없다.
+    private func makeLoadingVC(image: UIImage) -> PillLoadingVC {
         let viewModel = DrugIdentificationViewModel(image: image)
         let loadingVC = PillLoadingVC(image: image, viewModel: viewModel)
 
@@ -162,14 +171,14 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
         }
         loadingVC.onFailure = { [weak self, weak loadingVC] message in
             guard let loadingVC else { return }
-            self?.showFailure(message: message, replacing: loadingVC)
+            self?.showFailure(message: message, image: image, replacing: loadingVC)
         }
         // 한도 도달은 실패가 아니다 — 미리보기로 되돌리고 안내 팝업만 띄운다.
         loadingVC.onLimitExceeded = { [weak self] usage in
             self?.exitToHomeWithLimitAlert(usage: usage)
         }
 
-        navigationController.pushViewController(loadingVC, animated: true)
+        return loadingVC
     }
 
     // MARK: - ⑤ 인식 결과
@@ -354,14 +363,26 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
 
     /// - Parameter message: 서버가 준 실패 사유. 화면이 그대로 띄운다 — 예전엔 여기서 버려져
     ///   네트워크와 무관한 오류(App Check 실패 등)도 "네트워크 연결을 확인하라"고 안내됐다.
-    private func showFailure(message: String?, replacing loadingVC: UIViewController) {
+    private func showFailure(message: String?, image: UIImage, replacing loadingVC: UIViewController) {
         let vc = AnalysisFailedVC(message: message)
-        // 네비바 뒤로·푸터 '뒤로' 모두 홈으로 — 이 화면엔 돌아갈 이전 단계가 없다.
-        vc.onBackTapped = { [weak self] in self?.exitToHome() }
-        vc.onBack = { [weak self] in self?.exitToHome() }
-        vc.onRetry = { [weak self] in
-            self?.navigationController.popViewController(animated: true)
+
+        /*
+         두 버튼 모두 spec 의 분기를 따른다 (spec: feature/pill-recognition/README.md §식별 → 인식 결과).
+
+           E -->|재시도| B   재시도는 **인식으로 되돌아간다** — 같은 사진으로 다시 분석
+           E -->|뒤로| X     뒤로는 **촬영/미리보기로 복귀**
+
+         예전엔 둘 다 어긋나 있었다. 재시도가 pop 이라 사실상 spec 의 '뒤로' 였고, 뒤로는
+         홈으로 나가 버려 사진을 다시 고를 기회 없이 흐름이 끊겼다("돌아갈 이전 단계가 없다"고
+         적혀 있었지만, showPreview 가 push 한 PhotoPreviewVC 가 스택에 그대로 남아 있다).
+         */
+        vc.onBackTapped = { [weak self] in self?.navigationController.popViewController(animated: true) }
+        vc.onBack = { [weak self] in self?.navigationController.popViewController(animated: true) }
+        vc.onRetry = { [weak self, weak vc] in
+            guard let self, let vc else { return }
+            self.replace(vc, with: self.makeLoadingVC(image: image))
         }
+
         replace(loadingVC, with: vc)
     }
 

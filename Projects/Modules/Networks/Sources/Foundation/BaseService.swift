@@ -226,6 +226,13 @@ extension BaseService {
             return apiError
         }
 
+        // 서버에 닿지도 못한 경우. 응답이 없어 아래 분기를 못 타고 원문이 그대로 화면에 나간다
+        // ("URLSessionTask failed with error: The Internet connection appears to be offline.").
+        // Moya → AFError → URLError 로 감싸여 오므로 체인을 풀어 확인한다.
+        if let urlError = Self.urlError(in: error), Self.isOffline(urlError) {
+            return APIError.offline
+        }
+
         guard let moya = error as? MoyaError,
               let response = moya.response,
               var problem = try? JSONDecoder().decode(NetworkError.self, from: response.data) else {
@@ -234,5 +241,30 @@ extension BaseService {
         // 확장 멤버(예: 429 의 usage)를 상위 계층이 decode 할 수 있도록 원문을 보존한다.
         problem.rawBody = response.data
         return APIError.network(statusCode: response.statusCode, error: problem)
+    }
+
+    /// 감싸인 `URLError` 를 꺼낸다. Moya(underlying) → AFError(underlyingError) → URLError 순으로 중첩된다.
+    private static func urlError(in error: Error) -> URLError? {
+        if let urlError = error as? URLError { return urlError }
+        if case MoyaError.underlying(let underlying, _) = error { return urlError(in: underlying) }
+        if let afError = error as? AFError, let underlying = afError.underlyingError {
+            return urlError(in: underlying)
+        }
+        return nil
+    }
+
+    /// "요청이 서버에 닿지 못했다" 로 볼 코드들.
+    ///
+    /// 타임아웃은 넣지 않는다 — 연결은 됐는데 서버·회선이 느린 경우라 "인터넷 연결을 확인하라"가
+    /// 맞는 안내가 아니다. 일반 문구로 떨어뜨린다.
+    private static func isOffline(_ error: URLError) -> Bool {
+        switch error.code {
+        case .notConnectedToInternet, .networkConnectionLost,
+             .cannotConnectToHost, .cannotFindHost,
+             .dataNotAllowed, .internationalRoamingOff:
+            return true
+        default:
+            return false
+        }
     }
 }
