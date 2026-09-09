@@ -132,5 +132,8 @@ public enum AuthError: Error, Equatable {
     case consentVersionMismatch
     /// 탈퇴 500 — 계정이 남아 있을 수 있어 **로그아웃하지 않고** 재시도한다.
     case accountDeletionFailed
+    /// 401 — 세션 만료(탈퇴·토큰 폐기 포함). 재시도로 풀리지 않으므로 **조용히 로그아웃**한다
+    /// (spec: feature/auth/README.md §토큰·세션 — 탈퇴를 콕 집어 적어둔다).
+    case sessionExpired
     case unknown
 }

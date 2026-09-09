@@ -139,6 +139,26 @@ final class AuthUseCaseTests: XCTestCase {
         XCTAssertNotNil(sut.user.value)
     }
 
+    /// 401 은 예외 — 삭제 실패가 아니라 세션 만료라 **로그아웃하고 계정 캐시를 비운다**
+    /// (spec: feature/auth/README.md §토큰·세션 "401 이면 세션 만료(탈퇴·폐기 포함)", NM-446 ④).
+    /// 위 테스트의 500 과 정반대로 동작해야 한다.
+    func test_deleteAccount_401이면_로그아웃하고_캐시를_비운다() async {
+        repository.isSignedIn = true
+        repository.meResult = .success(.stub(onboardingRequired: false))
+        _ = try? await sut.restoreSession()
+        repository.deleteResult = .failure(AuthError.sessionExpired)
+
+        do {
+            try await sut.deleteAccount()
+            XCTFail("세션 만료는 throw 되어야 한다")
+        } catch {
+            XCTAssertEqual(error as? AuthError, .sessionExpired)
+        }
+
+        XCTAssertEqual(repository.signOutCallCount, 1)
+        XCTAssertNil(sut.user.value, "앞사람 계정 정보가 남으면 안 된다")
+    }
+
     func test_deleteAccount_성공하면_로그아웃하고_계정정보를_비운다() async throws {
         repository.isSignedIn = true
         repository.meResult = .success(.stub(onboardingRequired: false))

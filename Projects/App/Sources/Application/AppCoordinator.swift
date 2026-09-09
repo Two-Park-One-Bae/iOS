@@ -256,12 +256,20 @@ final class AppCoordinator: BaseCoordinator {
         // 내 의사와 무관하게 끊긴 것 — 왜 로그인 화면에 와 있는지 반드시 알린다.
         nc.addObserver(forName: .authSessionExpired, object: nil, queue: .main) { [weak self] _ in
             guard self?.returnToAuth() == true else { return }
+
+            // 탈퇴 도중이었다면 **탈퇴가 끝나지 않았다는 사실**까지 알려야 한다 (NM-446 ④).
+            // spec 의 클라이언트 대응이 "재로그인 후 재시도" 다(domains/errors.md §DELETE /users/me).
+            // 세션 안내만 띄우면 사용자는 계정이 삭제된 줄 알고 떠난다 — 계정은 그대로 남아 있다.
+            let interruptedDeletion = self?.isDeletingAccount == true
+
             // 화면을 갈아끼운 **뒤에** 띄운다. presentOverWindow 는 최상단 뷰컨트롤러를 찾는데
             // 같은 런루프에서 부르면 아직 옛 화면이 최상단이라, 전환과 함께 안내가 사라진다.
             DispatchQueue.main.async {
                 DSAlertCardView.presentOverWindow(
-                    title: "다시 로그인해 주세요",
-                    message: "로그인 정보가 만료되어 로그아웃했어요."
+                    title: interruptedDeletion ? "계정 삭제를 완료하지 못했어요" : "다시 로그인해 주세요",
+                    message: interruptedDeletion
+                        ? "로그인 정보가 만료되어 로그아웃했어요. 다시 로그인한 뒤 시도해 주세요."
+                        : "로그인 정보가 만료되어 로그아웃했어요."
                 )
             }
         }
@@ -302,11 +310,27 @@ final class AppCoordinator: BaseCoordinator {
         )
     }
 
+    /// 탈퇴 요청이 떠 있는 동안만 참.
+    ///
+    /// 401 은 인터셉터가 먼저 `.authSessionExpired` 를 쏘고, 그 옵저버가 화면 전환과 안내를 맡는다.
+    /// 이 플래그가 없으면 옵저버는 "그냥 세션이 끊겼다" 와 "탈퇴하다 끊겼다" 를 구별할 수 없다.
+    private var isDeletingAccount = false
+
     private func deleteAccount() {
         Task { @MainActor in
+            isDeletingAccount = true
+            // 한 런루프 뒤에 내린다. 인터셉터가 쏜 `.authSessionExpired` 는 **이 요청이 실패로
+            // 돌아오기 전에** 메인 큐에 실리는데, 여기서 바로 내리면 둘의 순서가 보장되지 않아
+            // 옵저버가 이미 false 를 읽는 경우가 생긴다.
+            defer { DispatchQueue.main.async { [weak self] in self?.isDeletingAccount = false } }
+
             do {
                 try await authUseCase.deleteAccount()
                 // 성공하면 .authDidSignOut 이 로그인 화면으로 되돌린다.
+            } catch AuthError.sessionExpired {
+                // 세션 만료 (NM-446 ④) — 화면 전환도 안내도 `.authSessionExpired` 옵저버가 맡는다.
+                // 위 플래그 덕분에 그쪽이 "계정 삭제를 완료하지 못했어요" 로 안내한다.
+                // 여기서 또 띄우면 서로 다른 두 알럿이 겹친다.
             } catch {
                 // 실패하면 로그아웃하지 않고 설정에 머문다 — 계정이 남아 있는데 삭제됐다고 안내하지 않기 위함.
                 // 서버가 멱등이라 다시 눌러도 안전하다(spec: domains/auth.md §탈퇴).
