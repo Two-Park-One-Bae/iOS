@@ -190,6 +190,10 @@ let project = Project(
                 ],
             ]),
             sources: ["Widget/Sources/**"],
+            // 무음 모드 알람이 쓰는 사운드 (NM-447). AlarmKit 의 .named(_:) 는 예약을 건
+            // **프로세스의 번들**에서 찾으므로, 앱 번들에만 있으면 위젯에서 시작한 알람이
+            // 무음을 못 따른다. 앱 타깃(Resources/**)과 같은 파일을 익스텐션에도 넣는다.
+            resources: ["Resources/silence.caf"],
             entitlements: .dictionary([
                 "com.apple.security.application-groups": .array([.string("group.app.nursemate.timer")])
             ]),

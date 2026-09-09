@@ -2,6 +2,7 @@ import UIKit
 import Combine
 import BaseFeatureDependency
 import Core
+import TimerShared
 import Domain
 
 // C1 리스트 → (FAB) 권한 체크 → A3 안내/거부 → C3 프리셋 시트 → 원탭 즉시 시작

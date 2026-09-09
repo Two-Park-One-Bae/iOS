@@ -56,12 +56,20 @@ enum TimerWidgetAlarmScheduler {
             metadata: CareTimerAlarmMetadata(label: label, categoryName: categoryName, duration: seconds),
             tintColor: Color(red: 0.937, green: 0.267, blue: 0.267)   // 빨강 #EF4444 (경고·알람)
         )
+        // 울림 방식은 앱과 **같은 값**을 봐야 한다 (NM-447).
+        // RingModeStore 는 앱 그룹 UserDefaults 라 위젯 프로세스에서도 그대로 읽힌다 —
+        // 예전엔 .default 로 못박혀 있어서, 앱에서 시작하면 무음인데 위젯에서 시작하면
+        // 소리가 났다. 야간 병동에서 무음으로 맞춰둔 사용자에게 예고 없이 소리가 나간다.
+        //
+        // 규칙은 AlarmKitAlarmScheduler 와 동일: 소리=기본 알람음+진동 /
+        // 무음=무음 사운드 파일(소리 없음, 시스템 진동은 남음 — AlarmKit 알람은 발화 시 항상 진동).
+        let useSound = RingModeStore.shared.current == .sound
         let configuration = AlarmManager.AlarmConfiguration(
             countdownDuration: Alarm.CountdownDuration(preAlert: TimeInterval(seconds), postAlert: nil),
             schedule: nil,
             attributes: attributes,
             stopIntent: TimerWidgetStopIntent(id: id.uuidString),
-            sound: .default
+            sound: useSound ? .default : .named("silence.caf")
         )
         try await AlarmManager.shared.schedule(id: id, configuration: configuration)
     }

@@ -8,6 +8,10 @@ public enum RingMode: String, CaseIterable, Sendable {
 }
 
 // 울림 방식 저장소. 앱·위젯·익스텐션이 같은 값을 보도록 앱 그룹 UserDefaults 공유.
+//
+// **Core 가 아니라 TimerShared 에 둔다** (NM-447). 위젯 익스텐션도 이 값을 읽어야 하는데
+// Core 는 Firebase·GoogleSignIn 을 끌고 와 익스텐션에 링크할 수 없다. TimerShared 는
+// 앱과 위젯이 같은 타입을 링크하려고 만든 leaf 모듈이라 여기가 제 자리다.
 public final class RingModeStore {
     public static let shared = RingModeStore()
 

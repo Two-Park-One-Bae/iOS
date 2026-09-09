@@ -95,6 +95,8 @@ private func demoPair(name: String, bundleSuffix: String, sources: String, displ
         deploymentTargets: Environment.deploymentTarget,
         infoPlist: widgetInfoPlist(displayName: displayName),
         sources: widgetSources,
+        // 위젯 소스를 앱과 공유하므로 무음 사운드도 같이 넣는다 (NM-447).
+        resources: [.glob(pattern: .relativeToRoot("Projects/App/Resources/silence.caf"))],
         entitlements: widgetEntitlements,
         dependencies: [
             Dep.Modules.TimerShared.TimerShared,
