@@ -88,8 +88,11 @@ public final class ConsentViewModel {
             } catch AuthError.consentVersionMismatch {
                 // 저장 중 서버가 약관 버전을 올린 경우. 오류로 끝내지 않고 새 버전으로 화면을 다시 그린다
                 // (spec: feature/auth/README.md §동의 온보딩).
+                //
+                // 문구는 정본을 그대로 쓴다. 사용자에게 보이는 자리는 「변경」으로 통일한다 —
+                // 계약 서술은 「개정」이지만 화면에서 세 단어(변경·업데이트·개정)가 섞여 있었다.
                 isLoading.send(false)
-                errorMessage.send("약관이 업데이트됐어요. 새 내용을 확인해 주세요.")
+                errorMessage.send("약관이 변경되어 다시 불러왔어요. 확인 후 동의해 주세요.")
                 load()
             } catch {
                 isLoading.send(false)
