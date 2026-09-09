@@ -2,6 +2,7 @@ import UIKit
 import SnapKit
 import DSKit
 import Core
+import TimerShared
 
 // YbkNe — 타이머 첫 시작 시 울림 방식을 고르는 바텀시트.
 // "이대로 시작하기" → 선택 저장 후 onConfirm(선택 방식) 콜백.

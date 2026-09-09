@@ -2,6 +2,7 @@ import UIKit
 import SnapKit
 import DSKit
 import Core
+import TimerShared
 
 // 울림 방식 선택기 (소리 / 진동 / 무음) — 3등분 세그먼트. 첫 시작 시트·설정에서 공용.
 public final class RingModeSelectorView: UIView {

@@ -2,6 +2,7 @@ import UIKit
 import SnapKit
 import DSKit
 import Core
+import TimerShared
 
 // Xoc5z — 설정 · 타이머 섹션(NM-308) + 계정 섹션(NM-410).
 //
