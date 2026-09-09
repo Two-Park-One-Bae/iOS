@@ -36,6 +36,22 @@ public struct AuthUser: Equatable {
     }
 }
 
+public extension AuthUser {
+
+    /// 약관 **개정**으로 다시 묻는 것인지 — 예전 버전에 동의한 기록이 있는데 지금은 미충족.
+    ///
+    /// 최초 가입자와 갈라 **안내 문구만** 정하는 값이다. 화면 게이트는 그대로
+    /// `onboardingRequired`(서버 값)가 쥔다 — "클라이언트가 consents 로 다시 계산하지 않는다"는
+    /// 규칙(spec: domains/auth.md §동의)은 그 게이트에 대한 것이고, 여기서 그걸 다시 세지 않는다.
+    /// 이 값이 틀려도 잘못된 문구가 나갈 뿐, 들여보낼 사람을 막거나 막을 사람을 들이지 않는다.
+    ///
+    /// `agreed && !satisfied` = "동의는 했는데 그 버전이 현재 필수 버전이 아니다" = 개정.
+    /// 한 번도 동의한 적 없는 항목은 `agreed == false` 라 걸리지 않는다.
+    var needsReconsent: Bool {
+        consents.contains { $0.agreed && !$0.satisfied }
+    }
+}
+
 /// 로그인 공급자. 계정 연결(account-linking)이 없어 같은 사람이라도 공급자가 다르면 별개 회원이다.
 public enum AuthProvider: String, CaseIterable, Equatable {
     case google = "GOOGLE"
