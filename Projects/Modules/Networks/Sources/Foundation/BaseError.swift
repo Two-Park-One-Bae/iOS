@@ -29,11 +29,18 @@ public enum APIError: Error, Equatable {
     case network(statusCode: Int, error: NetworkError)
     case unknown
     case tokenReissuanceFailed
+    /// 요청이 서버에 닿지도 못했다(기내모드·권역 이탈·Wi-Fi 끊김 등).
+    ///
+    /// 응답 본문이 없어 `network(_:_:)` 로 만들 수 없고, 그대로 두면 Moya 가 감싼 원문이
+    /// 화면에 나간다 — 실제로 분석 실패 화면에 이렇게 떴다:
+    /// "URLSessionTask failed with error: The Internet connection appears to be offline."
+    case offline
 
     public static func == (lhs: APIError, rhs: APIError) -> Bool {
         switch (lhs, rhs) {
         case (.unknown, .unknown):                             return true
         case (.tokenReissuanceFailed, .tokenReissuanceFailed): return true
+        case (.offline, .offline):                             return true
         case (.network(let ls, _), .network(let rs, _)):       return ls == rs
         default:                                               return false
         }
@@ -60,6 +67,9 @@ extension APIError: LocalizedError {
             return Self.message(statusCode: statusCode, code: problem.code)
         case .tokenReissuanceFailed:
             return "로그인이 만료됐어요. 다시 로그인해 주세요."
+        case .offline:
+            // 사용자가 실제로 할 수 있는 일을 말한다 — 서버 상태와 무관하게 기기 쪽 문제다.
+            return "인터넷 연결을 확인해 주세요."
         case .unknown:
             return Self.generic
         }

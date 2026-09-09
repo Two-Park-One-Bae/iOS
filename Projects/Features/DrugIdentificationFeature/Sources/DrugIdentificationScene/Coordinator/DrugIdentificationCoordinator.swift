@@ -37,7 +37,12 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
         pillTabObserver = NotificationCenter.default.addObserver(
             forName: .pillTabSelected, object: nil, queue: .main
         ) { [weak self] _ in
-            self?.presentCameraIfAppropriate()
+            guard let self else { return }
+            // 진입 시 잔여 조회 (spec: §식별 횟수 제한 "첫 실행·재설치·화면 진입 시 표시값의 기준").
+            // 조회 전용이라 카운트는 늘지 않는다(NM-331). 홈이 viewWillAppear 마다 하는 것과 같은
+            // 이유로, 홈을 거치지 않고 탭으로 바로 들어온 경우에도 값을 최신으로 만든다.
+            self.pillUseCase.fetchPillUsage()
+            self.presentCameraIfAppropriate()
         }
     }
 
@@ -49,6 +54,27 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
     private func presentCameraIfAppropriate() {
         guard navigationController.presentedViewController == nil,
               navigationController.viewControllers.count <= 1 else { return }
+
+        /*
+         진입 게이트 (spec: feature/pill-recognition/README.md §식별 횟수 제한 §흐름 규칙
+         "식별 진입 시점(홈 '알약 식별' 카드/탭)에 … 0이면 안내 팝업을 띄우고 진입하지 않는다").
+
+         홈 카드는 HomeViewModel 이 같은 규칙으로 막는데 **탭 경로에만 게이트가 없어서**,
+         탭으로 들어오면 0회여도 촬영까지 그대로 진행됐다.
+
+         값을 모르면 통과한다 — 최종 판정은 서버 429 다(spec: "잔여 미확인 시 통과").
+
+         막을 때는 홈으로 되돌린다. 알약 탭 루트는 **카메라가 덮는 걸 전제로 한 빈 화면**이라
+         그대로 두면 흰 화면만 남는다. spec 흐름도도 팝업 확인 뒤를 홈으로 둔다(P -->|확인| H).
+         (미리보기에서 막힌 경우는 반대로 화면을 유지한다 — 거긴 찍은 사진이 있고, 잔여 0회를
+          경고색으로 보여 주는 자리다.)
+         */
+        if let usage = pillUseCase.pillUsage.value, usage.isExhausted {
+            NotificationCenter.default.post(name: .selectHomeTab, object: nil)
+            presentLimitAlert(usage: usage)
+            return
+        }
+
         cameraPicker.present(from: navigationController, source: .camera)
     }
 
@@ -112,7 +138,8 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
             // 세션 중 소진 방어: 진입 후 마지막 횟수를 쓰고 돌아온 경우, 요청을 보내지 않는다.
             // 값을 모르면 통과 — 최종 판정은 서버 429다 (NM-323).
             if let usage = self.pillUseCase.pillUsage.value, usage.isExhausted {
-                self.exitToHomeWithLimitAlert(usage: usage)
+                // 이미 미리보기에 서 있다 — 화면을 그대로 두고 팝업만 띄운다.
+                self.presentLimitAlert(usage: usage)
                 return
             }
 
@@ -124,20 +151,19 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
         navigationController.pushViewController(vc, animated: true)
     }
 
-    /// 한도에 걸리면 홈으로 되돌리고 안내 팝업을 띄운다.
+    /// 한도 안내 팝업 — **확인 뒤 미리보기에 머무른다**. 찍은 사진을 잃지 않는다
+    /// (spec: feature/pill-recognition/README.md §식별 횟수 제한 "확인 시 현재 화면에 머무른다").
     ///
-    /// 미리보기에 남겨두면 재촬영·이 사진 사용 둘 다 다시 막혀 막다른 길이 된다.
-    /// 요청 전에 막힌 경우(게이트)와 서버가 거절한 경우(429)를 사용자는 구분할 수 없으므로
-    /// 두 경로의 동작을 통일한다.
+    /// 예전엔 홈으로 내보내 사진이 날아갔다. "미리보기에 남겨두면 재촬영·이 사진 사용 둘 다
+    /// 다시 막혀 막다른 길" 이라는 게 이유였지만, 미리보기는 남은 횟수를 0회·경고색으로
+    /// 표시하므로 막다른 길이 아니라 **왜 막혔는지 보이는 자리**다. 사진을 버리는 대가로
+    /// 얻는 게 없다 — 다시 찍으려면 촬영부터 다시 해야 한다.
     ///
     /// **여기서는 계측하지 않는다.** `pill_limit_reached` 는 한도를 실제로 소진하는 순간
     /// (마지막 1회를 쓴 요청의 성공 응답)에 `DrugIdentificationViewModel` 이 발사한다 —
     /// 막힌 시도를 세면 재시도하지 않은 사용자가 빠지고 재시도한 사용자는 중복으로 잡힌다.
-    private func exitToHomeWithLimitAlert(usage: PillUsageModel?) {
-        navigationController.popToRootViewController(animated: false)
-        NotificationCenter.default.post(name: .selectHomeTab, object: nil)
-
-        // 탭 전환 뒤에도 보이도록 윈도우 위에 띄운다.
+    private func presentLimitAlert(usage: PillUsageModel?) {
+        // 루트(네비게이션 컨트롤러) 뷰에 붙으므로 push·pop 과 무관하게 남는다.
         DSAlertCardView.presentOverWindow(
             title: PillLimitAlertText.title,
             message: PillLimitAlertText.message(resetAt: usage?.resetAt)
@@ -147,6 +173,15 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
     // MARK: - ④ 로딩 → ⑤/⑥/⑦
 
     private func startIdentification(image: UIImage) {
+        navigationController.pushViewController(makeLoadingVC(image: image), animated: true)
+    }
+
+    /// 로딩 화면 + 분석 VM 한 벌.
+    ///
+    /// 최초 진입은 push 로, **실패 후 재시도는 실패 화면과 replace** 해서 쓴다 —
+    /// 재시도가 같은 사진으로 분석을 처음부터(온디바이스 탐지 + 서버 왕복) 다시 돌려야 하는데,
+    /// VM 은 이미 종료 상태를 방출한 뒤라 재사용할 수 없다.
+    private func makeLoadingVC(image: UIImage) -> PillLoadingVC {
         let viewModel = DrugIdentificationViewModel(image: image)
         let loadingVC = PillLoadingVC(image: image, viewModel: viewModel)
 
@@ -162,14 +197,19 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
         }
         loadingVC.onFailure = { [weak self, weak loadingVC] message in
             guard let loadingVC else { return }
-            self?.showFailure(message: message, replacing: loadingVC)
+            self?.showFailure(message: message, image: image, replacing: loadingVC)
         }
         // 한도 도달은 실패가 아니다 — 미리보기로 되돌리고 안내 팝업만 띄운다.
         loadingVC.onLimitExceeded = { [weak self] usage in
-            self?.exitToHomeWithLimitAlert(usage: usage)
+            guard let self else { return }
+            // 로딩 화면은 머무를 수 있는 자리가 아니다 — 나갈 버튼이 없다(PillLoadingVC 가 숨긴다).
+            // 사진을 고른 미리보기로 되돌려, 게이트로 막힌 경우와 같은 자리에서 같은 팝업을 띄운다
+            // (spec: "요청이 429 로 거부된 경우도 같은 팝업으로 처리한다").
+            self.navigationController.popViewController(animated: true)
+            self.presentLimitAlert(usage: usage)
         }
 
-        navigationController.pushViewController(loadingVC, animated: true)
+        return loadingVC
     }
 
     // MARK: - ⑤ 인식 결과
@@ -354,14 +394,26 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
 
     /// - Parameter message: 서버가 준 실패 사유. 화면이 그대로 띄운다 — 예전엔 여기서 버려져
     ///   네트워크와 무관한 오류(App Check 실패 등)도 "네트워크 연결을 확인하라"고 안내됐다.
-    private func showFailure(message: String?, replacing loadingVC: UIViewController) {
+    private func showFailure(message: String?, image: UIImage, replacing loadingVC: UIViewController) {
         let vc = AnalysisFailedVC(message: message)
-        // 네비바 뒤로·푸터 '뒤로' 모두 홈으로 — 이 화면엔 돌아갈 이전 단계가 없다.
-        vc.onBackTapped = { [weak self] in self?.exitToHome() }
-        vc.onBack = { [weak self] in self?.exitToHome() }
-        vc.onRetry = { [weak self] in
-            self?.navigationController.popViewController(animated: true)
+
+        /*
+         두 버튼 모두 spec 의 분기를 따른다 (spec: feature/pill-recognition/README.md §식별 → 인식 결과).
+
+           E -->|재시도| B   재시도는 **인식으로 되돌아간다** — 같은 사진으로 다시 분석
+           E -->|뒤로| X     뒤로는 **촬영/미리보기로 복귀**
+
+         예전엔 둘 다 어긋나 있었다. 재시도가 pop 이라 사실상 spec 의 '뒤로' 였고, 뒤로는
+         홈으로 나가 버려 사진을 다시 고를 기회 없이 흐름이 끊겼다("돌아갈 이전 단계가 없다"고
+         적혀 있었지만, showPreview 가 push 한 PhotoPreviewVC 가 스택에 그대로 남아 있다).
+         */
+        vc.onBackTapped = { [weak self] in self?.navigationController.popViewController(animated: true) }
+        vc.onBack = { [weak self] in self?.navigationController.popViewController(animated: true) }
+        vc.onRetry = { [weak self, weak vc] in
+            guard let self, let vc else { return }
+            self.replace(vc, with: self.makeLoadingVC(image: image))
         }
+
         replace(loadingVC, with: vc)
     }
 
