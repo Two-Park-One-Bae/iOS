@@ -69,28 +69,61 @@ final class AppCoordinator: BaseCoordinator {
     private func showSplash() {
         let splash = SplashViewController()
         // 스플래시 표시(0.8초)와 세션 판정을 겹쳐 돌린다. 둘 다 끝나야 다음 화면으로 간다.
-        let routeTask = Task { await authUseCase.restoreSession() }
+        let routeTask = Task { try await authUseCase.restoreSession() }
 
-        splash.onFinish = { [weak self] in
+        splash.onFinish = { [weak self, weak splash] in
             Task { @MainActor in
-                guard let self else { return }
-                let route = await routeTask.value
-
-                UIView.transition(
-                    with: self.navigationController.view,
-                    duration: 0.3,
-                    options: .transitionCrossDissolve
-                ) {
-                    self.show(route)
-                } completion: { _ in
-                    // 탭바로 곧장 들어간 경우에만 여기서 딥링크를 처리한다.
-                    // 로그인을 거치는 경로는 탭바가 뜨는 showTabBar() 에서 다시 흘려보낸다.
-                    if route == .home { self.flushTabBarReady() }
+                guard let self, let splash else { return }
+                do {
+                    self.transition(to: try await routeTask.value)
+                } catch {
+                    self.presentSessionRestoreRetry(on: splash)
                 }
             }
         }
         navigationController.setViewControllers([splash], animated: false)
         navigationController.setNavigationBarHidden(true, animated: false)
+    }
+
+    @MainActor
+    private func transition(to route: AuthRoute) {
+        UIView.transition(
+            with: navigationController.view,
+            duration: 0.3,
+            options: .transitionCrossDissolve
+        ) {
+            self.show(route)
+        } completion: { _ in
+            // 탭바로 곧장 들어간 경우에만 여기서 딥링크를 처리한다.
+            // 로그인을 거치는 경로는 탭바가 뜨는 showTabBar() 에서 다시 흘려보낸다.
+            if route == .home { self.flushTabBarReady() }
+        }
+    }
+
+    /*
+     세션 복원이 서버 문제(500·503)로 실패했을 때 (spec: feature/auth/README.md §토큰·세션).
+
+     로그인 화면으로 되돌리지 않는다. 503 은 일시 장애라 잠시 뒤 풀리고, 500 의 공급자 불일치는
+     서버 쪽 상태 문제라 재로그인해도 같은 응답이 온다 — 어느 쪽이든 로그인 버튼을 눌러 봐야
+     사용자가 빠져나갈 수 없다. 세션을 든 채 스플래시에 머물러 재시도만 받는다.
+     */
+    @MainActor
+    private func presentSessionRestoreRetry(on splash: SplashViewController) {
+        DSAlertCardView.present(
+            on: splash.view,
+            title: "잠시 후 다시 시도해 주세요",
+            message: "서버와 연결이 원활하지 않아요.",
+            confirmTitle: "다시 시도"
+        ) { [weak self, weak splash] in
+            guard let self, let splash else { return }
+            Task { @MainActor in
+                do {
+                    self.transition(to: try await self.authUseCase.restoreSession())
+                } catch {
+                    self.presentSessionRestoreRetry(on: splash)
+                }
+            }
+        }
     }
 
     private func show(_ route: AuthRoute) {
