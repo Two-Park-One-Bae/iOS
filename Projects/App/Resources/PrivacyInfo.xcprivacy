@@ -50,8 +50,13 @@
                 <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
             </array>
         </dict>
-        <!-- IDFA = 기기 식별자. Meta 광고 어트리뷰션 전용이며 **ATT 동의 시에만** 수집된다
-             (거부하면 SKAdNetwork 집계로만 간다).
+        <!-- IDFA = 기기 식별자. Meta 광고 어트리뷰션 전용이며 **ATT 동의 시에만** 수집된다.
+
+             목적은 `ThirdPartyAdvertising` 이다. 애플이 두 목적을 가르는 실질 기준은
+             **ATT 와 식별자**다 — `DeveloperAdvertising`(자사 광고·크로스프로모션)은 앱을 벗어나지
+             않아 ATT 가 면제되고 IDFV 로 충분한 경우를 가리킨다. 우리는 IDFA 를 쓰고 ATT 를 띄우며
+             데이터가 Meta 로 나가므로 그 정의에 해당하지 않는다.
+             App Store Connect 신고(`타사 광고`)와 맞춘 값이다. (ATT 를 거부하면 SKAdNetwork 집계로만 간다).
 
              이 항목은 원래 Keychain 기기 UUID 용이었는데 그건 NM-410 클린 컷오버로 사라졌다.
              같은 데이터 유형이 다른 이유로 되살아난 것이라, 용도를 광고로 바꿔 적는다. -->
