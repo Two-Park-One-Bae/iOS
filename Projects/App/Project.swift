@@ -41,6 +41,19 @@ let project = Project(
                 "NSPhotoLibraryUsageDescription": "앨범에서 알약 사진을 선택하기 위해 접근이 필요합니다.",
                 // 카카오 SDK 초기화 키 (NM-410). 값은 gitignore 된 Secrets.xcconfig 에만 둔다.
                 "KAKAO_NATIVE_APP_KEY": "$(KAKAO_NATIVE_APP_KEY)",
+                // Meta 광고 어트리뷰션 (NM-465). 값은 카카오 키와 같이 Secrets.xcconfig 에만 둔다.
+                "FacebookAppID": "$(META_APP_ID)",
+                "FacebookClientToken": "$(META_CLIENT_TOKEN)",
+                "FacebookDisplayName": "NurseMate",
+                // 자동 수집 차단 — 화이트리스트 이벤트만 MetaAdsService 가 수동으로 보낸다.
+                // 켜 두면 붙이는 순간 무슨 이벤트가 나가는지 모르는 상태가 된다.
+                "FacebookAutoLogAppEventsEnabled": false,
+                // IDFA 수집 허용. 실제 수집 여부는 ATT 동의가 가르고, 거부하면 SKAdNetwork 로만 집계된다.
+                "FacebookAdvertiserIDCollectionEnabled": true,
+                // ATT 프롬프트 문구. **무엇에 쓰는지와 쓰지 않는 것**을 같이 적는다 —
+                // "맞춤 광고" 같은 모호한 문구는 심사 반려가 잦고, 뒷문장은 실제로 사실이다
+                // (Meta 로는 가입 전환 하나만 나간다 — MetaAdsService 참고).
+                "NSUserTrackingUsageDescription": "광고 성과를 측정해 더 나은 서비스를 만드는 데 사용됩니다. 알약 식별·타이머 기록은 수집하지 않습니다.",
                 // 앱을 여는 URL 스킴 세 갈래.
                 //   nursemate                 위젯 "+" 딥링크 (NM-302)
                 //   kakao{네이티브앱키}         카카오톡 로그인 후 복귀 (NM-410)
