@@ -21,5 +21,9 @@ public extension TargetDependency {
         public static let KakaoSDKCommon = TargetDependency.external(name: "KakaoSDKCommon")
         public static let KakaoSDKAuth = TargetDependency.external(name: "KakaoSDKAuth")
         public static let KakaoSDKUser = TargetDependency.external(name: "KakaoSDKUser")
+
+        // MARK: - 광고 어트리뷰션 (NM-465)
+
+        public static let FacebookCore = TargetDependency.external(name: "FacebookCore")
     }
 }

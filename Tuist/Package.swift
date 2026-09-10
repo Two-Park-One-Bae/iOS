@@ -40,5 +40,9 @@ let package = Package(
         // 카카오는 비네이티브라 액세스 토큰을 서버에 넘겨 Custom Token 을 받는다 (spec: domains/auth.md).
         .package(url: "https://github.com/google/GoogleSignIn-iOS", .upToNextMajor(from: "8.0.0")),
         .package(url: "https://github.com/kakao/kakao-ios-sdk", .upToNextMajor(from: "2.24.0")),
+        // Meta 광고 어트리뷰션 (NM-465). 광고 전용 채널이라 제품 지표(Firebase)와 역할이 겹치지 않는다 —
+        // Meta 가 자기 광고를 최적화하려면 전환 신호를 **되돌려 받아야** 한다.
+        // FacebookCore 만 쓴다. 소셜 로그인은 구글·애플·카카오라 FacebookLogin 은 불필요.
+        .package(url: "https://github.com/facebook/facebook-ios-sdk", .upToNextMajor(from: "17.0.0")),
     ]
 )

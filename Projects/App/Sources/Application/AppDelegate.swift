@@ -73,6 +73,11 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         // 구글은 GoogleService-Info.plist 의 CLIENT_ID 를 읽고, 카카오는 앱 키가 필요하다.
         SocialLoginSDK.configure()
 
+        // Meta 광고 어트리뷰션 (NM-465). 제품 지표가 아니라 **광고 전용 채널**이다 —
+        // Meta 가 자기 광고를 최적화하려면 전환 신호를 되돌려 받아야 한다.
+        // 자동 수집은 여기서 끄고, 화이트리스트 이벤트만 MetaAdsService 가 수동으로 보낸다.
+        MetaAdsService.configure(application, launchOptions: launchOptions)
+
         // Firebase Analytics — dev/prod 프로젝트가 분리돼 있어 내부 빌드도 수집한다(dev 속성).
         //   주 통제는 Info.plist FIREBASE_ANALYTICS_COLLECTION_ENABLED(구성별)로 init 전부터 적용된다
         //   — 런타임 disable만으론 first_open 등이 새는 게 확인됨(firebase-ios-sdk#5837).

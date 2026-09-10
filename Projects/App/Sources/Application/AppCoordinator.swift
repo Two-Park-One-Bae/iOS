@@ -191,6 +191,15 @@ final class AppCoordinator: BaseCoordinator {
         tabBarCoordinator.start()
 
         flushTabBarReady()
+
+        // ATT 프롬프트 (NM-465). 홈에 도착한 **뒤**에 묻는다 — 콜드런치 즉시 물으면 무슨 앱인지
+        // 모르는 상태라 대개 거부한다. 여기까지 온 사용자는 로그인·동의를 마쳤고 앱이 뭘 하는지 봤다.
+        //
+        // 한 런루프 뒤로 미루는 건 전환 애니메이션·동의 시트 dismiss 와 겹치지 않게 하려는 것이다.
+        // 앱이 활성 상태여야 시스템 프롬프트가 뜬다.
+        DispatchQueue.main.async {
+            MetaAdsService.requestTrackingAuthorizationIfNeeded()
+        }
     }
 
     private func flushTabBarReady() {
