@@ -111,6 +111,79 @@ platform :ios do
     "버그 수정 및 개선 사항"
   end
 
+  # ASC API 키 정보(key_id·issuer_id·.p8 파일경로). 로컬은 fastlane/api_key.json, CI는 env.
+  # xcodebuild 의 -authenticationKey* 플래그가 .p8 **파일경로**를 요구하므로 항상 파일로 떨군다.
+  def asc_key_info
+    if ENV["CI"]
+      { key_id: ENV["APP_STORE_CONNECT_API_KEY_ID"],
+        issuer_id: ENV["APP_STORE_CONNECT_API_KEY_ISSUER_ID"],
+        key_path: API_KEY_PATH }
+    else
+      require "json"
+      data = JSON.parse(File.read(File.expand_path("../api_key.json", __FILE__)))
+      File.write(API_KEY_PATH, data["key"])
+      { key_id: data["key_id"], issuer_id: data["issuer_id"], key_path: API_KEY_PATH }
+    end
+  end
+
+  # xcodebuild 가 프로파일을 자동 생성·갱신하도록 하는 인증 플래그.
+  # archive·export 두 xcodebuild 호출 모두에 넘겨야 각 단계에서 프로파일을 만들 수 있다.
+  def provisioning_auth_xcargs
+    i = asc_key_info
+    "-allowProvisioningUpdates " \
+      "-authenticationKeyPath #{i[:key_path]} " \
+      "-authenticationKeyID #{i[:key_id]} " \
+      "-authenticationKeyIssuerID #{i[:issuer_id]}"
+  end
+
+  # App Store 아카이브를 **자동 서명(Xcode 관리)** 으로 만든다. match 를 걷어낸 뒤의 단일 서명 경로.
+  #
+  # 이 머신의 배포 인증서(팀 DEVELOPMENT_TEAM)로 서명하고, 프로비저닝 프로파일은
+  # `-allowProvisioningUpdates` + ASC API 키로 xcodebuild 가 자동 생성·갱신한다.
+  # 만드는 건 **프로파일뿐**이라 인증서를 폐기하지 않는다(개수 제한·팀 영향 없음).
+  #
+  # 프로젝트 전체(App·익스텐션·프레임워크)를 자동 서명으로 통일한다 — 예전 match 방식이 겪던
+  # "프레임워크는 자동, 앱은 수동" 반쪽 상태의 conflicting settings 를 애초에 만들지 않는다.
+  #
+  # firebase_env: 이 빌드가 쓸 Firebase 구성(Debug=dev / Release=prod). 빌드·dSYM 이 같은 값을 봐야 한다.
+  # extra_xcargs: 레인별 추가 인자(내부 빌드의 INTERNAL 조건·BASE_URL 등).
+  def build_appstore(firebase_env:, extra_xcargs: "")
+    team = ENV.fetch("DEVELOPMENT_TEAM", "")
+    auth = provisioning_auth_xcargs
+
+    update_code_signing_settings(
+      use_automatic_signing: true,
+      path: "Projects/App/App.xcodeproj",
+      team_id: team
+    )
+
+    build_app(
+      workspace: "Application.xcworkspace",
+      scheme: "App",
+      configuration: "Release",
+      export_method: "app-store",
+      output_directory: "build",
+      # gym 은 이 xcargs 를 archive·export 두 xcodebuild 호출 **모두**에 넘긴다.
+      # 따라서 auth 플래그는 여기 한 번만 둔다 — export_xcargs 로 또 넣으면
+      # export 명령에 -authenticationKeyPath 가 중복돼 xcodebuild 가 거부한다.
+      xcargs: "#{auth} DEVELOPMENT_TEAM=#{team} FIREBASE_ENV=#{firebase_env} #{extra_xcargs}".strip,
+      export_options: {
+        method: "app-store",
+        signingStyle: "automatic",
+        teamID: team
+      }
+    )
+  end
+
+  desc "[검증용] 업로드 없이 자동 서명 아카이브만 만든다 — 서명 체인 확인"
+  lane :verify_signing do
+    build_appstore(
+      firebase_env: FIREBASE_ENV_DEV,
+      extra_xcargs: "SWIFT_ACTIVE_COMPILATION_CONDITIONS='$(inherited) INTERNAL' FIREBASE_ANALYTICS_ENABLED=YES BASE_URL='$(BASE_URL_DEBUG)'"
+    )
+    UI.success("서명 + 아카이브 성공 — build/ 에 .ipa 생성됨 (업로드는 안 함)")
+  end
+
   desc "Run unit tests"
   lane :test do
     run_tests(
@@ -126,12 +199,6 @@ platform :ios do
   lane :beta_internal do
     key = api_key
 
-    match(
-      type: "appstore",
-      api_key: key,
-      readonly: true
-    )
-
     build_number = latest_testflight_build_number(
       api_key: key,
       app_identifier: "app.nursemate.app",
@@ -143,59 +210,23 @@ platform :ios do
       xcodeproj: "Projects/App/App.xcodeproj"
     )
 
-    # App + 임베드되는 익스텐션(워치앱·위젯·컴플리케이션) 각각을 해당 match 프로파일로 수동 서명.
-    signing = {
-      "App"               => "app.nursemate.app",
-      "WatchApp"          => "app.nursemate.app.watchapp",
-      "TimerWidget"       => "app.nursemate.app.timerwidget",
-      "WatchComplication" => "app.nursemate.app.watchapp.presetcomplication",
-    }
-    signing.each do |target, bundle_id|
-      update_code_signing_settings(
-        use_automatic_signing: false,
-        path: "Projects/App/App.xcodeproj",
-        targets: [target],
-        code_sign_identity: "iPhone Distribution",
-        profile_name: "match AppStore #{bundle_id}"
-      )
-    end
-
-    build_app(
-      workspace: "Application.xcworkspace",
-      scheme: "App",
-      configuration: "Release",
-      export_method: "app-store",
-      output_directory: "build",
-      # 프레임워크 타깃(TimerDomain 등)이 아카이브 시 개발 인증서를 찾다 실패하는 문제 방지.
-      # 아카이브 전체를 수동 서명(Manual) + 배포 인증서로 통일 — 프레임워크는 프로파일 없이
-      # 인증서만으로 서명되고, 앱·익스텐션은 export_options 의 프로파일을 그대로 사용한다.
-      # (Manual 없이 identity 만 강제하면 자동 서명 프레임워크와 "conflicting settings" 충돌)
-      # 내부 TestFlight 빌드에만 INTERNAL 컴파일 조건 주입 → AppEnvironment.isInternal=true
-      # → S3 원본업로드 OFF. 버킷이 하나뿐이라 내부 테스트 사진이 학습 데이터셋을 오염시킨다.
-      # Firebase Analytics 는 dev 프로젝트로 수집한다(YES) — 운영 속성과 분리돼 있다.
-      # (NM-458 이전에는 Amplitude 전송도 이 플래그로 껐다 — 프로젝트가 하나뿐이었다.)
-      # external/release 레인은 주입 안 함 → 외부 테스터·프로덕션은 prod 로 정상 수집.
-      #
-      # 서명 때문에 Release 구성으로 빌드하지만 환경은 dev 로 돌린다 —
-      # FIREBASE_ENV=Debug(dev 프로젝트) + BASE_URL(dev 서버). 둘은 항상 같은 편이어야 한다.
-      # App Check 토큰의 aud 는 Firebase 프로젝트에 묶여 있어, 한쪽만 바꾸면 서버가 401 을 낸다.
-      xcargs: "DEVELOPMENT_TEAM=#{ENV.fetch('DEVELOPMENT_TEAM', '')} CODE_SIGN_IDENTITY='Apple Distribution' CODE_SIGN_STYLE=Manual SWIFT_ACTIVE_COMPILATION_CONDITIONS='$(inherited) INTERNAL' FIREBASE_ANALYTICS_ENABLED=YES FIREBASE_ENV=#{FIREBASE_ENV_DEV} BASE_URL='$(BASE_URL_DEBUG)'",
-      export_options: {
-        method: "app-store",
-        signingStyle: "manual",
-        provisioningProfiles: signing.each_with_object({}) { |(_, bundle_id), h| h[bundle_id] = "match AppStore #{bundle_id}" }
-      }
+    # 내부 TestFlight 빌드에만 INTERNAL 컴파일 조건 주입 → AppEnvironment.isInternal=true
+    # → S3 원본업로드 OFF. 버킷이 하나뿐이라 내부 테스트 사진이 학습 데이터셋을 오염시킨다.
+    # Firebase Analytics 는 dev 프로젝트로 수집한다(YES) — 운영 속성과 분리돼 있다.
+    # external/release 레인은 주입 안 함 → 외부 테스터·프로덕션은 prod 로 정상 수집.
+    #
+    # 서명 때문에 Release 구성으로 빌드하지만 환경은 dev 로 돌린다 —
+    # FIREBASE_ENV=Debug(dev 프로젝트) + BASE_URL(dev 서버). 둘은 항상 같은 편이어야 한다.
+    # App Check 토큰의 aud 는 Firebase 프로젝트에 묶여 있어, 한쪽만 바꾸면 서버가 401 을 낸다.
+    build_appstore(
+      firebase_env: FIREBASE_ENV_DEV,
+      extra_xcargs: "SWIFT_ACTIVE_COMPILATION_CONDITIONS='$(inherited) INTERNAL' FIREBASE_ANALYTICS_ENABLED=YES BASE_URL='$(BASE_URL_DEBUG)'"
     )
 
     upload_dsyms_to_crashlytics(FIREBASE_ENV_DEV)
 
     upload_to_testflight(
-      api_key: app_store_connect_api_key(
-        key_id: ENV["APP_STORE_CONNECT_API_KEY_ID"],
-        issuer_id: ENV["APP_STORE_CONNECT_API_KEY_ISSUER_ID"],
-        key_filepath: API_KEY_RAW_PATH,
-        in_house: false
-      ),
+      api_key: key,
       skip_waiting_for_build_processing: true
     )
   end
@@ -204,12 +235,6 @@ platform :ios do
   lane :beta_external do
     key = api_key
 
-    match(
-      type: "appstore",
-      api_key: key,
-      readonly: true
-    )
-
     build_number = latest_testflight_build_number(
       api_key: key,
       app_identifier: "app.nursemate.app",
@@ -221,37 +246,8 @@ platform :ios do
       xcodeproj: "Projects/App/App.xcodeproj"
     )
 
-    # App + 임베드되는 익스텐션(워치앱·위젯·컴플리케이션) 각각을 해당 match 프로파일로 수동 서명.
-    signing = {
-      "App"               => "app.nursemate.app",
-      "WatchApp"          => "app.nursemate.app.watchapp",
-      "TimerWidget"       => "app.nursemate.app.timerwidget",
-      "WatchComplication" => "app.nursemate.app.watchapp.presetcomplication",
-    }
-    signing.each do |target, bundle_id|
-      update_code_signing_settings(
-        use_automatic_signing: false,
-        path: "Projects/App/App.xcodeproj",
-        targets: [target],
-        code_sign_identity: "iPhone Distribution",
-        profile_name: "match AppStore #{bundle_id}"
-      )
-    end
-
-    build_app(
-      workspace: "Application.xcworkspace",
-      scheme: "App",
-      configuration: "Release",
-      export_method: "app-store",
-      output_directory: "build",
-      # beta_internal 과 동일한 수동 서명 정책(프레임워크 자동 서명 충돌 방지).
-      xcargs: "DEVELOPMENT_TEAM=#{ENV.fetch('DEVELOPMENT_TEAM', '')} CODE_SIGN_IDENTITY='Apple Distribution' CODE_SIGN_STYLE=Manual",
-      export_options: {
-        method: "app-store",
-        signingStyle: "manual",
-        provisioningProfiles: signing.each_with_object({}) { |(_, bundle_id), h| h[bundle_id] = "match AppStore #{bundle_id}" }
-      }
-    )
+    # 외부 테스터·프로덕션은 prod Firebase(Release) 로 수집한다 — 내부(dev)와 분리.
+    build_appstore(firebase_env: FIREBASE_ENV_PROD)
 
     upload_dsyms_to_crashlytics(FIREBASE_ENV_PROD)
 
@@ -269,12 +265,7 @@ platform :ios do
     # 나머지 에러는 그대로 올린다 — 서명·프로파일·네트워크 같은 진짜 실패를 삼키면 안 된다.
     begin
       upload_to_testflight(
-        api_key: app_store_connect_api_key(
-          key_id: ENV["APP_STORE_CONNECT_API_KEY_ID"],
-          issuer_id: ENV["APP_STORE_CONNECT_API_KEY_ISSUER_ID"],
-          key_filepath: API_KEY_RAW_PATH,
-          in_house: false
-        ),
+        api_key: key,
         distribute_external: true,
         groups: ["Nurse"],   # App Store Connect 외부 그룹명과 대소문자까지 정확히 일치해야 함
         # 베타 앱 설명·피드백 이메일·심사 연락처는 App Store Connect(TestFlight 테스트 정보)를 단일 소스로 둔다.
@@ -297,12 +288,6 @@ platform :ios do
   lane :release do
     key = api_key
 
-    match(
-      type: "appstore",
-      api_key: key,
-      readonly: true
-    )
-
     build_number = latest_testflight_build_number(
       api_key: key,
       app_identifier: "app.nursemate.app",
@@ -314,50 +299,13 @@ platform :ios do
       xcodeproj: "Projects/App/App.xcodeproj"
     )
 
-    # App + 임베드되는 익스텐션(워치앱·위젯·컴플리케이션) 각각을 해당 match 프로파일로 수동 서명.
-    signing = {
-      "App"               => "app.nursemate.app",
-      "WatchApp"          => "app.nursemate.app.watchapp",
-      "TimerWidget"       => "app.nursemate.app.timerwidget",
-      "WatchComplication" => "app.nursemate.app.watchapp.presetcomplication",
-    }
-    signing.each do |target, bundle_id|
-      update_code_signing_settings(
-        use_automatic_signing: false,
-        path: "Projects/App/App.xcodeproj",
-        targets: [target],
-        code_sign_identity: "iPhone Distribution",
-        profile_name: "match AppStore #{bundle_id}"
-      )
-    end
-
-    build_app(
-      workspace: "Application.xcworkspace",
-      scheme: "App",
-      configuration: "Release",
-      export_method: "app-store",
-      output_directory: "build",
-      # 프레임워크 타깃(TimerDomain 등)이 아카이브 시 개발 인증서를 찾다 실패하는 문제 방지.
-      # 아카이브 전체를 수동 서명(Manual) + 배포 인증서로 통일 — 프레임워크는 프로파일 없이
-      # 인증서만으로 서명되고, 앱·익스텐션은 export_options 의 프로파일을 그대로 사용한다.
-      # (Manual 없이 identity 만 강제하면 자동 서명 프레임워크와 "conflicting settings" 충돌)
-      xcargs: "DEVELOPMENT_TEAM=#{ENV.fetch('DEVELOPMENT_TEAM', '')} CODE_SIGN_IDENTITY='Apple Distribution' CODE_SIGN_STYLE=Manual",
-      export_options: {
-        method: "app-store",
-        signingStyle: "manual",
-        provisioningProfiles: signing.each_with_object({}) { |(_, bundle_id), h| h[bundle_id] = "match AppStore #{bundle_id}" }
-      }
-    )
+    # 프로덕션은 prod Firebase(Release) 로 수집한다.
+    build_appstore(firebase_env: FIREBASE_ENV_PROD)
 
     upload_dsyms_to_crashlytics(FIREBASE_ENV_PROD)
 
     upload_to_testflight(
-      api_key: app_store_connect_api_key(
-        key_id: ENV["APP_STORE_CONNECT_API_KEY_ID"],
-        issuer_id: ENV["APP_STORE_CONNECT_API_KEY_ISSUER_ID"],
-        key_filepath: API_KEY_RAW_PATH,
-        in_house: false
-      ),
+      api_key: key,
       skip_waiting_for_build_processing: false
     )
   end
