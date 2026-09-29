@@ -9,11 +9,12 @@ SECRETS := $(HOME)/.nursemate-secrets
 # 팀 ID 는 시크릿 원본에서 읽는다(작업 트리 복사본이 아직 없을 수도 있으므로).
 export DEVELOPMENT_TEAM := $(shell grep '^DEVELOPMENT_TEAM' $(SECRETS)/Secrets.xcconfig 2>/dev/null | sed 's/.*=[[:space:]]*//')
 
-.PHONY: help secrets generate doctor test verify beta beta-external release open
+.PHONY: help secrets models generate doctor test verify beta beta-external release open
 
 help:
 	@echo "NurseMate iOS — 로컬 CI/CD"
 	@echo "  make doctor         환경이 CI 와 맞는지 검사"
+	@echo "  make models         CoreML 모델 받기 (ML 레포 DVC) ← 클론 직후 한 번"
 	@echo "  make test           유닛 테스트 (구 ci.yml)"
 	@echo "  make verify         업로드 없이 서명·아카이브만 검증"
 	@echo "  make beta           내부 TestFlight 배포 (구 cd-beta)      ← 개발 중 아무 때나"
@@ -30,8 +31,14 @@ secrets:
 	@cp "$(SECRETS)/api_key.json" fastlane/api_key.json
 	@echo "✅ 시크릿 배치 완료"
 
+## CoreML 모델을 ML 레포 DVC(S3)에서 받는다 — models.lock 기준. 이미 받은 것은 건너뛴다 (NM-482)
+## 모델은 git 에 없다. 빠진 채 빌드하면 SegmentationKit 빌드 단계가 멈춘다.
+models:
+	Tools/models.sh fetch
+
 ## Tuist 프로젝트 재생성 — 브랜치 전환 후 필수(안 하면 낡은 파일 참조로 빌드 실패)
-generate:
+## 모델을 먼저 받는다 — 브랜치마다 models.lock 이 다를 수 있다.
+generate: models
 	tuist install
 	tuist generate --no-open
 
@@ -41,6 +48,8 @@ doctor:
 	@bundle exec fastlane --version >/dev/null 2>&1 && echo "✅ fastlane(gem)" || echo "❌ gem 미설치 — 'bundle install' 필요"
 	@xcrun simctl list devices available | grep -q 'iPhone 16 ' && echo "✅ iPhone 16 시뮬레이터" || echo "❌ iPhone 16 시뮬 없음 — 'xcrun simctl create' 필요"
 	@test -f "$(SECRETS)/api_key.json" && echo "✅ ASC API 키" || echo "❌ $(SECRETS)/api_key.json 없음"
+	@dvc version 2>/dev/null | grep -q 's3' && echo "✅ dvc(S3)" || echo "❌ dvc(S3 지원) 없음 — 'brew install dvc'"
+	@aws sts get-caller-identity --profile nursemate-dvc >/dev/null 2>&1 && echo "✅ AWS 프로필 nursemate-dvc" || echo "❌ AWS 프로필 nursemate-dvc 인증 실패 — 'aws configure --profile nursemate-dvc'(키는 영빈)"
 	@test -n "$(DEVELOPMENT_TEAM)" && echo "✅ DEVELOPMENT_TEAM=$(DEVELOPMENT_TEAM)" || echo "❌ DEVELOPMENT_TEAM 못 읽음"
 
 ## 유닛 테스트 (구 ci.yml)
