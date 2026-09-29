@@ -6,7 +6,7 @@
 # 모델을 바꾸는 법: ML 레포에 새 버전 폴더를 올리고(dvc push) 그 커밋을 REV 로, 경로를 새 폴더로 고친다.
 # REV 는 브랜치 이름이 아니라 커밋 해시로 둔다 — 브랜치는 움직이므로 같은 REV 가 같은 모델임을 보장하지 못한다.
 
-REV=46ff94ca2dce443a4a6b188919bca21eeaf206c1
+REV=d41e48f7d97d0bd37899fa67502e90e83716eeb5
 
 # <ML 레포 안 경로>                                                          <이 레포 안 목적지>
 models/seg/20260610-rfdetr-seg-small/rfdetr_seg_small_fp32.mlpackage   Projects/Modules/SegmentationKit/Sources/rfdetr_seg_small_fp32.mlpackage
