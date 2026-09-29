@@ -43,6 +43,12 @@ public struct Dep {
                 path: .relativeToRoot("Projects/Modules/SegmentationKit")
             )
         }
+        public struct ImprintKit {
+            public static let ImprintKit = TargetDependency.project(
+                target: "ImprintKit",
+                path: .relativeToRoot("Projects/Modules/ImprintKit")
+            )
+        }
         public struct TimerShared {
             public static let TimerShared = TargetDependency.project(
                 target: "TimerShared",

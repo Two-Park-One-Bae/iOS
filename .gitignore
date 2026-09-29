@@ -72,5 +72,8 @@ Projects/App/Firebase/*/GoogleService-Info.plist
 fastlane/api_key.json
 
 # CoreML 모델 — git 이 아니라 ML 레포 DVC 에서 받는다 (models.lock · make models, NM-482)
-Projects/**/Sources/*.mlpackage/
+# 어느 모듈·폴더에 두든 커밋되지 않게 위치를 가리지 않는다. 컴파일본(.mlmodelc)·구형 단일 파일(.mlmodel)도 막는다.
+*.mlpackage/
+*.mlmodel
+*.mlmodelc/
 .models/
