@@ -70,3 +70,7 @@ Projects/App/Firebase/*/GoogleService-Info.plist
 
 # ASC API 키(개인키) — 로컬 배포용, 절대 커밋 금지
 fastlane/api_key.json
+
+# CoreML 모델 — git 이 아니라 ML 레포 DVC 에서 받는다 (models.lock · make models, NM-482)
+Projects/**/Sources/*.mlpackage/
+.models/

@@ -1,0 +1,12 @@
+# 앱이 번들하는 CoreML 모델 목록 — ML 레포(Two-Park-One-Bae/ML)의 DVC(S3)에서 받는다 (NM-482).
+#
+# `make models` 가 이 파일을 읽어 받고, 빌드 단계가 받은 것이 이 파일과 맞는지 확인한다.
+# 모델 파일은 git 에 없다(.gitignore). 클론 직후에는 `make models` 를 먼저 돌린다.
+#
+# 모델을 바꾸는 법: ML 레포에 새 버전 폴더를 올리고(dvc push) 그 커밋을 REV 로, 경로를 새 폴더로 고친다.
+# REV 는 브랜치 이름이 아니라 커밋 해시로 둔다 — 브랜치는 움직이므로 같은 REV 가 같은 모델임을 보장하지 못한다.
+
+REV=46ff94ca2dce443a4a6b188919bca21eeaf206c1
+
+# <ML 레포 안 경로>                                                          <이 레포 안 목적지>
+models/seg/20260610-rfdetr-seg-small/rfdetr_seg_small_fp32.mlpackage   Projects/Modules/SegmentationKit/Sources/rfdetr_seg_small_fp32.mlpackage
