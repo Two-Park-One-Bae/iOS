@@ -10,3 +10,5 @@ REV=d41e48f7d97d0bd37899fa67502e90e83716eeb5
 
 # <ML 레포 안 경로>                                                          <이 레포 안 목적지>
 models/seg/20260610-rfdetr-seg-small/rfdetr_seg_small_fp32.mlpackage   Projects/Modules/SegmentationKit/Sources/rfdetr_seg_small_fp32.mlpackage
+models/imprint/20260907-crnn-ep60-s1/Reader_s1_b24_fp32.mlpackage        Projects/Modules/ImprintKit/Sources/Reader_s1_b24_fp32.mlpackage
+models/mark/20260925-convnext-species/Mark_b8_fp16.mlpackage              Projects/Modules/MarkKit/Sources/Mark_b8_fp16.mlpackage

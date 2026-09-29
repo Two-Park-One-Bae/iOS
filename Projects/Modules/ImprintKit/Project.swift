@@ -2,9 +2,9 @@ import ProjectDescription
 import ProjectDescriptionHelpers
 import DependencyPlugin
 
+// 각인 OCR (NM-459). 모델은 ML 레포 models/imprint/20260907-crnn-ep60-s1 — models.lock 으로 받는다.
 let project = Project.makeModule(
-    name: "SegmentationKit",
+    name: "ImprintKit",
     targets: [.dynamicFramework, .unitTest],
-    // 모델(mlpackage)은 git 에 없고 `make models` 로 받는다 — 빠지면 빌드에서 막는다 (NM-482)
     scripts: [.checkCoreMLModels]
 )
