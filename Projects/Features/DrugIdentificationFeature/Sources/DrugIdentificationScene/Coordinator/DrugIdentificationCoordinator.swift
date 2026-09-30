@@ -296,7 +296,10 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
     private func showEdit(pill: IdentifiedPill) {
         let viewModel = PillEditViewModel(
             pillIndex: pill.index,
-            attribute: pill.attribute,
+            // 임시 — 새 수정 화면(NM-513 C)에서 조건 모델로 바꾼다. 응답 전 · 수동 추가는 빈 속성.
+            attribute: pill.attribute ?? PillAttributeModel(
+                pillId: pill.pillId, attributeToken: nil, colorHexes: [], shape: nil, formulation: nil, error: nil
+            ),
             thumbnail: pill.thumbnail
         )
         let vc = PillEditVC(viewModel: viewModel)

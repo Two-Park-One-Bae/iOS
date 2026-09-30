@@ -111,15 +111,12 @@ public final class DrugIdentificationViewModel {
         // 크롭은 원본 정규화 1회로 일괄 생성(detection마다 재렌더하던 것 제거).
         let crops = RFDetrSegmentor.croppedImages(from: image, detections: detections)
         return detections.enumerated().map { offset, detection in
-            let placeholder = PillAttributeModel(
-                pillId: "\(detection.id)", attributeToken: nil, colorHexes: [],
-                shape: nil, formulation: nil, error: nil
-            )
-            return IdentifiedPill(
+            IdentifiedPill(
                 index: offset + 1,
+                pillId: "\(detection.id)",   // 검출 질의 번호 — 한 사진 안에서 고유
                 thumbnail: crops[offset],
                 boundingBox: detection.box,
-                attribute: placeholder
+                attribute: nil
             )
         }
     }
@@ -130,7 +127,7 @@ public final class DrugIdentificationViewModel {
         pills.map { pill in
             // 인코딩 임시 버퍼(PNG Data·base64 String)를 즉시 해제.
             let base64 = autoreleasepool { pill.thumbnail?.pngData()?.base64EncodedString() ?? "" }
-            return (pillId: pill.attribute.pillId, croppedImage: base64)
+            return (pillId: pill.pillId, croppedImage: base64)
         }
     }
 
@@ -241,9 +238,10 @@ public final class DrugIdentificationViewModel {
     ) -> [IdentifiedPill] {
         let byId = Dictionary(attributes.map { ($0.pillId, $0) }, uniquingKeysWith: { first, _ in first })
         return pills.map { pill in
-            guard let attribute = byId[pill.attribute.pillId] else { return pill }
+            guard let attribute = byId[pill.pillId] else { return pill }
             return IdentifiedPill(
                 index: pill.index,
+                pillId: pill.pillId,
                 thumbnail: pill.thumbnail,
                 boundingBox: pill.boundingBox,
                 attribute: attribute
