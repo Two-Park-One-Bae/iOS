@@ -24,6 +24,7 @@ final class PillEditVC: UIViewController {
     var onSelectCompare: ((PillCandidateModel, UIImage?, CGRect, UIImage?) -> Void)?
     /// 조건이 바뀔 때마다 — Coordinator 가 알약별로 보관해 화면을 다시 열어도 이어지게 한다.
     var onConditionsChanged: ((PillConditions) -> Void)?
+    var onEditRecordChanged: ((PillEditRecord) -> Void)?
 
     // MARK: - Sections / State
 
@@ -352,6 +353,12 @@ final class PillEditVC: UIViewController {
                 self.relayoutCard()
                 self.onConditionsChanged?(conditions)
             }
+            .store(in: &cancelBag)
+
+        // 수정 기록도 Coordinator 에 넘긴다 — 다시 열었을 때 edit_count 가 0 으로 돌아가지 않게(NM-535).
+        viewModel.editRecordSubject
+            .dropFirst()
+            .sink { [weak self] in self?.onEditRecordChanged?($0) }
             .store(in: &cancelBag)
 
         // 개수는 목록보다 먼저 온다(ViewModel) — 목록을 다시 그릴 때 헤더 · 끝 안내가 함께 반영된다.
