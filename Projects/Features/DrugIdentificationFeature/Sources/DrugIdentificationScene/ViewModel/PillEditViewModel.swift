@@ -56,6 +56,8 @@ final class PillEditViewModel {
     /// 알약 한 개의 조건. 화면을 닫았다 열어도 이어지도록 Coordinator 가 받아 보관한다.
     let conditionsSubject: CurrentValueSubject<PillConditions, Never>
     var conditions: PillConditions { conditionsSubject.value }
+    /// 수정 기록도 조건처럼 Coordinator 가 받아 보관한다 — 다시 열면 이어서 센다(NM-535).
+    let editRecordSubject: CurrentValueSubject<PillEditRecord, Never>
 
     // MARK: - Streams
 
@@ -91,6 +93,7 @@ final class PillEditViewModel {
         pillIndex: Int,
         displayNumber: Int,
         conditions: PillConditions,
+        editRecord: PillEditRecord = PillEditRecord(),
         thumbnail: UIImage?,
         isManual: Bool = false,
         startsExpanded: Bool = false
@@ -98,6 +101,7 @@ final class PillEditViewModel {
         self.pillIndex = pillIndex
         self.displayNumber = displayNumber
         self.conditionsSubject = CurrentValueSubject(conditions)
+        self.editRecordSubject = CurrentValueSubject(editRecord)
         self.thumbnail = thumbnail
         self.isManual = isManual
         self.startsExpanded = startsExpanded || isManual
@@ -132,15 +136,10 @@ final class PillEditViewModel {
 
     // MARK: - Analytics (조건 편집 추적)
 
-    private(set) var editCount = 0
-    private var editedAttrs: Set<String> = []
-    /// 확정까지 수정한 속성 종류 (pill_confirm.edited_attrs, ≤100자).
-    /// 수정 없이 확정하는 게 다수 케이스인데 빈 문자열을 보내면 GA4 에서 (not set) 으로 보여
-    /// "파라미터가 안 왔다"와 구분이 안 된다 — enteredValuesSummary 와 같이 "none" 으로 명시한다.
-    var editedAttrsJoined: String {
-        let joined = editedAttrs.isEmpty ? "none" : editedAttrs.sorted().joined(separator: ",")
-        return String(joined.prefix(100))
-    }
+    /// 이 알약을 처음 연 뒤로 수정한 횟수 — 화면을 닫았다 열어도 이어진다.
+    var editCount: Int { editRecordSubject.value.count }
+    /// 확정까지 수정한 속성 종류 (pill_confirm.edited_attrs).
+    var editedAttrsJoined: String { editRecordSubject.value.joinedAttributes }
     /// 이탈 시 지금까지 사용자가 정한 조건 요약 (pill_flow_exit.entered_values, ≤100자).
     var enteredValuesSummary: String {
         let c = conditions
@@ -160,8 +159,9 @@ final class PillEditViewModel {
     }
 
     private func recordEdit(_ attribute: String) {
-        editCount += 1
-        editedAttrs.insert(attribute)
+        var record = editRecordSubject.value
+        record.record(attribute)
+        editRecordSubject.send(record)
         guard !isManual else { return }   // 수동 추가 알약은 집계 제외(모델 정확도 지표 오염 방지)
         AppAnalytics.track(.pillAttrEdit(attribute: attribute, pillIndex: pillIndex))
     }

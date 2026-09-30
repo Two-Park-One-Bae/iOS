@@ -38,6 +38,7 @@ public final class DrugIdentificationVC: UIViewController {
     private var displayOrder: [Int] = []
     /// 알약별 수정 조건 — 수정 화면을 닫았다 열어도 고친 값이 이어진다(한 식별 흐름 안에서만).
     private var conditionsByIndex: [Int: PillConditions] = [:]
+    private var editRecordsByIndex: [Int: PillEditRecord] = [:]
     private var identifiedIndices = Set<Int>()
     private var deletedIndices = Set<Int>()
     private var selectedCandidates: [Int: PillCandidateModel] = [:]
@@ -304,6 +305,15 @@ public final class DrugIdentificationVC: UIViewController {
 
     func store(_ conditions: PillConditions, for index: Int) {
         conditionsByIndex[index] = conditions
+    }
+
+    /// 조건과 짝 — 조건을 이어서 여는 이상 수정 횟수도 이어서 센다(NM-535).
+    func editRecord(of index: Int) -> PillEditRecord {
+        editRecordsByIndex[index] ?? PillEditRecord()
+    }
+
+    func store(_ record: PillEditRecord, for index: Int) {
+        editRecordsByIndex[index] = record
     }
 
     /// 식별 완료가 가장 우선 — 인식 실패 알약도 직접 입력해 고르면 식별 완료다.

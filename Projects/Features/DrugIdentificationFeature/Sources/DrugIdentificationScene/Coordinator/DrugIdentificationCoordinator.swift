@@ -303,6 +303,7 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
             displayNumber: resultVC.displayNumber(of: pill.index),
             // 전에 고친 조건이 있으면 이어서 연다 — 없으면 모델 출력으로 시작.
             conditions: resultVC.conditions(of: pill),
+            editRecord: resultVC.editRecord(of: pill.index),
             thumbnail: pill.thumbnail,
             isManual: isManual,
             // 추출 실패는 보여 줄 모델 값이 없어 펼친 상태로 연다(수동 추가도 VM 이 펼친다).
@@ -312,6 +313,9 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
         vc.dwellTracker = dwellTracker
         vc.onConditionsChanged = { [weak resultVC] conditions in
             resultVC?.store(conditions, for: pill.index)
+        }
+        vc.onEditRecordChanged = { [weak resultVC] record in
+            resultVC?.store(record, for: pill.index)
         }
         vc.onBackTapped = { [weak self] in
             self?.navigationController.popViewController(animated: true)
