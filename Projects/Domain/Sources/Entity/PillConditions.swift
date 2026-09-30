@@ -82,9 +82,21 @@ public struct PillModelOutput: Equatable {
 }
 
 /// 마크 유무 점수를 조건으로 접는 규칙 — **계약이 소유한다**(두 앱이 다르게 접으면 같은 알약에 다른 후보가 나온다).
+///
+/// 임계는 **같은 면의 각인 유무로 나눈다**(NM-527) — 각인 모델값(확신 글자)이 있으면 0.80, 없으면 0.60.
+/// 각인이 있는 면은 각인만으로 후보가 좁혀지므로 마크를 확실할 때만 건다(놓친 `true` 하나가 정답을 떨어뜨린다).
+/// 각인이 없으면 마크가 남은 단서라 더 낮은 점수에서도 건다. 현 마크 모델(convnext-species) 기준 —
+/// 모델을 바꾸면 spec 과 함께 고친다.
 public enum PillMarkRule {
-    /// 현 마크 모델(convnext-species) 기준. 모델을 바꾸면 spec 과 함께 고친다.
-    public static let presenceThreshold: Float = 0.80
+    public static let presenceThresholdWithImprint: Float = 0.80
+    public static let presenceThresholdWithoutImprint: Float = 0.60
+
+    /// 모델 점수가 `있음` 인가. `imprint` 는 같은 면의 각인 모델값 — nil(보류·판독 실패)이면 각인 없음으로 본다.
+    public static func isPresent(score: Float?, imprint: String?) -> Bool {
+        guard let score else { return false }
+        let hasImprint = !(imprint ?? "").isEmpty
+        return score >= (hasImprint ? presenceThresholdWithImprint : presenceThresholdWithoutImprint)
+    }
 }
 
 // MARK: - 외형 (색 · 모양 · 제형)
@@ -192,12 +204,13 @@ public struct PillConditions: Equatable {
         self.back = FaceConditions()
     }
 
-    /// 앞면 초기값 — 각인은 확신 글자(모델값), 마크는 점수 ≥ 0.80 이면 `있음`, 아니면 `전체`. 구분선은 모델이 없다.
+    /// 앞면 초기값 — 각인은 확신 글자(모델값), 마크는 점수가 임계(각인 있음 0.80 · 없음 0.60) 이상이면 `있음`,
+    /// 아니면 `전체`. 구분선은 모델이 없다.
     private static func initialFront(_ model: PillModelOutput) -> FaceConditions {
         FaceConditions(
             imprint: model.frontImprint.map { .value($0, source: .model) } ?? .all,
             dividingLine: .all,
-            mark: (model.frontMarkScore ?? 0) >= PillMarkRule.presenceThreshold ? .present(source: .model) : .all
+            mark: PillMarkRule.isPresent(score: model.frontMarkScore, imprint: model.frontImprint) ? .present(source: .model) : .all
         )
     }
 

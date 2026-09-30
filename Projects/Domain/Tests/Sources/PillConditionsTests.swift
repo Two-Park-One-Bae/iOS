@@ -39,10 +39,21 @@ final class PillConditionsTests: XCTestCase {
         }
     }
 
-    func test_마크_점수가_080_이상이면_있음_아니면_전체() {
-        XCTAssertEqual(PillConditions(model: PillModelOutput(frontMarkScore: 0.80)).front.mark, .present(source: .model))
-        XCTAssertEqual(PillConditions(model: PillModelOutput(frontMarkScore: 0.79)).front.mark, .all)
-        XCTAssertEqual(PillConditions(model: PillModelOutput(frontMarkScore: nil)).front.mark, .all)
+    func test_각인이_있으면_마크_점수가_080_이상일_때만_있음() {
+        let mark = { (score: Float?) in PillConditions(model: PillModelOutput(frontImprint: "AX", frontMarkScore: score)).front.mark }
+        XCTAssertEqual(mark(0.80), .present(source: .model))
+        XCTAssertEqual(mark(0.79), .all)
+        XCTAssertEqual(mark(0.60), .all)
+        XCTAssertEqual(mark(nil), .all)
+    }
+
+    func test_각인이_없으면_마크_점수가_060_이상이면_있음() {
+        // 확신 글자가 없는 면(보류·판독 실패 포함)은 각인 없음으로 본다 (NM-527).
+        let mark = { (score: Float?) in PillConditions(model: PillModelOutput(frontImprint: nil, frontMarkScore: score)).front.mark }
+        XCTAssertEqual(mark(0.60), .present(source: .model))
+        XCTAssertEqual(mark(0.79), .present(source: .model))
+        XCTAssertEqual(mark(0.59), .all)
+        XCTAssertEqual(mark(nil), .all)
     }
 
     func test_모델은_마크_없음을_만들지_않는다() {

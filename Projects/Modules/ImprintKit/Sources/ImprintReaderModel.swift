@@ -3,10 +3,12 @@ import Foundation
 
 public enum ImprintReaderModelError: LocalizedError {
     case missingModel
+    case missingOutput
 
     public var errorDescription: String? {
         switch self {
         case .missingModel: return "앱 번들에서 \(ImprintReaderModel.resourceName).mlmodelc를 찾지 못했습니다."
+        case .missingOutput: return "각인 모델 출력(logits)을 읽지 못했습니다."
         }
     }
 }
@@ -23,12 +25,15 @@ public final class ImprintReaderModel {
 
     public let model: MLModel
 
-    public init() throws {
-        guard let url = Bundle(for: ImprintReaderModel.self).url(forResource: Self.resourceName, withExtension: "mlmodelc") else {
+    /// fp32 모델이라 ANE 는 후보가 아니다 — `.all` 이면 GPU, `.cpuOnly` 면 CPU 로 돈다.
+    /// `ImprintReader` 가 두 장치를 동시에 쓰려고 레인마다 하나씩 연다.
+    /// - Parameter url: 컴파일된 `.mlmodelc`. nil 이면 이 프레임워크 번들에서 찾는다(대조 도구가 경로를 준다).
+    public init(url: URL? = nil, computeUnits: MLComputeUnits = .all) throws {
+        guard let url = url ?? Bundle(for: ImprintReaderModel.self).url(forResource: Self.resourceName, withExtension: "mlmodelc") else {
             throw ImprintReaderModelError.missingModel
         }
         let config = MLModelConfiguration()
-        config.computeUnits = .all
+        config.computeUnits = computeUnits
         model = try MLModel(contentsOf: url, configuration: config)
     }
 }
