@@ -9,7 +9,7 @@ import Foundation
 
 // OpenAPI `Image` 스키마 — 이미지는 문자열이 아니라 { mimeType, data } 객체.
 public struct PillImageRequest: Encodable {
-    public let mimeType: String   // 예: image/jpeg, image/png
+    public let mimeType: String   // spec 은 image/png 만 허용 — 크롭은 마스크를 알파에 담은 PNG
     public let data: String       // base64 인코딩 바이트(data URI 프리픽스 없이 순수 base64)
 
     public init(mimeType: String, data: String) {
