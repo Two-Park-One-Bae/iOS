@@ -3,12 +3,17 @@ import SnapKit
 import Then
 import DSKit
 
-// ⑧-e 각인 입력 키보드 위 기호 바 (△▽○∧∨∩∪★☆↑♡) — inputAccessoryView
+// 각인 입력 키보드 위 기호 바 — inputAccessoryView
+//
+// 기호 9종의 정본은 spec `feature/pill-recognition/README.md` 「기호 바 (NM-523)」다.
+// = 각인 정규화 허용 기호 8종 + ∧ (정규화가 Λ · ∧ · λ 를 A 로 접는다 — DB 각인이 대부분 Λ).
+// ○ 는 정규화가 0 으로 접어 O · 0 입력과 같아지고, ∨ 는 DB 각인이 0면이라 두지 않는다.
+// 목록을 바꾸면 디자인 · Android PillSymbolBar · 서버 ImprintNormalizer 도 함께 고친다.
 final class ImprintSymbolBar: UIView {
 
     var onSymbol: ((String) -> Void)?
 
-    private let symbols = ["△", "▽", "○", "∧", "∨", "∩", "∪", "★", "☆", "↑", "♡"]
+    private let symbols = ["△", "▽", "∧", "∩", "∪", "★", "☆", "↑", "♡"]
 
     override var intrinsicContentSize: CGSize {
         CGSize(width: UIView.noIntrinsicMetric, height: 44)
