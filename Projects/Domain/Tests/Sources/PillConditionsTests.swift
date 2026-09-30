@@ -212,6 +212,20 @@ final class PillConditionsTests: XCTestCase {
         }
     }
 
+    /// 입력 전(spec NM-529) — 토큰도 조건도 없으면 조회하지 않는다. 임베딩만 있는 건 입력으로 치지 않는다.
+    func test_토큰도_조건도_없으면_입력_전이다() {
+        XCTAssertTrue(PillConditions(model: .empty).query.isWithoutInput)
+        XCTAssertTrue(PillConditions(model: PillModelOutput(frontEmbedding: [0.1])).query.isWithoutInput)
+        XCTAssertFalse(PillConditions(model: model).query.isWithoutInput)
+
+        var manual = PillConditions(model: .empty)
+        manual.setShape(.round)
+        XCTAssertFalse(manual.query.isWithoutInput)
+        var imprintOnly = PillConditions(model: .empty)
+        imprintOnly.submitImprint("AX", on: .back)
+        XCTAssertFalse(imprintOnly.query.isWithoutInput)
+    }
+
     func test_수동_추가는_토큰도_조건도_없다() {
         let q = PillConditions(model: .empty).query
         XCTAssertNil(q.attributeToken)

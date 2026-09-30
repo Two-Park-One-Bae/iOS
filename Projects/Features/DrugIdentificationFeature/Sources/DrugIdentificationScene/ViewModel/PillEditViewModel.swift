@@ -17,8 +17,12 @@ final class PillEditViewModel {
 
     struct Output {
         let candidates: AnyPublisher<[PillCandidateModel], Never>
-        let isEmpty: AnyPublisher<Bool, Never>
+        /// 첫 조회(보여 줄 목록이 없을 때)만 true — 조건을 바꿔 다시 조회하는 동안은 이전 화면을 둔다(spec NM-529).
         let isSearching: AnyPublisher<Bool, Never>
+        /// 입력 전 — 속성 토큰도 조건도 없어 조회하지 않았다(spec NM-529).
+        let awaitingInput: AnyPublisher<Void, Never>
+        /// 이어서 조회(21번째부터) 실패 — 보이는 후보는 두고 목록 끝에 한 줄 + 다시 시도. 자동 재시도 없음.
+        let loadMoreFailed: AnyPublisher<Bool, Never>
         /// 조회 실패 — 로딩을 멈추고 다시 시도를 보여 준다.
         let searchFailed: AnyPublisher<Void, Never>
         /// 헤더용 후보 수 — ids 수 − 사라진 품목, `truncated` 면 `200개+`.
@@ -55,9 +59,15 @@ final class PillEditViewModel {
 
     // MARK: - Streams
 
-    private let candidatesSubject = CurrentValueSubject<[PillCandidateModel], Never>([])
+    /// 지금 목록에 보이는 후보 — 재조회 중에도 응답이 오기 전까지는 이 목록을 둔다.
+    private var shown: [PillCandidateModel] = []
+    private let candidatesSubject = PassthroughSubject<[PillCandidateModel], Never>()
     private let searchingSubject = PassthroughSubject<Bool, Never>()
     private let searchFailedSubject = PassthroughSubject<Void, Never>()
+    private let awaitingInputSubject = PassthroughSubject<Void, Never>()
+    private let loadMoreFailedSubject = PassthroughSubject<Bool, Never>()
+    /// 이어서 조회가 실패하면 사용자가 다시 시도할 때까지 멈춘다 — 스크롤로 저절로 재요청하지 않는다.
+    private var loadMoreFailed = false
     private let summarySubject = PassthroughSubject<CandidateSummary, Never>()
     // 조건 변경 → 재조회 트리거. 연타/빠른 변경 시 디바운스로 마지막 값만 검색.
     private let editTrigger = PassthroughSubject<Void, Never>()
@@ -112,8 +122,9 @@ final class PillEditViewModel {
 
         return Output(
             candidates: candidatesSubject.eraseToAnyPublisher(),
-            isEmpty: candidatesSubject.map { $0.isEmpty }.eraseToAnyPublisher(),
             isSearching: searchingSubject.eraseToAnyPublisher(),
+            awaitingInput: awaitingInputSubject.eraseToAnyPublisher(),
+            loadMoreFailed: loadMoreFailedSubject.removeDuplicates().eraseToAnyPublisher(),
             searchFailed: searchFailedSubject.eraseToAnyPublisher(),
             summary: summarySubject.eraseToAnyPublisher()
         )
@@ -187,12 +198,21 @@ final class PillEditViewModel {
         // 이전 조건의 순서로 이어 받지 않도록 비운다 — 새 응답이 오기 전 loadMore 는 아무것도 하지 않는다.
         ids = []
         nextIndex = 0
-        searchingSubject.send(true)
-        searchCancellable = pillUseCase.fetchPillCandidates(query: conditions.query)
+        setLoadMoreFailed(false)
+        let query = conditions.query
+        guard !query.isWithoutInput else {
+            shown = []
+            awaitingInputSubject.send(())
+            return
+        }
+        // 스피너는 보여 줄 목록이 없을 때만 — 조건을 바꿔 다시 조회할 때 목록이 깜빡이지 않게(spec NM-529).
+        if shown.isEmpty { searchingSubject.send(true) }
+        searchCancellable = pillUseCase.fetchPillCandidates(query: query)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] completion in
                 guard let self, case .failure = completion else { return }
-                // 실패해도 로딩에 머물지 않는다 — 다시 시도를 보여 준다.
+                // 실패해도 로딩에 머물지 않는다 — 다시 시도를 보여 준다. 이전 목록은 지운다(조건이 바뀌어 맞지 않는다).
+                self.shown = []
                 self.searchingSubject.send(false)
                 self.searchFailedSubject.send(())
             } receiveValue: { [weak self] result in
@@ -204,6 +224,7 @@ final class PillEditViewModel {
                 self.searchingSubject.send(false)
                 // 개수를 먼저 — 화면은 목록을 다시 그릴 때 헤더도 함께 그린다.
                 self.sendSummary()
+                self.shown = result.candidates
                 self.candidatesSubject.send(result.candidates)
             }
     }
@@ -213,14 +234,16 @@ final class PillEditViewModel {
     }
 
     /// 다음 구간 — 목록 끝에 다다르면 호출(VC willDisplay). ids 순서대로 이어 붙이고, 사라진 품목은 뺀다.
-    /// 실패하면 조용히 멈춘다 — 다시 스크롤하면 같은 구간을 다시 요청한다.
+    /// 실패하면 멈추고 목록 끝에 다시 시도를 보인다 — 사용자가 누를 때까지 재요청하지 않는다(spec NM-529).
     func loadMore() {
-        guard loadMoreCancellable == nil, nextIndex < ids.count else { return }
+        guard loadMoreCancellable == nil, !loadMoreFailed, nextIndex < ids.count else { return }
         let chunk = Array(ids[nextIndex..<min(nextIndex + Self.itemsPageSize, ids.count)])
         loadMoreCancellable = pillUseCase.fetchPillCandidateItems(pillCodes: chunk)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] completion in
-                if case .failure = completion { self?.loadMoreCancellable = nil }
+                guard let self, case .failure = completion else { return }
+                self.loadMoreCancellable = nil
+                self.setLoadMoreFailed(true)
             } receiveValue: { [weak self] result in
                 guard let self else { return }
                 let byCode = Dictionary(result.items.map { ($0.pillCode, $0) }, uniquingKeysWith: { first, _ in first })
@@ -230,8 +253,20 @@ final class PillEditViewModel {
                 self.nextIndex += chunk.count
                 self.loadMoreCancellable = nil
                 self.sendSummary()
-                self.candidatesSubject.send(self.candidatesSubject.value + ordered)
+                self.shown += ordered
+                self.candidatesSubject.send(self.shown)
             }
+    }
+
+    /// 목록 끝 '다시 시도' — 같은 구간을 다시 요청한다. 식별 횟수를 쓰지 않는다(후보 조회는 429 없음).
+    func retryLoadMore() {
+        setLoadMoreFailed(false)
+        loadMore()
+    }
+
+    private func setLoadMoreFailed(_ failed: Bool) {
+        loadMoreFailed = failed
+        loadMoreFailedSubject.send(failed)
     }
 
     private func sendSummary() {

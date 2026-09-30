@@ -28,7 +28,8 @@ final class PillEditVC: UIViewController {
     // MARK: - Sections / State
 
     private enum Section: Int, CaseIterable { case attribute, candidates }
-    private enum ListState { case loading, empty, failed, results([PillCandidateModel]) }
+    /// 후보 영역 상태(spec NM-529) — 입력 전 · 조회 중 · 0개 · 조회 실패 · 목록.
+    private enum ListState { case idle, loading, empty, failed, results([PillCandidateModel]) }
 
     // MARK: - Properties
 
@@ -39,7 +40,9 @@ final class PillEditVC: UIViewController {
     private var listState: ListState = .loading
     private var selectedPillCode: String?
     private weak var header: CandidateHeaderView?
-    private weak var truncatedFooter: CandidateTruncatedFooter?
+    private weak var listFooter: CandidateListFooter?
+    /// 이어서 조회(21번째부터) 실패 — 목록 끝 한 줄 + 다시 시도.
+    private var loadMoreFailed = false
     /// 헤더 개수 — 조회 중 · 실패면 nil(개수 없이 `후보`).
     private var summary: PillEditViewModel.CandidateSummary?
 
@@ -71,6 +74,7 @@ final class PillEditVC: UIViewController {
         $0.register(CandidateCell.self, forCellWithReuseIdentifier: CandidateCell.reuseID)
         $0.register(CandidateLoadingCell.self, forCellWithReuseIdentifier: CandidateLoadingCell.reuseID)
         $0.register(CandidateEmptyCell.self, forCellWithReuseIdentifier: CandidateEmptyCell.reuseID)
+        $0.register(CandidateIdleCell.self, forCellWithReuseIdentifier: CandidateIdleCell.reuseID)
         $0.register(CandidateFailedCell.self, forCellWithReuseIdentifier: CandidateFailedCell.reuseID)
         $0.register(
             CandidateHeaderView.self,
@@ -78,9 +82,9 @@ final class PillEditVC: UIViewController {
             withReuseIdentifier: CandidateHeaderView.reuseID
         )
         $0.register(
-            CandidateTruncatedFooter.self,
+            CandidateListFooter.self,
             forSupplementaryViewOfKind: UICollectionView.elementKindSectionFooter,
-            withReuseIdentifier: CandidateTruncatedFooter.reuseID
+            withReuseIdentifier: CandidateListFooter.reuseID
         )
     }
 
@@ -368,7 +372,29 @@ final class PillEditVC: UIViewController {
             }
             .store(in: &cancelBag)
 
-        // 검색 시작 시에만 로딩 셀로 전환. 응답이 오면 candidates 싱크가 결과/빈상태를 그린다.
+        output.awaitingInput
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] in
+                guard let self else { return }
+                self.listState = .idle
+                self.selectedPillCode = nil
+                self.summary = nil
+                self.collectionView.reloadSections(IndexSet(integer: Section.candidates.rawValue))
+                self.updateFooterVisibility()
+            }
+            .store(in: &cancelBag)
+
+        output.loadMoreFailed
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] failed in
+                guard let self else { return }
+                self.loadMoreFailed = failed
+                self.listFooter?.configure(self.footerMode)
+                self.collectionView.collectionViewLayout.invalidateLayout()
+            }
+            .store(in: &cancelBag)
+
+        // 첫 조회(보여 줄 목록이 없을 때)만 로딩 셀로 — 재조회는 응답이 올 때까지 이전 화면을 둔다(ViewModel).
         output.isSearching
             .receive(on: DispatchQueue.main)
             .sink { [weak self] searching in
@@ -384,9 +410,11 @@ final class PillEditVC: UIViewController {
 
     // MARK: - Candidates
 
-    /// 서버가 200개에서 자른 결과일 때만 목록 끝 안내.
-    private var showsTruncatedNotice: Bool {
-        !currentResults.isEmpty && summary?.truncated == true
+    /// 목록 끝 한 줄 — 이어서 조회 실패가 먼저, 아니면 서버가 200개에서 자른 결과일 때 안내.
+    private var footerMode: CandidateListFooter.Mode {
+        guard !currentResults.isEmpty else { return .none }
+        if loadMoreFailed { return .loadMoreFailed }
+        return summary?.truncated == true ? .truncated : .none
     }
 
     private var currentResults: [PillCandidateModel] {
@@ -443,7 +471,7 @@ extension PillEditVC: UICollectionViewDataSource {
             return 1
         case .candidates:
             switch listState {
-            case .loading, .empty, .failed: return 1
+            case .idle, .loading, .empty, .failed: return 1
             case .results(let c): return c.count
             }
         case .none:
@@ -462,6 +490,10 @@ extension PillEditVC: UICollectionViewDataSource {
 
         case .candidates:
             switch listState {
+            case .idle:
+                return collectionView.dequeueReusableCell(
+                    withReuseIdentifier: CandidateIdleCell.reuseID, for: indexPath
+                )
             case .loading:
                 return collectionView.dequeueReusableCell(
                     withReuseIdentifier: CandidateLoadingCell.reuseID, for: indexPath
@@ -518,10 +550,11 @@ extension PillEditVC: UICollectionViewDataSource {
             return header
         }
         let footer = collectionView.dequeueReusableSupplementaryView(
-            ofKind: kind, withReuseIdentifier: CandidateTruncatedFooter.reuseID, for: indexPath
-        ) as! CandidateTruncatedFooter
-        footer.setVisible(showsTruncatedNotice)
-        truncatedFooter = footer
+            ofKind: kind, withReuseIdentifier: CandidateListFooter.reuseID, for: indexPath
+        ) as! CandidateListFooter
+        footer.configure(footerMode)
+        footer.onRetry = { [weak self] in self?.viewModel.retryLoadMore() }
+        listFooter = footer
         return footer
     }
 }
@@ -530,8 +563,8 @@ extension PillEditVC: UICollectionViewDataSource {
 
 extension PillEditVC: UICollectionViewDelegate {
 
-    // 후보 목록 끝(마지막 3개 이내)에 다다르면 다음 페이지를 미리 요청(커서 페이지네이션).
-    // 중복 호출·마지막 페이지 가드는 viewModel.loadMore 내부에서 처리한다.
+    // 후보 목록 끝(마지막 3개 이내)에 다다르면 ids 다음 구간을 미리 요청한다.
+    // 중복 호출 · 마지막 구간 · 실패 후 멈춤 가드는 viewModel.loadMore 내부에서 처리한다.
     func collectionView(_ collectionView: UICollectionView, willDisplay cell: UICollectionViewCell, forItemAt indexPath: IndexPath) {
         guard Section(rawValue: indexPath.section) == .candidates,
               case .results(let candidates) = listState,
