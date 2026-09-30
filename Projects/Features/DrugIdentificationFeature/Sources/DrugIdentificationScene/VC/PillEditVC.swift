@@ -28,7 +28,7 @@ final class PillEditVC: UIViewController {
     // MARK: - Sections / State
 
     private enum Section: Int, CaseIterable { case attribute, candidates }
-    private enum ListState { case loading, empty, results([PillCandidateModel]) }
+    private enum ListState { case loading, empty, failed, results([PillCandidateModel]) }
 
     // MARK: - Properties
 
@@ -68,6 +68,7 @@ final class PillEditVC: UIViewController {
         $0.register(CandidateCell.self, forCellWithReuseIdentifier: CandidateCell.reuseID)
         $0.register(CandidateLoadingCell.self, forCellWithReuseIdentifier: CandidateLoadingCell.reuseID)
         $0.register(CandidateEmptyCell.self, forCellWithReuseIdentifier: CandidateEmptyCell.reuseID)
+        $0.register(CandidateFailedCell.self, forCellWithReuseIdentifier: CandidateFailedCell.reuseID)
         $0.register(
             CandidateHeaderView.self,
             forSupplementaryViewOfKind: UICollectionView.elementKindSectionHeader,
@@ -344,6 +345,17 @@ final class PillEditVC: UIViewController {
             }
             .store(in: &cancelBag)
 
+        output.searchFailed
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] in
+                guard let self else { return }
+                self.listState = .failed
+                self.selectedPillCode = nil
+                self.collectionView.reloadSections(IndexSet(integer: Section.candidates.rawValue))
+                self.updateFooterVisibility()
+            }
+            .store(in: &cancelBag)
+
         // 검색 시작 시에만 로딩 셀로 전환. 응답이 오면 candidates 싱크가 결과/빈상태를 그린다.
         output.isSearching
             .receive(on: DispatchQueue.main)
@@ -411,7 +423,7 @@ extension PillEditVC: UICollectionViewDataSource {
             return 1
         case .candidates:
             switch listState {
-            case .loading, .empty: return 1
+            case .loading, .empty, .failed: return 1
             case .results(let c): return c.count
             }
         case .none:
@@ -438,6 +450,12 @@ extension PillEditVC: UICollectionViewDataSource {
                 return collectionView.dequeueReusableCell(
                     withReuseIdentifier: CandidateEmptyCell.reuseID, for: indexPath
                 )
+            case .failed:
+                let cell = collectionView.dequeueReusableCell(
+                    withReuseIdentifier: CandidateFailedCell.reuseID, for: indexPath
+                ) as! CandidateFailedCell
+                cell.onRetry = { [weak self] in self?.viewModel.retry() }
+                return cell
             case .results(let candidates):
                 let cell = collectionView.dequeueReusableCell(
                     withReuseIdentifier: CandidateCell.reuseID, for: indexPath

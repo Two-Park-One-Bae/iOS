@@ -15,17 +15,12 @@ public protocol PillRepositoryProtocol {
         items: [(pillId: String, croppedImage: String)]
     ) -> AnyPublisher<PillAttributeResultModel, Error>
 
-    // 수정 속성 → 후보 알약 조회
-    func fetchPillCandidates(
-        colors: [PillColorModel]?,
-        isTransparent: Bool?,
-        shape: PillShapeModel?,
-        formulation: PillFormulationModel?,
-        front: PillFaceModel?,
-        back: PillFaceModel?,
-        cursor: String?,
-        size: Int
-    ) -> AnyPublisher<PillCandidatePageModel, Error>
+    // 수정 속성 → 후보 조회 (서버 /api/v1, NM-488). 정렬된 ids(≤200) + 앞 20개 상세.
+    // 서버가 속성 토큰을 해석 못 하면 PillInvalidAttributeTokenError.
+    func fetchPillCandidates(query: PillCandidateQuery) -> AnyPublisher<PillCandidateResultModel, Error>
+
+    // ids 다음 구간의 후보 카드(1~50개, NM-489). 순서는 보장하지 않는다.
+    func fetchPillCandidateItems(pillCodes: [String]) -> AnyPublisher<PillCandidateItemsModel, Error>
 
     // 학습데이터용 원본 이미지를 S3에 직접 업로드 (NM-348). 식별과 분리된 베스트 에포트 —
     // 실패해도 식별 플로우에 영향 없다. presigned URL 발급 → S3 PUT까지 수행한다.

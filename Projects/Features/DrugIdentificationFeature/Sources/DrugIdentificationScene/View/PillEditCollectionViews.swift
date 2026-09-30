@@ -363,3 +363,53 @@ final class SelectHintFooter: UICollectionReusableView {
         collapse.isActive = !visible
     }
 }
+
+/// 후보 조회 실패 — 로딩에 머물지 않고 다시 시도를 보여 준다(디자인 없음 · 빈 상태 셀 모양을 따름).
+final class CandidateFailedCell: UICollectionViewCell {
+    static let reuseID = "CandidateFailedCell"
+
+    var onRetry: (() -> Void)?
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        let title = UILabel().then {
+            $0.text = "후보를 불러오지 못했어요"
+            $0.font = DSKitFontFamily.Pretendard.bold.font(size: 16)
+            $0.textColor = DSColor.textPrimary
+            $0.textAlignment = .center
+        }
+        let desc = UILabel().then {
+            $0.text = "네트워크 상태를 확인하고 다시 시도해 주세요"
+            $0.font = DSKitFontFamily.Pretendard.regular.font(size: 13)
+            $0.textColor = DSColor.textTertiary
+            $0.textAlignment = .center
+            $0.numberOfLines = 0
+        }
+        let retry = UIButton(type: .system).then {
+            $0.setTitle("다시 시도", for: .normal)
+            $0.setTitleColor(DSColor.Primary._600, for: .normal)
+            $0.titleLabel?.font = DSKitFontFamily.Pretendard.semiBold.font(size: 14)
+            $0.backgroundColor = DSColor.Primary._50
+            $0.layer.cornerRadius = 10
+            $0.contentEdgeInsets = UIEdgeInsets(top: 8, left: 16, bottom: 8, right: 16)
+            $0.addAction(UIAction { [weak self] _ in self?.onRetry?() }, for: .touchUpInside)
+        }
+        contentView.addSubview(title)
+        contentView.addSubview(desc)
+        contentView.addSubview(retry)
+        title.snp.makeConstraints {
+            $0.top.equalToSuperview().offset(32)
+            $0.leading.trailing.equalToSuperview()
+        }
+        desc.snp.makeConstraints {
+            $0.top.equalTo(title.snp.bottom).offset(6)
+            $0.leading.trailing.equalToSuperview()
+        }
+        retry.snp.makeConstraints {
+            $0.top.equalTo(desc.snp.bottom).offset(14)
+            $0.centerX.equalToSuperview()
+            $0.bottom.equalToSuperview().inset(16)
+        }
+    }
+    required init?(coder: NSCoder) { fatalError() }
+}

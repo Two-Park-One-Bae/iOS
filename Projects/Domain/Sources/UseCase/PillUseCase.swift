@@ -14,17 +14,12 @@ public protocol PillUseCase {
         items: [(pillId: String, croppedImage: String)]
     )
 
-    // 속성 수정 → 후보 조회. 실시간 재호출용
-    func fetchPillCandidates(
-        colors: [PillColorModel]?,
-        isTransparent: Bool?,
-        shape: PillShapeModel?,
-        formulation: PillFormulationModel?,
-        front: PillFaceModel?,
-        back: PillFaceModel?,
-        cursor: String?,
-        size: Int
-    )
+    // 속성 수정 → 후보 조회 (NM-488). 실시간 재호출용. 속성 토큰을 서버가 못 읽으면(INVALID_ATTRIBUTE_TOKEN) 토큰 없이 한 번 더 조회한다.
+    // 조건이 바뀔 때마다 부르는 쪽이 이전 구독을 끊는다(최신 조건만) — 그래서 공유 채널이 아니라 publisher 로 돌려준다.
+    func fetchPillCandidates(query: PillCandidateQuery) -> AnyPublisher<PillCandidateResultModel, Error>
+
+    // ids 다음 구간의 후보 카드(1~50개, NM-489)
+    func fetchPillCandidateItems(pillCodes: [String]) -> AnyPublisher<PillCandidateItemsModel, Error>
 
     // 원본 이미지 S3 업로드 (NM-348). 식별과 분리된 베스트 에포트 — 실패해도 무시, 방출 없음.
     func uploadOriginalImage(_ jpegData: Data)
@@ -39,7 +34,6 @@ public protocol PillUseCase {
     func resetAccountScopedState()
 
     var pillAttributes: PassthroughSubject<[PillAttributeModel], Never> { get }
-    var pillCandidates: PassthroughSubject<PillCandidatePageModel, Never> { get }
     var pillDetail:     PassthroughSubject<PillDetailModel, Never> { get }
     var errorMessage:   PassthroughSubject<String, Never> { get }
 
@@ -56,12 +50,8 @@ public protocol PillUseCase {
 public final class DefaultPillUseCase: PillUseCase {
     private let repository: PillRepositoryProtocol
     private var cancellables = Set<AnyCancellable>()
-    // 후보 조회는 실시간 재호출되므로 전용 cancellable 로 관리 —
-    // 새 호출 시 이전 in-flight 요청을 취소해 동시 요청 누적/응답 뒤섞임을 막는다.
-    private var candidatesCancellable: AnyCancellable?
 
     public let pillAttributes = PassthroughSubject<[PillAttributeModel], Never>()
-    public let pillCandidates = PassthroughSubject<PillCandidatePageModel, Never>()
     public let pillDetail     = PassthroughSubject<PillDetailModel, Never>()
     public let errorMessage   = PassthroughSubject<String, Never>()
     public let pillUsage      = CurrentValueSubject<PillUsageModel?, Never>(nil)
@@ -120,34 +110,20 @@ public final class DefaultPillUseCase: PillUseCase {
             .store(in: &cancellables)
     }
 
-    public func fetchPillCandidates(
-        colors: [PillColorModel]?,
-        isTransparent: Bool?,
-        shape: PillShapeModel?,
-        formulation: PillFormulationModel?,
-        front: PillFaceModel?,
-        back: PillFaceModel?,
-        cursor: String?,
-        size: Int
-    ) {
-        // 이전 요청을 취소하고 최신 요청만 유지(switch-to-latest 효과).
-        candidatesCancellable = repository.fetchPillCandidates(
-            colors: colors,
-            isTransparent: isTransparent,
-            shape: shape,
-            formulation: formulation,
-            front: front,
-            back: back,
-            cursor: cursor,
-            size: size
-        )
-        .catch { [weak self] error in
-            self?.errorMessage.send(error.localizedDescription)
-            return Empty<PillCandidatePageModel, Never>()
-        }
-        .sink { [weak self] page in
-            self?.pillCandidates.send(page)
-        }
+    public func fetchPillCandidates(query: PillCandidateQuery) -> AnyPublisher<PillCandidateResultModel, Error> {
+        let repository = repository
+        return repository.fetchPillCandidates(query: query)
+            .catch { error -> AnyPublisher<PillCandidateResultModel, Error> in
+                guard error is PillInvalidAttributeTokenError, query.attributeToken != nil else {
+                    return Fail(error: error).eraseToAnyPublisher()
+                }
+                return repository.fetchPillCandidates(query: query.withoutToken)
+            }
+            .eraseToAnyPublisher()
+    }
+
+    public func fetchPillCandidateItems(pillCodes: [String]) -> AnyPublisher<PillCandidateItemsModel, Error> {
+        repository.fetchPillCandidateItems(pillCodes: pillCodes)
     }
 
     public func fetchPillDetail(pillCode: String) {

@@ -5,6 +5,7 @@
 //  Created by 바견규 on 7/2/26.
 //
 
+import Accelerate
 import Foundation
 
 import Domain
@@ -64,16 +65,6 @@ extension PillAttributeEntity {
     /// spec pattern `^#[0-9A-Fa-f]{6}$`.
     static func isHexColor(_ value: String) -> Bool {
         value.count == 7 && value.first == "#" && value.dropFirst().allSatisfy(\.isHexDigit)
-    }
-}
-
-extension PillFaceEntity {
-    public func toDomain() -> PillFaceModel {
-        PillFaceModel(
-            imprint:      imprint,
-            dividingLine: dividingLine?.toDomain(),
-            hasMark:      hasMark
-        )
     }
 }
 
@@ -150,24 +141,40 @@ extension DividingLine {
 extension PillCandidateEntity {
     public func toDomain() -> PillCandidateModel {
         PillCandidateModel(
-            pillCode:      pillCode,
-            pillName:      pillName,
-            companyName:   companyName,
+            pillCode:         pillCode,
+            pillName:         pillName,
+            companyName:      companyName,
             pillThumbnailUrl: pillThumbnailUrl,
-            pillImageUrl:  pillImageUrl,
+            pillImageUrl:     pillImageUrl,
             // 미지의 값·누락은 정상 취급(배지 없음·조회 진행) — 안전측.
-            licenseStatus: licenseStatus?.uppercased() == "REVOKED" ? .revoked : .normal
+            licenseStatus:    licenseStatus?.uppercased() == "REVOKED" ? .revoked : .normal,
+            front:            front?.toDomain(),
+            back:             back?.toDomain()
         )
     }
 }
 
-extension PillCandidatePageEntity {
-    public func toDomain() -> PillCandidatePageModel {
-        PillCandidatePageModel(
-            candidates: candidates.map { $0.toDomain() },
-            nextCursor: nextCursor,
-            hasNext:    hasNext
-        )
+extension PillFaceEntity {
+    public func toDomain() -> PillFaceModel {
+        let line: DividingLineModel?
+        switch dividingLine {
+        case .plus?:  line = .plus
+        case .minus?: line = .minus
+        default:      line = nil   // NONE · 누락 · 미지의 값 = 구분선 없음으로 보인다
+        }
+        return PillFaceModel(imprint: imprint, dividingLine: line, hasMark: hasMark ?? false, markCode: markCode)
+    }
+}
+
+extension PillCandidateResultEntity {
+    public func toDomain() -> PillCandidateResultModel {
+        PillCandidateResultModel(ids: ids, candidates: candidates.map { $0.toDomain() }, truncated: truncated)
+    }
+}
+
+extension PillCandidateItemsEntity {
+    public func toDomain() -> PillCandidateItemsModel {
+        PillCandidateItemsModel(items: items.map { $0.toDomain() }, missing: missing)
     }
 }
 
@@ -343,12 +350,68 @@ extension DividingLineModel {
     }
 }
 
-extension PillFaceModel {
-    public func toNetwork() -> PillFaceRequest {
-        PillFaceRequest(
-            imprint:      imprint,
-            dividingLine: dividingLine?.toNetwork(),
-            hasMark:      hasMark
+// MARK: - Candidate Request
+
+extension PillCandidateQuery {
+    public func toNetwork() -> PillCandidateRequest {
+        PillCandidateRequest(
+            attributeToken: attributeToken,
+            colors:         colors.compactMap { $0.toNetwork() },
+            shape:          shape?.toNetwork(),
+            formulation:    formulation?.toNetwork(),
+            front:          front?.toNetwork(),
+            back:           back?.toNetwork()
         )
+    }
+}
+
+extension PillFaceQuery {
+    public func toNetwork() -> PillFaceRequest {
+        let line: DividingLine?
+        switch dividingLine {
+        case .none?:  line = DividingLine.none
+        case .plus?:  line = .plus
+        case .minus?: line = .minus
+        case nil:     line = nil
+        }
+        return PillFaceRequest(
+            imprint:       imprint,
+            // imprint 가 있을 때만 — 출처만 보내면 서버가 400 을 낸다.
+            imprintSource: imprint == nil ? nil : (imprintSource == .user ? "USER" : "MODEL"),
+            dividingLine:  line,
+            hasMark:       hasMark,
+            markEmbedding: embedding.flatMap(MarkEmbeddingEncoder.base64)
+        )
+    }
+}
+
+/// 마크 임베딩 → 요청 문자열. base64 · fp16 · little-endian · 8×768 row-major(회전 8개가 바깥).
+///
+/// 모델이 L2 정규화한 값을 그대로 보낸다 — 서버는 다시 정규화하지 않는다.
+enum MarkEmbeddingEncoder {
+    static let rotations = 8
+    static let dimension = 768
+
+    /// 길이가 8×768 이 아니면 nil — 모양이 틀린 값을 보내 후보 조회 전체가 400 이 되느니 임베딩 항만 뺀다.
+    static func base64(_ embedding: [Float]) -> String? {
+        guard embedding.count == rotations * dimension else { return nil }
+        var halves = [UInt16](repeating: 0, count: embedding.count)
+        let converted = embedding.withUnsafeBufferPointer { src in
+            halves.withUnsafeMutableBufferPointer { dst -> Bool in
+                var source = vImage_Buffer(data: UnsafeMutableRawPointer(mutating: src.baseAddress!),
+                                           height: 1, width: vImagePixelCount(src.count),
+                                           rowBytes: src.count * MemoryLayout<Float>.size)
+                var destination = vImage_Buffer(data: dst.baseAddress!,
+                                                height: 1, width: vImagePixelCount(dst.count),
+                                                rowBytes: dst.count * MemoryLayout<UInt16>.size)
+                return vImageConvert_PlanarFtoPlanar16F(&source, &destination, 0) == kvImageNoError
+            }
+        }
+        guard converted else { return nil }
+        let data = halves.withUnsafeBufferPointer { buffer in
+            Data(buffer: UnsafeBufferPointer(start: buffer.baseAddress, count: buffer.count))
+        }
+        // iOS 기기는 모두 little-endian — UInt16 메모리 그대로가 곧 LE 바이트다.
+        return data.base64EncodedString()
     }
 }

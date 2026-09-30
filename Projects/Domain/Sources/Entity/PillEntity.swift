@@ -38,15 +38,19 @@ public struct PillAttributeModel: Equatable {
     }
 }
 
+/// 후보 카드의 면 정보(표시용). 구분선 `NONE` 은 nil 과 같이 '없음'으로 보인다.
 public struct PillFaceModel: Equatable {
     public let imprint: String?
     public let dividingLine: DividingLineModel?
-    public let hasMark: Bool?
+    public let hasMark: Bool
+    /// 식약처 마크 코드(r0062 형식) — 표시용, 검색에 쓰지 않는다.
+    public let markCode: String?
 
-    public init(imprint: String?, dividingLine: DividingLineModel?, hasMark: Bool?) {
+    public init(imprint: String?, dividingLine: DividingLineModel?, hasMark: Bool, markCode: String?) {
         self.imprint = imprint
         self.dividingLine = dividingLine
         self.hasMark = hasMark
+        self.markCode = markCode
     }
 }
 
@@ -64,6 +68,9 @@ public struct PillCandidateModel: Equatable {
     public let pillThumbnailUrl: String?   // 목록 대조용 썸네일 (NM-347). 원본은 세부정보에서 조회.
     public let pillImageUrl: String?       // 낱알 원본 이미지 (썸네일 탭 시 원본 대조 뷰어용, NM-356). 없으면 폴백.
     public let licenseStatus: LicenseStatus
+    /// 카탈로그 앞·뒷면 — 후보 카드 면 요약용 (NM-488).
+    public let front: PillFaceModel?
+    public let back: PillFaceModel?
 
     public init(
         pillCode: String,
@@ -71,7 +78,9 @@ public struct PillCandidateModel: Equatable {
         companyName: String?,
         pillThumbnailUrl: String?,
         pillImageUrl: String? = nil,
-        licenseStatus: LicenseStatus
+        licenseStatus: LicenseStatus,
+        front: PillFaceModel? = nil,
+        back: PillFaceModel? = nil
     ) {
         self.pillCode = pillCode
         self.pillName = pillName
@@ -79,24 +88,47 @@ public struct PillCandidateModel: Equatable {
         self.pillThumbnailUrl = pillThumbnailUrl
         self.pillImageUrl = pillImageUrl
         self.licenseStatus = licenseStatus
+        self.front = front
+        self.back = back
     }
 }
 
-// 후보 목록 + 커서 페이지네이션
-public struct PillCandidatePageModel: Equatable {
-    public let candidates: [PillCandidateModel]
-    public let nextCursor: String?   // 다음 페이지 커서. nil이면 마지막 페이지
-    public let hasNext: Bool
 
-    public init(
-        candidates: [PillCandidateModel],
-        nextCursor: String?,
-        hasNext: Bool
-    ) {
+/// 후보 조회 결과 — 서버가 정렬을 끝낸 pillCode 목록과 앞 20개 상세.
+///
+/// 순서는 `ids` 가 고정한다. 21번째부터는 `ids` 를 잘라 ID 로 조회한다(커서 없음).
+public struct PillCandidateResultModel: Equatable {
+    /// 정렬된 pillCode — 최대 200개.
+    public let ids: [String]
+    /// `ids` 앞 20개의 상세, 같은 순서.
+    public let candidates: [PillCandidateModel]
+    /// 하드 조건을 통과한 후보가 200개를 넘어 뒤가 잘렸는지 — 헤더 `200개+`.
+    public let truncated: Bool
+
+    public init(ids: [String], candidates: [PillCandidateModel], truncated: Bool) {
+        self.ids = ids
         self.candidates = candidates
-        self.nextCursor = nextCursor
-        self.hasNext = hasNext
+        self.truncated = truncated
     }
+}
+
+/// 후보 카드 일괄 조회 결과. `items` 는 순서가 없다 — 앱이 `ids` 순서대로 놓는다.
+public struct PillCandidateItemsModel: Equatable {
+    public let items: [PillCandidateModel]
+    /// 요청했지만 그사이 사라진 pillCode — 목록에서 뺀다(로딩으로 남기지 않는다).
+    public let missing: [String]
+
+    public init(items: [PillCandidateModel], missing: [String]) {
+        self.items = items
+        self.missing = missing
+    }
+}
+
+/// 서버가 속성 토큰을 해석하지 못함 (400 `INVALID_ATTRIBUTE_TOKEN`).
+///
+/// 앱은 토큰 없이 다시 조회한다 — 후보는 나오고 정렬만 덜 맞는다.
+public struct PillInvalidAttributeTokenError: Error {
+    public init() {}
 }
 
 // MARK: - Pill Detail (NM-312)

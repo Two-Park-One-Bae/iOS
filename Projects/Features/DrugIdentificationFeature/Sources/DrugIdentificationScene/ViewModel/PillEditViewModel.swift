@@ -19,6 +19,15 @@ final class PillEditViewModel {
         let candidates: AnyPublisher<[PillCandidateModel], Never>
         let isEmpty: AnyPublisher<Bool, Never>
         let isSearching: AnyPublisher<Bool, Never>
+        /// 조회 실패 — 로딩을 멈추고 다시 시도를 보여 준다.
+        let searchFailed: AnyPublisher<Void, Never>
+        /// 헤더용 후보 수 — ids 수 − 사라진 품목, `truncated` 면 `200개+`.
+        let summary: AnyPublisher<CandidateSummary, Never>
+    }
+
+    struct CandidateSummary: Equatable {
+        let count: Int
+        let truncated: Bool
     }
 
     // MARK: - Dependencies
@@ -48,15 +57,23 @@ final class PillEditViewModel {
 
     private let candidatesSubject = CurrentValueSubject<[PillCandidateModel], Never>([])
     private let searchingSubject = PassthroughSubject<Bool, Never>()
+    private let searchFailedSubject = PassthroughSubject<Void, Never>()
+    private let summarySubject = PassthroughSubject<CandidateSummary, Never>()
     // 조건 변경 → 재조회 트리거. 연타/빠른 변경 시 디바운스로 마지막 값만 검색.
     private let editTrigger = PassthroughSubject<Void, Never>()
     private var didLoad = false
-    // 커서 페이지네이션 — 아래로 스크롤 시 다음 페이지를 이어 붙인다. (v1 ids 방식으로 바뀌면 NM-514 에서 교체)
-    private var nextCursor: String?
-    private var hasNext = false
-    private var isLoadingMore = false
-    private var appendNextPage = false
+    // 서버가 정렬을 끝낸 순서(≤200). 21번째부터는 이 목록을 잘라 ID 로 조회한다 — 커서가 없다(NM-489).
+    private var ids: [String] = []
+    private var truncated = false
+    private var missingCount = 0
+    /// ids 중 다음에 조회할 위치.
+    private var nextIndex = 0
+    private var searchCancellable: AnyCancellable?
+    private var loadMoreCancellable: AnyCancellable?
     private var cancelBag = Set<AnyCancellable>()
+
+    /// 한 번에 이어 받는 후보 수 — 서버 한도(1~50).
+    private static let itemsPageSize = 50
 
     // MARK: - Init
 
@@ -79,23 +96,6 @@ final class PillEditViewModel {
     // MARK: - Transform
 
     func transform(input: Input) -> Output {
-        pillUseCase.pillCandidates
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] page in
-                guard let self else { return }
-                self.searchingSubject.send(false)
-                self.nextCursor = page.nextCursor
-                self.hasNext = page.hasNext
-                if self.appendNextPage {
-                    self.candidatesSubject.send(self.candidatesSubject.value + page.candidates)
-                } else {
-                    self.candidatesSubject.send(page.candidates)
-                }
-                self.appendNextPage = false
-                self.isLoadingMore = false
-            }
-            .store(in: &cancelBag)
-
         input.viewDidLoad
             .sink { [weak self] in
                 guard let self, !self.didLoad else { return }
@@ -113,7 +113,9 @@ final class PillEditViewModel {
         return Output(
             candidates: candidatesSubject.eraseToAnyPublisher(),
             isEmpty: candidatesSubject.map { $0.isEmpty }.eraseToAnyPublisher(),
-            isSearching: searchingSubject.eraseToAnyPublisher()
+            isSearching: searchingSubject.eraseToAnyPublisher(),
+            searchFailed: searchFailedSubject.eraseToAnyPublisher(),
+            summary: summarySubject.removeDuplicates().eraseToAnyPublisher()
         )
     }
 
@@ -177,47 +179,61 @@ final class PillEditViewModel {
 
     // MARK: - Fetch
 
-    /// 임시 — 서버 v1 후보 조회(NM-514 D)가 붙기 전까지 조건을 v0 요청 모양으로 옮긴다.
-    /// 사용자가 고른 값만 담는 건 v1 과 같다. 토큰 · 임베딩 · 각인 출처는 v0 에 자리가 없어 빠진다.
-    private var legacyRequest: (colors: [PillColorModel]?, shape: PillShapeModel?, formulation: PillFormulationModel?,
-                                front: PillFaceModel?, back: PillFaceModel?) {
-        let q = conditions.query
-        func face(_ f: PillFaceQuery?) -> PillFaceModel? {
-            guard let f else { return nil }
-            let line: DividingLineModel?
-            switch f.dividingLine {
-            case .plus?:  line = .plus
-            case .minus?: line = .minus
-            default:      line = nil   // v0 은 '구분선 없음' 조건을 표현하지 못한다
-            }
-            return PillFaceModel(imprint: f.imprint, dividingLine: line, hasMark: f.hasMark)
-        }
-        return (q.colors.isEmpty ? nil : q.colors, q.shape, q.formulation, face(q.front), face(q.back))
-    }
-
-    // 신규 검색(최초·조건 변경) — 첫 페이지부터 다시 조회하고 목록을 교체한다.
+    /// 신규 검색(최초 · 조건 변경 · 다시 시도) — 진행 중인 조회를 끊고 처음부터 다시 받는다.
+    /// 조건은 PillConditions.query 가 사용자값만 추린다(토큰 · 임베딩 · 각인 출처 포함).
     private func fetchCandidates() {
-        appendNextPage = false
-        isLoadingMore = false
-        nextCursor = nil
-        hasNext = false
+        searchCancellable = nil
+        loadMoreCancellable = nil
+        // 이전 조건의 순서로 이어 받지 않도록 비운다 — 새 응답이 오기 전 loadMore 는 아무것도 하지 않는다.
+        ids = []
+        nextIndex = 0
         searchingSubject.send(true)
-        let r = legacyRequest
-        pillUseCase.fetchPillCandidates(
-            colors: r.colors, isTransparent: nil, shape: r.shape, formulation: r.formulation,
-            front: r.front, back: r.back, cursor: nil, size: 20
-        )
+        searchCancellable = pillUseCase.fetchPillCandidates(query: conditions.query)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] completion in
+                guard let self, case .failure = completion else { return }
+                // 실패해도 로딩에 머물지 않는다 — 다시 시도를 보여 준다.
+                self.searchingSubject.send(false)
+                self.searchFailedSubject.send(())
+            } receiveValue: { [weak self] result in
+                guard let self else { return }
+                self.ids = result.ids
+                self.truncated = result.truncated
+                self.missingCount = 0
+                self.nextIndex = min(result.candidates.count, result.ids.count)
+                self.searchingSubject.send(false)
+                self.candidatesSubject.send(result.candidates)
+                self.sendSummary()
+            }
     }
 
-    // 다음 페이지 — 아래로 스크롤해 목록 끝에 다다르면 호출(VC willDisplay). 결과를 기존 목록에 이어 붙인다.
+    func retry() {
+        fetchCandidates()
+    }
+
+    /// 다음 구간 — 목록 끝에 다다르면 호출(VC willDisplay). ids 순서대로 이어 붙이고, 사라진 품목은 뺀다.
+    /// 실패하면 조용히 멈춘다 — 다시 스크롤하면 같은 구간을 다시 요청한다.
     func loadMore() {
-        guard hasNext, !isLoadingMore, let cursor = nextCursor else { return }
-        isLoadingMore = true
-        appendNextPage = true
-        let r = legacyRequest
-        pillUseCase.fetchPillCandidates(
-            colors: r.colors, isTransparent: nil, shape: r.shape, formulation: r.formulation,
-            front: r.front, back: r.back, cursor: cursor, size: 20
-        )
+        guard loadMoreCancellable == nil, nextIndex < ids.count else { return }
+        let chunk = Array(ids[nextIndex..<min(nextIndex + Self.itemsPageSize, ids.count)])
+        loadMoreCancellable = pillUseCase.fetchPillCandidateItems(pillCodes: chunk)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] completion in
+                if case .failure = completion { self?.loadMoreCancellable = nil }
+            } receiveValue: { [weak self] result in
+                guard let self else { return }
+                let byCode = Dictionary(result.items.map { ($0.pillCode, $0) }, uniquingKeysWith: { first, _ in first })
+                let ordered = chunk.compactMap { byCode[$0] }
+                // missing 에 없는데 items 에도 없는 ID 도 빠진 것으로 센다 — 로딩으로 남기지 않는다.
+                self.missingCount += chunk.count - ordered.count
+                self.nextIndex += chunk.count
+                self.loadMoreCancellable = nil
+                self.candidatesSubject.send(self.candidatesSubject.value + ordered)
+                self.sendSummary()
+            }
+    }
+
+    private func sendSummary() {
+        summarySubject.send(CandidateSummary(count: ids.count - missingCount, truncated: truncated))
     }
 }

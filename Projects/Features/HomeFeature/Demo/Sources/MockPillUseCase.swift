@@ -10,7 +10,6 @@ import Domain
 final class MockPillUseCase: PillUseCase {
 
     let pillAttributes = PassthroughSubject<[PillAttributeModel], Never>()
-    let pillCandidates = PassthroughSubject<PillCandidatePageModel, Never>()
     let pillDetail     = PassthroughSubject<PillDetailModel, Never>()
     let errorMessage   = PassthroughSubject<String, Never>()
     let pillUsage      = CurrentValueSubject<PillUsageModel?, Never>(nil)
@@ -44,16 +43,11 @@ final class MockPillUseCase: PillUseCase {
 
     func uploadOriginalImage(_ jpegData: Data) {}
 
-    func fetchPillCandidates(
-        colors: [PillColorModel]?,
-        isTransparent: Bool?,
-        shape: PillShapeModel?,
-        formulation: PillFormulationModel?,
-        front: PillFaceModel?,
-        back: PillFaceModel?,
-        cursor: String?,
-        size: Int
-    ) {}
-
+    func fetchPillCandidates(query: PillCandidateQuery) -> AnyPublisher<PillCandidateResultModel, Error> {
+        Empty().eraseToAnyPublisher()
+    }
+    func fetchPillCandidateItems(pillCodes: [String]) -> AnyPublisher<PillCandidateItemsModel, Error> {
+        Empty().eraseToAnyPublisher()
+    }
     func fetchPillDetail(pillCode: String) {}
 }

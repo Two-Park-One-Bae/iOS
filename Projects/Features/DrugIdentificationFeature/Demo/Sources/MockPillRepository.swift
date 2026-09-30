@@ -51,59 +51,71 @@ final class MockPillRepository: PillRepositoryProtocol {
         )
     }
 
-    func fetchPillCandidates(
-        colors: [PillColorModel]?,
-        isTransparent: Bool?,
-        shape: PillShapeModel?,
-        formulation: PillFormulationModel?,
-        front: PillFaceModel?,
-        back: PillFaceModel?,
-        cursor: String?,
-        size: Int
-    ) -> AnyPublisher<PillCandidatePageModel, Error> {
-        // 데모: 투명 알약으로 검색하면 "조건에 맞는 후보가 없어요" 빈 상태를 보여준다.
-        // 토글을 끄면 다시 후보가 나타난다.
-        if isTransparent == true {
-            let empty = PillCandidatePageModel(
-                candidates: [],
-                nextCursor: nil,
-                hasNext:    false
+    // MARK: 후보 (서버 /api/v1 흉내)
+
+    /// 데모 카탈로그 — 앞 셋은 이름 있는 품목, 뒤는 이어 받기(21번째~)를 보이려는 채움. 75개.
+    private static let catalog: [PillCandidateModel] = {
+        let named = [
+            PillCandidateModel(
+                pillCode: "A11A1234", pillName: "타이레놀정500밀리그람", companyName: "한국얀센",
+                pillThumbnailUrl: nil, licenseStatus: .normal,
+                front: PillFaceModel(imprint: "TY500", dividingLine: nil, hasMark: false, markCode: nil),
+                back: PillFaceModel(imprint: nil, dividingLine: .minus, hasMark: false, markCode: nil)
+            ),
+            PillCandidateModel(
+                pillCode: "A11A5678", pillName: "게보린정", companyName: "삼진제약",
+                pillThumbnailUrl: nil, licenseStatus: .revoked,
+                front: PillFaceModel(imprint: nil, dividingLine: .plus, hasMark: true, markCode: "M001"),
+                back: PillFaceModel(imprint: "SJ", dividingLine: nil, hasMark: false, markCode: nil)
+            ),
+            // 세부정보 404 데모 — 이 후보의 ⓘ를 누르면 '데이터 없음' 화면(⑩-e)이 뜬다.
+            PillCandidateModel(
+                pillCode: "A11A9999", pillName: "세부정보없는약(데모)", companyName: "데모제약",
+                pillThumbnailUrl: nil, licenseStatus: .normal
+            ),
+        ]
+        let filler = (4...75).map { n in
+            PillCandidateModel(
+                pillCode: String(format: "D%07d", n), pillName: "데모 후보 \(n)", companyName: "데모제약",
+                pillThumbnailUrl: nil, licenseStatus: .normal,
+                front: PillFaceModel(imprint: "D\(n)", dividingLine: nil, hasMark: n % 3 == 0, markCode: nil),
+                back: PillFaceModel(imprint: nil, dividingLine: nil, hasMark: false, markCode: nil)
             )
-            return Just(empty)
-                .setFailureType(to: Error.self)
+        }
+        return named + filler
+    }()
+
+    /// 그사이 사라진 품목 흉내 — ids 에는 있지만 items 조회에서 missing 으로 돌아온다.
+    private static let vanishedCode = String(format: "D%07d", 30)
+
+    struct DemoSearchFailure: Error {}
+
+    func fetchPillCandidates(query: PillCandidateQuery) -> AnyPublisher<PillCandidateResultModel, Error> {
+        // 데모: 모양 `기타` 를 고르면 0개(빈 상태), 제형 `기타` 를 고르면 조회 실패(다시 시도)를 보여 준다.
+        if query.formulation == .other {
+            return Fail(error: DemoSearchFailure())
+                .delay(for: .milliseconds(400), scheduler: DispatchQueue.main)
                 .eraseToAnyPublisher()
         }
-
-        let stub = PillCandidatePageModel(
-            candidates: [
-                PillCandidateModel(
-                    pillCode:      "A11A1234",
-                    pillName:      "타이레놀정500밀리그람",
-                    companyName:   "한국얀센",
-                    pillThumbnailUrl: nil,
-                    licenseStatus: .normal
-                ),
-                PillCandidateModel(
-                    pillCode:      "A11A5678",
-                    pillName:      "게보린정",
-                    companyName:   "삼진제약",
-                    pillThumbnailUrl: nil,
-                    licenseStatus: .revoked
-                ),
-                // 세부정보 404 데모 — 이 후보의 ⓘ를 누르면 '데이터 없음' 화면(⑩-e)이 뜬다.
-                PillCandidateModel(
-                    pillCode:      "A11A9999",
-                    pillName:      "세부정보없는약(데모)",
-                    companyName:   "데모제약",
-                    pillThumbnailUrl: nil,
-                    licenseStatus: .normal
-                ),
-            ],
-            nextCursor: nil,
-            hasNext:    false
+        let ids = query.shape == .other ? [] : Self.catalog.map(\.pillCode)
+        let result = PillCandidateResultModel(
+            ids: ids,
+            candidates: Array(Self.catalog.prefix(ids.isEmpty ? 0 : 20)),
+            truncated: false
         )
-        return Just(stub)
+        return Just(result)
             .setFailureType(to: Error.self)
+            .delay(for: .milliseconds(400), scheduler: DispatchQueue.main)
+            .eraseToAnyPublisher()
+    }
+
+    func fetchPillCandidateItems(pillCodes: [String]) -> AnyPublisher<PillCandidateItemsModel, Error> {
+        // 서버처럼 순서를 보장하지 않는다 — 뒤집어서 돌려준다.
+        let found = Self.catalog.filter { pillCodes.contains($0.pillCode) && $0.pillCode != Self.vanishedCode }
+        let missing = pillCodes.filter { $0 == Self.vanishedCode }
+        return Just(PillCandidateItemsModel(items: found.reversed(), missing: missing))
+            .setFailureType(to: Error.self)
+            .delay(for: .milliseconds(600), scheduler: DispatchQueue.main)
             .eraseToAnyPublisher()
     }
 

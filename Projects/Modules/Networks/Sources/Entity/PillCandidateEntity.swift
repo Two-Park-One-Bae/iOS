@@ -15,11 +15,19 @@ public struct PillCandidateEntity: Decodable {
     public let pillThumbnailUrl: String? // 낱알 썸네일 URL (목록 대조용 다운사이징본, NM-347). 원본은 세부정보 pillImageUrl
     public let pillImageUrl: String? // 낱알 원본 이미지 URL (썸네일 탭 시 원본 대조 뷰어용, NM-356). 없으면 CDN 404 → 폴백
     public let licenseStatus: String? // 허가상태 "NORMAL"|"REVOKED" (NM-337). 배지·후순위·세부정보 분기 기준
+    public let front: PillFaceEntity?  // 카탈로그 앞면 — 후보 카드 면 요약용 (NM-488)
+    public let back: PillFaceEntity?
 }
 
-// POST /api/v0/pill-candidates 응답 (커서 페이지네이션, NM-158)
-public struct PillCandidatePageEntity: Decodable {
+// POST /api/v1/pill-candidates 응답 — 정렬된 pillCode 목록(최대 200) + 앞 20개 상세 (NM-488). 커서 페이지네이션은 없다.
+public struct PillCandidateResultEntity: Decodable {
+    public let ids: [String]
     public let candidates: [PillCandidateEntity]
-    public let nextCursor: String?   // 다음 페이지 커서. null이면 마지막 페이지
-    public let hasNext: Bool
+    public let truncated: Bool   // 하드 필터를 통과한 후보가 200개를 넘어 뒤가 잘렸는지
+}
+
+// GET /api/v1/pill-candidates/items 응답 — 순서 보장 없음. 없어진 품목은 missing 에 담긴다(에러 아님, NM-489).
+public struct PillCandidateItemsEntity: Decodable {
+    public let items: [PillCandidateEntity]
+    public let missing: [String]
 }
