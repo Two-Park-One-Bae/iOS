@@ -376,28 +376,18 @@ final class AttributeHostCell: UICollectionViewCell {
 final class CandidateLoadingCell: UICollectionViewCell {
     static let reuseID = "CandidateLoadingCell"
 
-    private let spinner = UIActivityIndicatorView(style: .medium).then {
-        $0.color = DSColor.textTertiary
+    // 조회 중 — 문구 없이 스피너만(spec NM-529). 보여 줄 목록이 없는 첫 조회에만 뜬다.
+    private let spinner = UIActivityIndicatorView(style: .large).then {
+        $0.color = DSColor.Primary._500
+        $0.accessibilityLabel = "후보를 찾고 있어요"
     }
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        let label = UILabel().then {
-            $0.text = "후보를 찾고 있어요"
-            $0.font = DSKitFontFamily.Pretendard.regular.font(size: 13)
-            $0.textColor = DSColor.textTertiary
-            $0.textAlignment = .center
-        }
         contentView.addSubview(spinner)
-        contentView.addSubview(label)
         spinner.snp.makeConstraints {
-            $0.top.equalToSuperview().offset(32)
+            $0.top.bottom.equalToSuperview().inset(40)
             $0.centerX.equalToSuperview()
-        }
-        label.snp.makeConstraints {
-            $0.top.equalTo(spinner.snp.bottom).offset(10)
-            $0.leading.trailing.equalToSuperview()
-            $0.bottom.equalToSuperview().inset(8)
         }
     }
     required init?(coder: NSCoder) { fatalError() }
@@ -406,6 +396,48 @@ final class CandidateLoadingCell: UICollectionViewCell {
         super.willMove(toWindow: newWindow)
         if newWindow != nil { spinner.startAnimating() } else { spinner.stopAnimating() }
     }
+}
+
+// MARK: - 입력 전 셀
+
+/// 입력 전 — 속성 토큰도 조건도 없어 조회하지 않았다(수동 추가 · 추출 실패, DESIGN.pen ⑧-h · spec NM-529).
+final class CandidateIdleCell: UICollectionViewCell {
+    static let reuseID = "CandidateIdleCell"
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        let circle = UIView().then {
+            $0.backgroundColor = DSColor.Neutral._100
+            $0.layer.cornerRadius = 28
+        }
+        circle.snp.makeConstraints { $0.width.height.equalTo(56) }
+        let icon = UIImageView(image: DSIcon.search.uiImage).then {
+            $0.tintColor = DSColor.textTertiary
+            $0.contentMode = .scaleAspectFit
+        }
+        circle.addSubview(icon)
+        icon.snp.makeConstraints { $0.center.equalToSuperview(); $0.width.height.equalTo(26) }
+        let text = UILabel().then {
+            $0.text = "속성·각인을 입력하면 후보가 나타나요"
+            $0.font = DSKitFontFamily.Pretendard.medium.font(size: 13)
+            $0.textColor = DSColor.textTertiary
+            $0.textAlignment = .center
+            $0.numberOfLines = 0
+        }
+        contentView.addSubview(circle)
+        contentView.addSubview(text)
+        circle.snp.makeConstraints {
+            $0.top.equalToSuperview().offset(24)
+            $0.centerX.equalToSuperview()
+        }
+        text.snp.makeConstraints {
+            $0.top.equalTo(circle.snp.bottom).offset(10)
+            $0.centerX.equalToSuperview()
+            $0.width.lessThanOrEqualTo(240)
+            $0.bottom.equalToSuperview().inset(24)
+        }
+    }
+    required init?(coder: NSCoder) { fatalError() }
 }
 
 /// "조건에 맞는 후보가 없어요" 빈 상태 셀.
@@ -492,17 +524,33 @@ final class CandidateHeaderView: UICollectionReusableView {
     required init?(coder: NSCoder) { fatalError() }
 }
 
-// MARK: - 후보 섹션 푸터 (200개 초과 안내)
+// MARK: - 후보 섹션 푸터 (목록 끝 한 줄)
 
-/// 서버가 후보를 200개에서 잘랐을 때 목록 끝에 "찾는 약이 없다면 조건을 더 입력해 주세요".
-final class CandidateTruncatedFooter: UICollectionReusableView {
-    static let reuseID = "CandidateTruncatedFooter"
+/// 목록 끝 한 줄 — 둘 중 하나만 보인다.
+/// - 이어서 조회(21번째부터) 실패: `불러오지 못했어요` · `다시 시도`. 보이는 후보는 그대로(spec NM-529)
+/// - 서버가 200개에서 자른 목록: `찾는 약이 없다면 조건을 더 입력해 주세요`
+final class CandidateListFooter: UICollectionReusableView {
+    static let reuseID = "CandidateListFooter"
+
+    enum Mode { case none, truncated, loadMoreFailed }
+
+    var onRetry: (() -> Void)?
 
     private let label = UILabel().then {
-        $0.text = "찾는 약이 없다면 조건을 더 입력해 주세요"
         $0.font = DSKitFontFamily.Pretendard.regular.font(size: 12)
         $0.textColor = DSColor.textTertiary
         $0.textAlignment = .center
+    }
+    private let retry = UIButton(type: .system).then {
+        $0.setTitle("다시 시도", for: .normal)
+        $0.setTitleColor(DSColor.Primary._600, for: .normal)
+        $0.titleLabel?.font = DSKitFontFamily.Pretendard.semiBold.font(size: 13)
+        $0.contentEdgeInsets = UIEdgeInsets(top: 6, left: 8, bottom: 6, right: 8)
+    }
+    private lazy var row = UIStackView(arrangedSubviews: [label, retry]).then {
+        $0.axis = .horizontal
+        $0.spacing = 4
+        $0.alignment = .center
     }
 
     /// 숨길 때도 목록 아래 여백(24)은 남긴다.
@@ -510,24 +558,37 @@ final class CandidateTruncatedFooter: UICollectionReusableView {
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        addSubview(label)
-        label.snp.makeConstraints {
+        retry.addAction(UIAction { [weak self] _ in self?.onRetry?() }, for: .touchUpInside)
+        addSubview(row)
+        row.snp.makeConstraints {
             $0.top.equalToSuperview().offset(14 + 4)
-            $0.leading.trailing.equalToSuperview()
+            $0.centerX.equalToSuperview()
+            $0.leading.greaterThanOrEqualToSuperview()
             // 접을 때(높이 24) 이 제약이 양보한다.
             $0.bottom.equalToSuperview().inset(4 + 24).priority(.high)
         }
     }
     required init?(coder: NSCoder) { fatalError() }
 
-    /// 서버가 200개에서 자른 목록일 때만 목록 끝에 한 줄. 그 외엔 여백만 남기고 접는다.
-    func setVisible(_ visible: Bool) {
-        label.isHidden = !visible
-        collapse.isActive = !visible
+    func configure(_ mode: Mode) {
+        switch mode {
+        case .none:
+            row.isHidden = true
+        case .truncated:
+            row.isHidden = false
+            label.text = "찾는 약이 없다면 조건을 더 입력해 주세요"
+            retry.isHidden = true
+        case .loadMoreFailed:
+            row.isHidden = false
+            label.text = "불러오지 못했어요"
+            retry.isHidden = false
+        }
+        collapse.isActive = mode == .none
     }
 }
 
-/// 후보 조회 실패 — 로딩에 머물지 않고 다시 시도를 보여 준다(디자인 없음 · 빈 상태 셀 모양을 따름).
+/// 후보 조회 실패(DESIGN.pen 후보 조회 실패 · spec NM-529) — 부제는 인식 실패 · 세부정보 실패와 같은 정본 문구.
+/// 다시 시도 = 지금 조건으로 재조회, 식별 횟수를 쓰지 않는다.
 final class CandidateFailedCell: UICollectionViewCell {
     static let reuseID = "CandidateFailedCell"
 
@@ -535,6 +596,18 @@ final class CandidateFailedCell: UICollectionViewCell {
 
     override init(frame: CGRect) {
         super.init(frame: frame)
+        let circle = UIView().then {
+            $0.backgroundColor = DSColor.Neutral._100
+            $0.layer.cornerRadius = 32
+        }
+        circle.snp.makeConstraints { $0.width.height.equalTo(64) }
+        let icon = UIImageView(image: DSIcon.alertCircle.uiImage).then {
+            $0.tintColor = DSColor.textTertiary
+            $0.contentMode = .scaleAspectFit
+        }
+        circle.addSubview(icon)
+        icon.snp.makeConstraints { $0.center.equalToSuperview(); $0.width.height.equalTo(30) }
+
         let title = UILabel().then {
             $0.text = "후보를 불러오지 못했어요"
             $0.font = DSKitFontFamily.Pretendard.bold.font(size: 16)
@@ -542,7 +615,7 @@ final class CandidateFailedCell: UICollectionViewCell {
             $0.textAlignment = .center
         }
         let desc = UILabel().then {
-            $0.text = "네트워크 상태를 확인하고 다시 시도해 주세요"
+            $0.text = "네트워크 연결을 확인하고\n다시 시도해 주세요"
             $0.font = DSKitFontFamily.Pretendard.regular.font(size: 13)
             $0.textColor = DSColor.textTertiary
             $0.textAlignment = .center
@@ -550,28 +623,29 @@ final class CandidateFailedCell: UICollectionViewCell {
         }
         let retry = UIButton(type: .system).then {
             $0.setTitle("다시 시도", for: .normal)
-            $0.setTitleColor(DSColor.Primary._600, for: .normal)
-            $0.titleLabel?.font = DSKitFontFamily.Pretendard.semiBold.font(size: 14)
-            $0.backgroundColor = DSColor.Primary._50
-            $0.layer.cornerRadius = 10
-            $0.contentEdgeInsets = UIEdgeInsets(top: 8, left: 16, bottom: 8, right: 16)
+            $0.setTitleColor(DSColor.textPrimary, for: .normal)
+            $0.titleLabel?.font = DSKitFontFamily.Pretendard.semiBold.font(size: 15)
+            $0.backgroundColor = DSColor.Neutral._100
+            $0.layer.cornerRadius = 12
+            $0.layer.borderWidth = 1
+            $0.layer.borderColor = DSColor.Neutral._200.cgColor
+            $0.contentEdgeInsets = UIEdgeInsets(top: 11, left: 20, bottom: 11, right: 20)
             $0.addAction(UIAction { [weak self] _ in self?.onRetry?() }, for: .touchUpInside)
         }
-        contentView.addSubview(title)
-        contentView.addSubview(desc)
-        contentView.addSubview(retry)
-        title.snp.makeConstraints {
-            $0.top.equalToSuperview().offset(32)
-            $0.leading.trailing.equalToSuperview()
+        let texts = UIStackView(arrangedSubviews: [title, desc]).then {
+            $0.axis = .vertical
+            $0.spacing = 6
+            $0.alignment = .center
         }
-        desc.snp.makeConstraints {
-            $0.top.equalTo(title.snp.bottom).offset(6)
-            $0.leading.trailing.equalToSuperview()
+        let stack = UIStackView(arrangedSubviews: [circle, texts, retry]).then {
+            $0.axis = .vertical
+            $0.spacing = 14
+            $0.alignment = .center
         }
-        retry.snp.makeConstraints {
-            $0.top.equalTo(desc.snp.bottom).offset(14)
-            $0.centerX.equalToSuperview()
-            $0.bottom.equalToSuperview().inset(16)
+        contentView.addSubview(stack)
+        stack.snp.makeConstraints {
+            $0.top.bottom.equalToSuperview().inset(24)
+            $0.leading.trailing.equalToSuperview()
         }
     }
     required init?(coder: NSCoder) { fatalError() }

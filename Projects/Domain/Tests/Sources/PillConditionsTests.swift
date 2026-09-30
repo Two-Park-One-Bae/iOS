@@ -213,6 +213,20 @@ final class PillConditionsTests: XCTestCase {
         }
     }
 
+    /// 입력 전(spec NM-529) — 토큰도 조건도 없으면 조회하지 않는다. 임베딩만 있는 건 입력으로 치지 않는다.
+    func test_토큰도_조건도_없으면_입력_전이다() {
+        XCTAssertTrue(PillConditions(model: .empty).query.isWithoutInput)
+        XCTAssertTrue(PillConditions(model: PillModelOutput(frontEmbedding: [0.1])).query.isWithoutInput)
+        XCTAssertFalse(PillConditions(model: model).query.isWithoutInput)
+
+        var manual = PillConditions(model: .empty)
+        manual.setShape(.round)
+        XCTAssertFalse(manual.query.isWithoutInput)
+        var imprintOnly = PillConditions(model: .empty)
+        imprintOnly.submitImprint("AX", on: .back)
+        XCTAssertFalse(imprintOnly.query.isWithoutInput)
+    }
+
     /// 임베딩을 보내면 뽑은 모델 버전도 함께(spec NM-533) — 없으면 서버가 400.
     func test_임베딩을_보내면_마크_모델_버전도_함께_보낸다() {
         XCTAssertEqual(PillConditions(model: model).query.markEmbeddingModel, "mark-v1")

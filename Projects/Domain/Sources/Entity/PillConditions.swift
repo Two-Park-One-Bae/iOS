@@ -361,6 +361,15 @@ public struct PillCandidateQuery: Equatable {
         self.markEmbeddingModel = markEmbeddingModel
     }
 
+    /// 입력 전 — 속성 토큰도 조건도 없다(수동 추가 · 추출 실패로 처음 들어온 경우). 조회하지 않고
+    /// `속성·각인을 입력하면 후보가 나타나요` 를 보인다(spec NM-529). 임베딩은 조건이 아니라 정렬용이라 세지 않는다.
+    public var isWithoutInput: Bool {
+        attributeToken == nil && colors.isEmpty && shape == nil && formulation == nil
+            && [front, back].allSatisfy { face in
+                face.map { $0.imprint == nil && $0.dividingLine == nil && $0.hasMark == nil } ?? true
+            }
+    }
+
     /// `INVALID_ATTRIBUTE_TOKEN` 재조회용 — 후보는 나오고 정렬만 덜 맞는다. 화면에 따로 표시하지 않는다.
     public var withoutToken: PillCandidateQuery {
         var copy = self

@@ -99,8 +99,13 @@ final class MockPillRepository: PillRepositoryProtocol {
 
     struct DemoSearchFailure: Error {}
 
+    /// 이어서 조회 실패 데모 — 마지막 조회에서 뒷면 구분선을 골랐으면 items 조회가 실패한다(다시 시도는 성공).
+    private var failNextItems = false
+
     func fetchPillCandidates(query: PillCandidateQuery) -> AnyPublisher<PillCandidateResultModel, Error> {
+        failNextItems = query.back?.dividingLine != nil
         // 데모: 모양 `기타` 를 고르면 0개(빈 상태), 제형 `기타` 를 고르면 조회 실패(다시 시도),
+        // 뒷면 구분선을 고르면 이어서 조회(21번째~)가 한 번 실패,
         // 앞면 구분선을 고르면 서버가 200개에서 자른 것처럼(truncated) `+` 헤더와 끝 안내를 보여 준다.
         if query.formulation == .other {
             return Fail(error: DemoSearchFailure())
@@ -124,6 +129,12 @@ final class MockPillRepository: PillRepositoryProtocol {
     }
 
     func fetchPillCandidateItems(pillCodes: [String]) -> AnyPublisher<PillCandidateItemsModel, Error> {
+        if failNextItems {
+            failNextItems = false
+            return Fail(error: DemoSearchFailure())
+                .delay(for: .milliseconds(400), scheduler: DispatchQueue.main)
+                .eraseToAnyPublisher()
+        }
         // 서버처럼 순서를 보장하지 않는다 — 뒤집어서 돌려준다.
         let found = Self.catalog.filter { pillCodes.contains($0.pillCode) && $0.pillCode != Self.vanishedCode }
         let missing = pillCodes.filter { $0 == Self.vanishedCode }
