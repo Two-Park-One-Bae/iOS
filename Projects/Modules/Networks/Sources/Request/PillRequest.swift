@@ -40,50 +40,58 @@ public struct PillAttributeItemRequest: Encodable {
     }
 }
 
-// POST /api/v0/pill-candidates 요청 바디 (색 필터는 필수·non-null, 나머지는 선택)
+// POST /api/v1/pill-candidates 요청 바디 (NM-488). nil 은 키째 빠진다 = 조건 제외.
 public struct PillCandidateRequest: Encodable {
-    // 색 필터(required). 빈 배열이면 색 조건 제외. null 금지(OpenAPI required).
+    // 속성 추출 응답의 attributeToken 그대로 — 무엇을 고쳤든 항상. 수동 추가·추출 실패는 nil.
+    public let attributeToken: String?
+    // 사용자가 고른 색만(점수). 빈 배열이면 사용자색 항 없음.
     public let colors: [PillColor]
-    public let isTransparent: Bool?
+    // 사용자가 고른 모양·제형만 — 하드 필터. 대표값을 그대로 보내지 않는다.
     public let shape: PillShape?
     public let formulation: PillFormulation?
     public let front: PillFaceRequest?
     public let back: PillFaceRequest?
-    // 다음 페이지 커서. 첫 페이지는 nil(생략). 직전 응답의 nextCursor.
-    public let cursor: String?
-    // 페이지 크기 (기본 20)
-    public let size: Int
 
     public init(
+        attributeToken: String?,
         colors: [PillColor],
-        isTransparent: Bool? = nil,
-        shape: PillShape? = nil,
-        formulation: PillFormulation? = nil,
-        front: PillFaceRequest? = nil,
-        back: PillFaceRequest? = nil,
-        cursor: String? = nil,
-        size: Int = 20
+        shape: PillShape?,
+        formulation: PillFormulation?,
+        front: PillFaceRequest?,
+        back: PillFaceRequest?
     ) {
+        self.attributeToken = attributeToken
         self.colors = colors
-        self.isTransparent = isTransparent
         self.shape = shape
         self.formulation = formulation
         self.front = front
         self.back = back
-        self.cursor = cursor
-        self.size = size
     }
 }
 
-// 알약 한 면 (각인 수동 입력)
+// v1 면 조건. imprint 가 있으면 imprintSource 필수(없으면 400).
 public struct PillFaceRequest: Encodable {
+    // "" = 각인 없는 알약만(사용자값에서만)
     public let imprint: String?
+    // "MODEL" | "USER"
+    public let imprintSource: String?
+    // NONE = 구분선 없는 알약
     public let dividingLine: DividingLine?
     public let hasMark: Bool?
+    // base64 · fp16 LE · 8×768 row-major (12,288 B → 16,384자). 정렬에만 쓰인다.
+    public let markEmbedding: String?
 
-    public init(imprint: String? = nil, dividingLine: DividingLine? = nil, hasMark: Bool? = nil) {
+    public init(
+        imprint: String?,
+        imprintSource: String?,
+        dividingLine: DividingLine?,
+        hasMark: Bool?,
+        markEmbedding: String?
+    ) {
         self.imprint = imprint
+        self.imprintSource = imprintSource
         self.dividingLine = dividingLine
         self.hasMark = hasMark
+        self.markEmbedding = markEmbedding
     }
 }

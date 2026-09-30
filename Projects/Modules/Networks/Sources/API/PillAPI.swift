@@ -11,8 +11,10 @@ import Moya
 public enum PillAPI {
     // POST /api/v1/pill-attributes — 크롭 이미지 → 속성 토큰 + 표시값(색 hex · 대표 모양 · 대표 제형) (NM-487 · NM-521)
     case pillAttributes(request: PillAttributeRequest)
-    // POST /api/v0/pill-candidates — 수정 속성 → 후보 알약 조회
+    // POST /api/v1/pill-candidates — 수정 속성 → 정렬된 ids(≤200) + 앞 20개 상세 (NM-488)
     case pillCandidates(request: PillCandidateRequest)
+    // GET /api/v1/pill-candidates/items?pillCodes=a,b — ids 21번째부터의 후보 카드, 1~50개 (NM-489)
+    case pillCandidateItems(pillCodes: [String])
     // GET /api/v0/pill-details/{pillCode} — pillCode → 알약 세부정보 조회 (NM-312)
     case pillDetails(pillCode: String)
     // GET /api/v0/pill-attributes/usage — 잔여 식별 횟수 조회 (NM-331). 조회 전용 · 카운트 미증가
@@ -27,15 +29,16 @@ extension PillAPI: BaseAPI {
 
     public var apiVersion: String {
         switch self {
-        case .pillAttributes: return "v1"
-        default:              return "v0"
+        case .pillAttributes, .pillCandidates, .pillCandidateItems: return "v1"
+        default:                                                    return "v0"
         }
     }
 
     public var path: String {
         switch self {
-        case .pillAttributes:  return "/pill-attributes"
-        case .pillCandidates:  return "/pill-candidates"
+        case .pillAttributes:      return "/pill-attributes"
+        case .pillCandidates:      return "/pill-candidates"
+        case .pillCandidateItems:  return "/pill-candidates/items"
         case .pillDetails(let pillCode):
             let encoded = pillCode.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? pillCode
             return "/pill-details/\(encoded)"
@@ -46,8 +49,8 @@ extension PillAPI: BaseAPI {
 
     public var method: Moya.Method {
         switch self {
-        case .pillAttributes, .pillCandidates, .pillImagesUploadUrl: return .post
-        case .pillDetails, .pillAttributesUsage:                     return .get
+        case .pillAttributes, .pillCandidates, .pillImagesUploadUrl:          return .post
+        case .pillDetails, .pillAttributesUsage, .pillCandidateItems:         return .get
         }
     }
 
@@ -57,6 +60,10 @@ extension PillAPI: BaseAPI {
             return .requestJSONEncodable(request)
         case .pillCandidates(let request):
             return .requestJSONEncodable(request)
+        case .pillCandidateItems(let pillCodes):
+            // style: form, explode: false — 한 파라미터에 쉼표로 잇는다(pillCodes=a,b).
+            return .requestParameters(parameters: ["pillCodes": pillCodes.joined(separator: ",")],
+                                      encoding: URLEncoding.queryString)
         case .pillDetails, .pillAttributesUsage, .pillImagesUploadUrl:
             return .requestPlain
         }

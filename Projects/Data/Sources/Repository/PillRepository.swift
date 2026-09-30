@@ -82,31 +82,25 @@ public final class PillRepository: PillRepositoryProtocol {
         return PillLimitExceededError(usage: usage)
     }
 
-    public func fetchPillCandidates(
-        colors: [PillColorModel]?,
-        isTransparent: Bool?,
-        shape: PillShapeModel?,
-        formulation: PillFormulationModel?,
-        front: PillFaceModel?,
-        back: PillFaceModel?,
-        cursor: String?,
-        size: Int
-    ) -> AnyPublisher<PillCandidatePageModel, Error> {
-        // Domain 모델 → Network Request 모델 변환. colors는 required·non-null(nil이면 빈 배열).
-        let request = PillCandidateRequest(
-            colors: colors?.compactMap { $0.toNetwork() } ?? [],
-            isTransparent: isTransparent,
-            shape: shape?.toNetwork(),
-            formulation: formulation?.toNetwork(),
-            front: front?.toNetwork(),
-            back: back?.toNetwork(),
-            cursor: cursor,
-            size: size
-        )
+    public func fetchPillCandidates(query: PillCandidateQuery) -> AnyPublisher<PillCandidateResultModel, Error> {
+        service.fetchPillCandidates(request: query.toNetwork())
+            .map { $0.toDomain() }
+            .mapError { Self.mapInvalidAttributeToken($0) }
+            .eraseToAnyPublisher()
+    }
 
-        return service.fetchPillCandidates(request: request)
+    public func fetchPillCandidateItems(pillCodes: [String]) -> AnyPublisher<PillCandidateItemsModel, Error> {
+        service.fetchPillCandidateItems(pillCodes: pillCodes)
             .map { $0.toDomain() }
             .eraseToAnyPublisher()
+    }
+
+    /// 400 `INVALID_ATTRIBUTE_TOKEN` 만 타입 에러로 올린다 — UseCase 가 토큰 없이 다시 조회한다.
+    private static func mapInvalidAttributeToken(_ error: Error) -> Error {
+        guard case APIError.network(_, let problem) = error, problem.code == "INVALID_ATTRIBUTE_TOKEN" else {
+            return error
+        }
+        return PillInvalidAttributeTokenError()
     }
 
     public func fetchPillDetail(pillCode: String) -> AnyPublisher<PillDetailModel, Error> {
