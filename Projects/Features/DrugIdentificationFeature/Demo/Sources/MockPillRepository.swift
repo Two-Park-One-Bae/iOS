@@ -54,7 +54,7 @@ final class MockPillRepository: PillRepositoryProtocol {
     // MARK: 후보 (서버 /api/v1 흉내)
 
     /// 데모 카탈로그 — 앞 셋은 이름 있는 품목, 뒤는 이어 받기(21번째~)를 보이려는 채움. 200개.
-    /// 보통은 앞 151개(마크 296개가 모두 나오는 데까지)를, 잘린 결과(truncated)는 서버처럼 200개를 돌려준다.
+    /// 보통은 앞 152개(마크 298개가 모두 나오는 데까지)를, 잘린 결과(truncated)는 서버처럼 200개를 돌려준다.
     private static let catalog: [PillCandidateModel] = {
         let named = [
             PillCandidateModel(
@@ -83,8 +83,8 @@ final class MockPillRepository: PillRepositoryProtocol {
             PillCandidateModel(
                 pillCode: String(format: "D%07d", n), pillName: "데모 후보 \(n)", companyName: "데모제약",
                 pillThumbnailUrl: nil, licenseStatus: .normal,
-                // 앞 · 뒷면에 마크를 하나씩 순서대로 — 4~151번 후보가 앱에 넣은 마크 296개를 모두 한 번씩 보인다.
-                // 152번 이후는 마크 없음, 99번 뒷면은 앱에 없는 코드(일반 아이콘).
+                // 앞 · 뒷면에 마크를 하나씩 순서대로 — 4~152번 후보가 앱에 넣은 마크 298개를 모두 한 번씩 보인다.
+                // 153번 이후는 마크 없음, 99번 뒷면은 앱에 없는 코드(일반 아이콘).
                 front: PillFaceModel(imprint: "D\(n)", dividingLine: nil, hasMark: mark(n, 0) != nil,
                                               markCode: mark(n, 0)),
                 back: PillFaceModel(imprint: nil, dividingLine: nil, hasMark: n == 99 || mark(n, 1) != nil,
@@ -110,7 +110,7 @@ final class MockPillRepository: PillRepositoryProtocol {
         // 서버는 하드 조건을 통과한 후보가 200개를 넘으면 앞 200개만 ids 로 주고 truncated 를 켠다 —
         // 그 너머는 이어 받을 수 없고, 목록 끝 안내로 조건을 더 좁히게 한다.
         let truncated = query.front?.dividingLine != nil
-        let count = query.shape == .other ? 0 : (truncated ? 200 : 151)
+        let count = query.shape == .other ? 0 : (truncated ? 200 : 152)
         let ids = Self.catalog.prefix(count).map(\.pillCode)
         let result = PillCandidateResultModel(
             ids: ids,
