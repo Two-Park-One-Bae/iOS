@@ -97,6 +97,7 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
             overlay.updateFlashIcon(isOn: isOn)
         }
         cameraPicker.customOverlay = overlay
+        cameraPicker.squareGuideCenterY = overlay.squareFrame.midY
     }
 
     // MARK: - CameraPicker
