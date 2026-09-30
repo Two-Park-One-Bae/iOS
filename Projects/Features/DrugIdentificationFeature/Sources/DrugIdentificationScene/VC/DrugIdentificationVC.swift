@@ -32,8 +32,10 @@ public final class DrugIdentificationVC: UIViewController {
     private let photoSize: CGFloat = 300
 
     private var rowViews: [Int: PillResultRowView] = [:]
-    /// 사진 위 bbox + 번호 태그 — 삭제 시 같이 걷어내려고 index로 들고 있다.
-    private var boxViews: [Int: [UIView]] = [:]
+    /// 사진 위 bbox + 번호 태그 — 삭제 시 같이 걷어내고, 상태·번호가 바뀌면 다시 칠하려고 index로 들고 있다.
+    private var boxViews: [Int: (box: UIView, tag: UIView, label: UILabel)] = [:]
+    /// 화면에 보이는 순서(검출 순 → 수동 추가 순). 번호는 이 순서의 1-based 위치 — 삭제하면 다시 매긴다.
+    private var displayOrder: [Int] = []
     private var identifiedIndices = Set<Int>()
     private var deletedIndices = Set<Int>()
     private var selectedCandidates: [Int: PillCandidateModel] = [:]
@@ -90,6 +92,7 @@ public final class DrugIdentificationVC: UIViewController {
     init(pills: [IdentifiedPill], image: UIImage) {
         self.pills = pills
         self.capturedImage = image
+        self.displayOrder = pills.map(\.index)
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -181,10 +184,7 @@ public final class DrugIdentificationVC: UIViewController {
         listStack.addArrangedSubview(listTitle)
 
         for pill in pills {
-            let row = PillResultRowView(pill: pill)
-            row.onTap = { [weak self] in self?.onSelectPill?(pill) }
-            row.onMenu = { [weak self] in self?.showRowMenu(for: pill, anchor: row) }
-            rowViews[pill.index] = row
+            let row = makeRow(for: pill)
             listStack.addArrangedSubview(row)
         }
 
@@ -239,7 +239,7 @@ public final class DrugIdentificationVC: UIViewController {
     private func showExitConfirm() {
         presentExitConfirm(
             title: "지금 나가면 식별한 내용이 사라져요",
-            message: "식별 횟수도 다시 사용해야 해요"
+            message: "사용한 식별 횟수는 돌아오지 않아요"
         ) { [weak self] in
             self?.onExitToHome?()
         }
@@ -256,23 +256,70 @@ public final class DrugIdentificationVC: UIViewController {
         sender.view?.removeFromSuperview()
     }
 
+    /// 카드와 사진 위 영역을 함께 지우고 번호를 다시 매긴다(spec ⋮ 삭제). 수동 추가 알약은 영역이 없어 목록에서만 뺀다.
     private func deletePill(_ pill: IdentifiedPill) {
         rowViews[pill.index]?.removeFromSuperview()
         rowViews[pill.index] = nil
-        boxViews[pill.index]?.forEach { $0.removeFromSuperview() }
+        if let views = boxViews[pill.index] {
+            views.box.removeFromSuperview()
+            views.tag.removeFromSuperview()
+        }
         boxViews[pill.index] = nil
+        displayOrder.removeAll { $0 == pill.index }
         deletedIndices.insert(pill.index)
         identifiedIndices.remove(pill.index)
+        refreshAll()
         updateListTitle()
         updateProgress()
+    }
+
+    // MARK: - State · 번호
+
+    private func makeRow(for pill: IdentifiedPill) -> PillResultRowView {
+        let row = PillResultRowView(number: number(of: pill.index), thumbnail: pill.thumbnail, state: state(of: pill))
+        row.onTap = { [weak self] in self?.onSelectPill?(pill) }
+        row.onMenu = { [weak self] in self?.showRowMenu(for: pill, anchor: row) }
+        rowViews[pill.index] = row
+        return row
+    }
+
+    private func number(of index: Int) -> Int {
+        (displayOrder.firstIndex(of: index) ?? 0) + 1
+    }
+
+    /// 식별 완료가 가장 우선 — 인식 실패 알약도 직접 입력해 고르면 식별 완료다.
+    private func state(of pill: IdentifiedPill) -> PillResultState {
+        if let candidate = selectedCandidates[pill.index] {
+            return .identified(
+                name: candidate.pillName ?? "이름 미상",
+                company: candidate.companyName,
+                isRevoked: candidate.licenseStatus == .revoked,
+                isManual: manualPills.contains { $0.index == pill.index }
+            )
+        }
+        return pill.isExtractionFailed ? .failed : .pending
+    }
+
+    /// 카드 · 사진 위 영역의 번호와 색을 현재 상태로 다시 칠한다.
+    private func refreshAll() {
+        for pill in pills + manualPills where !deletedIndices.contains(pill.index) {
+            let state = state(of: pill)
+            let number = number(of: pill.index)
+            rowViews[pill.index]?.configure(number: number, state: state)
+            if let views = boxViews[pill.index] {
+                views.box.layer.borderColor = state.tone.accent.cgColor
+                views.tag.backgroundColor = state.tone.accent
+                views.label.text = "\(number)"
+            }
+        }
     }
 
     // MARK: - Selection
 
     func applySelection(pillIndex: Int, candidate: PillCandidateModel) {
-        rowViews[pillIndex]?.showSelected(name: candidate.pillName ?? "이름 미상")
         selectedCandidates[pillIndex] = candidate
         identifiedIndices.insert(pillIndex)
+        refreshAll()
         updateProgress()
     }
 
@@ -286,21 +333,17 @@ public final class DrugIdentificationVC: UIViewController {
     func addManualPill(index: Int, candidate: PillCandidateModel) {
         let pill = IdentifiedPill(
             index: index,
+            pillId: "manual-\(index)",
             thumbnail: nil,
             boundingBox: .zero,
-            attribute: PillAttributeModel(
-                pillId: "manual-\(index)", attributeToken: nil, colorHexes: [],
-                shape: nil, formulation: nil, error: nil
-            )
+            attribute: nil
         )
         manualPills.append(pill)
-        let row = PillResultRowView(pill: pill)
-        row.onTap = { [weak self] in self?.onSelectPill?(pill) }
-        row.onMenu = { [weak self] in self?.showRowMenu(for: pill, anchor: row) }
-        rowViews[index] = row
+        displayOrder.append(index)
         selectedCandidates[index] = candidate
         identifiedIndices.insert(index)
-        row.showSelected(name: candidate.pillName ?? "이름 미상")
+        let row = makeRow(for: pill)
+        row.setThumbnail(url: candidate.pillThumbnailUrl)
         let insertAt = max(0, listStack.arrangedSubviews.count - 1)
         listStack.insertArrangedSubview(row, at: insertAt)
         updateProgress()
@@ -373,21 +416,23 @@ public final class DrugIdentificationVC: UIViewController {
                 height: box.height * photoSize
             )
 
+            // 영역 테두리 · 번호 태그는 카드와 같은 색 — 카드와 번호로 짝을 짓는다.
+            let accent = state(of: pill).tone.accent
             let boxView = UIView(frame: rect).then {
                 $0.backgroundColor = .clear
-                $0.layer.borderColor = DSColor.Primary._500.cgColor
+                $0.layer.borderColor = accent.cgColor
                 $0.layer.borderWidth = 2
                 $0.layer.cornerRadius = 4
             }
             container.addSubview(boxView)
 
             let tag = UIView().then {
-                $0.backgroundColor = DSColor.Primary._500
+                $0.backgroundColor = accent
                 $0.layer.cornerRadius = 4
                 $0.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMinXMaxYCorner]
             }
             let tagLabel = UILabel().then {
-                $0.text = "\(pill.index)"
+                $0.text = "\(number(of: pill.index))"
                 $0.font = DSKitFontFamily.Pretendard.bold.font(size: 11)
                 $0.textColor = DSColor.Neutral._0
                 $0.textAlignment = .center
@@ -408,7 +453,7 @@ public final class DrugIdentificationVC: UIViewController {
                 tag.topAnchor.constraint(equalTo: container.topAnchor, constant: tagY)
             ])
 
-            boxViews[pill.index] = [boxView, tag]
+            boxViews[pill.index] = (boxView, tag, tagLabel)
         }
     }
 
