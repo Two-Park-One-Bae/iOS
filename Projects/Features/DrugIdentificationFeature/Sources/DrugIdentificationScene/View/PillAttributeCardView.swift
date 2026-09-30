@@ -122,7 +122,7 @@ final class PillAttributeCardView: UIView {
         let toggle = UIButton(type: .system).then {
             $0.backgroundColor = isExpanded ? DSColor.Primary._500 : DSColor.Neutral._100
             $0.layer.cornerRadius = 17
-            $0.setImage((isExpanded ? DSIcon.check : DSIcon.pencil).uiImage, for: .normal)
+            $0.setImage((isExpanded ? DSIcon.check : DSIcon.slidersHorizontal).uiImage, for: .normal)
             $0.tintColor = isExpanded ? DSColor.Neutral._0 : DSColor.textSecondary
             $0.accessibilityLabel = isExpanded ? "완료" : "수정"
             $0.addAction(UIAction { [weak self] _ in self?.onAction?(.toggleExpanded) }, for: .touchUpInside)
@@ -143,6 +143,7 @@ final class PillAttributeCardView: UIView {
         chip.isAccessibilityElement = true
         chip.accessibilityTraits = .button
         chip.accessibilityLabel = label
+        chip.accessibilityIdentifier = "attributeChip.\(label)"
         return UIStackView(arrangedSubviews: [smallLabel(label), chip]).then {
             $0.axis = .horizontal
             $0.spacing = isExpanded ? 3 : 4

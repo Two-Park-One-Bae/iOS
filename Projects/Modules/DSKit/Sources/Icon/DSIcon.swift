@@ -110,6 +110,7 @@ public enum DSIcon: String {
     case maximize = "Icons/ic_maximize"
     case scissors = "Icons/ic_scissors"
     case undo = "Icons/ic_undo"
+    case slidersHorizontal = "Icons/ic_sliders_horizontal"
 
     // MARK: - Arrows
 

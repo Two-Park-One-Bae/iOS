@@ -15,6 +15,8 @@ struct ConditionGridItem {
     let id: String
     let label: String
     let icon: UIView
+    /// 고른 칸의 그림 모양 — 색 원은 진한 호박 테두리, 모양 · 제형 그림은 호박색(디자인 ⑧-b~d).
+    var applySelected: ((Bool) -> Void)? = nil
 }
 
 final class ConditionGridMenuView: UIView {
@@ -25,7 +27,7 @@ final class ConditionGridMenuView: UIView {
     private let items: [ConditionGridItem]
     private let multiple: Bool
     private var selected: Set<String>
-    private var cellViews: [String: (box: UIView, label: UILabel)] = [:]
+    private var cellViews: [String: (box: UIView, label: UILabel, applySelected: ((Bool) -> Void)?)] = [:]
     private let allCheck = UIImageView(image: DSIcon.check.uiImage)
     private let allLabel = UILabel()
     private let allRow = UIControl()
@@ -119,7 +121,7 @@ final class ConditionGridMenuView: UIView {
         }
         cell.addSubview(stack)
         stack.snp.makeConstraints { $0.edges.equalToSuperview().inset(UIEdgeInsets(top: 8, left: 0, bottom: 8, right: 0)) }
-        cellViews[item.id] = (cell, label)
+        cellViews[item.id] = (cell, label, item.applySelected)
         return cell
     }
 
@@ -154,6 +156,7 @@ final class ConditionGridMenuView: UIView {
             views.label.textColor = on ? DSColor.Warning._900 : DSColor.textSecondary
             views.label.font = on ? DSKitFontFamily.Pretendard.bold.font(size: 11) : DSKitFontFamily.Pretendard.medium.font(size: 11)
             views.box.accessibilityTraits = on ? [.button, .selected] : .button
+            views.applySelected?(on)
         }
     }
 }

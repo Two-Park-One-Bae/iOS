@@ -522,7 +522,7 @@ private extension PillEditVC {
         case .colors(let anchor):
             let userColors = viewModel.conditions.colors.userValue ?? []
             let menu = ConditionGridMenuView(
-                items: Self.colorOrder.map { ConditionGridItem(id: $0.rawValue, label: $0.menuLabel, icon: Self.colorIcon($0)) },
+                items: Self.colorOrder.map(Self.colorItem),
                 selected: Set(userColors.map(\.rawValue)),
                 multiple: true,
                 modelPreview: modelColorPreview()
@@ -537,7 +537,7 @@ private extension PillEditVC {
 
         case .shape(let anchor):
             let menu = ConditionGridMenuView(
-                items: Self.shapeOrder.map { ConditionGridItem(id: $0.rawValue, label: $0.menuLabel, icon: Self.shapeIcon($0)) },
+                items: Self.shapeOrder.map(Self.shapeItem),
                 selected: Set([viewModel.conditions.shape.userValue?.rawValue].compactMap { $0 }),
                 multiple: false,
                 modelPreview: viewModel.conditions.model.shape.map(Self.shapeIcon)
@@ -550,9 +550,7 @@ private extension PillEditVC {
 
         case .formulation(let anchor):
             let menu = ConditionGridMenuView(
-                items: Self.formulationOrder.map {
-                    ConditionGridItem(id: $0.rawValue, label: $0.displayName, icon: Self.formulationIcon($0))
-                },
+                items: Self.formulationOrder.map(Self.formulationItem),
                 selected: Set([viewModel.conditions.formulation.userValue?.rawValue].compactMap { $0 }),
                 multiple: false,
                 modelPreview: viewModel.conditions.model.formulation.map(Self.formulationIcon)
@@ -695,12 +693,10 @@ private extension PillEditVC {
     ]
     static let formulationOrder: [PillFormulationModel] = [.tablet, .hardCapsule, .softCapsule, .other]
 
-    static func colorIcon(_ color: PillColorModel) -> UIView {
+    static func colorItem(_ color: PillColorModel) -> ConditionGridItem {
         let dot = UIView().then {
             $0.backgroundColor = color.swatchColor ?? DSColor.Neutral._0
             $0.layer.cornerRadius = 14
-            $0.layer.borderWidth = 1
-            $0.layer.borderColor = DSColor.Neutral._300.cgColor
             $0.clipsToBounds = true
             $0.snp.makeConstraints { $0.width.height.equalTo(28) }
         }
@@ -715,23 +711,50 @@ private extension PillEditVC {
             slash.lineWidth = 1.5
             dot.layer.addSublayer(slash)
         }
-        return dot
+        return ConditionGridItem(id: color.rawValue, label: color.menuLabel, icon: dot) { selected in
+            dot.layer.borderWidth = selected ? 2 : 1
+            dot.layer.borderColor = (selected ? DSColor.Warning._700 : DSColor.Neutral._300).cgColor
+        }
     }
 
-    static func shapeIcon(_ shape: PillShapeModel) -> UIView {
-        ShapeGlyphView(shape: shape).then {
+    static func shapeItem(_ shape: PillShapeModel) -> ConditionGridItem {
+        let glyph = shapeIcon(shape)
+        return ConditionGridItem(id: shape.rawValue, label: shape.menuLabel, icon: glyph) { selected in
+            glyph.setTint(selected ? DSColor.Warning._700 : DSColor.textSecondary)
+        }
+    }
+
+    static func formulationItem(_ formulation: PillFormulationModel) -> ConditionGridItem {
+        let icon = formulationIcon(formulation)
+        return ConditionGridItem(id: formulation.rawValue, label: formulation.displayName, icon: icon) { selected in
+            let tint = selected ? DSColor.Warning._700 : DSColor.textSecondary
+            (icon as? FormulationIconView)?.setTint(tint)
+            icon.tintColor = tint
+        }
+    }
+
+    /// 메뉴 칸 · '사진 기준' 모양 그림 — 32×28 칸에 디자인 크기 그대로.
+    static func shapeIcon(_ shape: PillShapeModel) -> ShapeGlyphView {
+        ShapeGlyphView(shape: shape, atDesignSize: true).then {
             $0.setTint(DSColor.textSecondary)
             $0.snp.makeConstraints { $0.width.equalTo(32); $0.height.equalTo(28) }
         }
     }
 
+    /// 메뉴 칸 · '사진 기준' 제형 그림 (28×24). `기타` 는 말줄임 아이콘(lucide ellipsis).
     static func formulationIcon(_ formulation: PillFormulationModel) -> UIView {
         guard formulation != .other, formulation != .unknown else {
-            return UIView().then { $0.snp.makeConstraints { $0.width.height.equalTo(1) } }
+            return UIView().then { box in
+                box.tintColor = DSColor.textSecondary
+                let dots = UIImageView(image: DSIcon.moreHorizontal.uiImage).then { $0.contentMode = .scaleAspectFit }
+                box.addSubview(dots)
+                dots.snp.makeConstraints { $0.center.equalToSuperview(); $0.width.equalTo(16) }
+                box.snp.makeConstraints { $0.width.equalTo(28); $0.height.equalTo(24) }
+            }
         }
         return FormulationIconView(formulation: formulation).then {
             $0.setTint(DSColor.textSecondary)
-            $0.snp.makeConstraints { $0.width.equalTo(formulation == .tablet ? 24 : 32); $0.height.equalTo(24) }
+            $0.snp.makeConstraints { $0.width.equalTo(formulation == .tablet ? 24 : 28); $0.height.equalTo(24) }
         }
     }
 
