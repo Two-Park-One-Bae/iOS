@@ -294,16 +294,23 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
     // MARK: - ⑧ 알약 수정
 
     private func showEdit(pill: IdentifiedPill) {
+        guard let resultVC else { return }
+        let isManual = resultVC.isManual(pill.index)
         let viewModel = PillEditViewModel(
             pillIndex: pill.index,
-            // 임시 — 새 수정 화면(NM-513 C)에서 조건 모델로 바꾼다. 응답 전 · 수동 추가는 빈 속성.
-            attribute: pill.attribute ?? PillAttributeModel(
-                pillId: pill.pillId, attributeToken: nil, colorHexes: [], shape: nil, formulation: nil, error: nil
-            ),
-            thumbnail: pill.thumbnail
+            displayNumber: resultVC.displayNumber(of: pill.index),
+            // 전에 고친 조건이 있으면 이어서 연다 — 없으면 모델 출력으로 시작.
+            conditions: resultVC.conditions(of: pill),
+            thumbnail: pill.thumbnail,
+            isManual: isManual,
+            // 추출 실패는 보여 줄 모델 값이 없어 펼친 상태로 연다(수동 추가도 VM 이 펼친다).
+            startsExpanded: pill.isExtractionFailed
         )
         let vc = PillEditVC(viewModel: viewModel)
         vc.dwellTracker = dwellTracker
+        vc.onConditionsChanged = { [weak resultVC] conditions in
+            resultVC?.store(conditions, for: pill.index)
+        }
         vc.onBackTapped = { [weak self] in
             self?.navigationController.popViewController(animated: true)
         }
@@ -335,17 +342,23 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
     private func showManualAdd() {
         guard let resultVC else { return }
         let index = resultVC.nextManualIndex()
-        let empty = PillAttributeModel(
-            pillId: "manual-\(index)", attributeToken: nil, colorHexes: [],
-            shape: nil, formulation: nil, error: nil
+        // 사진이 없는 알약 — 모델 출력 없이 모든 칸 `전체`, 펼친 상태로 시작.
+        let viewModel = PillEditViewModel(
+            pillIndex: index,
+            displayNumber: resultVC.nextDisplayNumber(),
+            conditions: PillConditions(model: .empty),
+            thumbnail: nil,
+            isManual: true
         )
-        let viewModel = PillEditViewModel(pillIndex: index, attribute: empty, thumbnail: nil, isManual: true)
+        var latest = viewModel.conditions
         let vc = PillEditVC(viewModel: viewModel)
+        vc.onConditionsChanged = { latest = $0 }
         vc.onBackTapped = { [weak self] in self?.navigationController.popViewController(animated: true) }
         vc.onCancel = { [weak self] in self?.navigationController.popViewController(animated: true) }
         // 빈 입력으로 후보 선택·확정 시에만 결과 목록에 새 카드로 추가 (취소 시 미추가)
         vc.onConfirm = { [weak self] candidate in
             self?.resultVC?.addManualPill(index: index, candidate: candidate)
+            self?.resultVC?.store(latest, for: index)   // 다시 열면 고친 조건 그대로
             self?.navigationController.popViewController(animated: true)
         }
         vc.onSelectDetail = { [weak self] pillCode, licenseStatus in

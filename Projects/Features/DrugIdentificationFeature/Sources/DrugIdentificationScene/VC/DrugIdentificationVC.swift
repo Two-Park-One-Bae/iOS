@@ -36,6 +36,8 @@ public final class DrugIdentificationVC: UIViewController {
     private var boxViews: [Int: (box: UIView, tag: UIView, label: UILabel)] = [:]
     /// 화면에 보이는 순서(검출 순 → 수동 추가 순). 번호는 이 순서의 1-based 위치 — 삭제하면 다시 매긴다.
     private var displayOrder: [Int] = []
+    /// 알약별 수정 조건 — 수정 화면을 닫았다 열어도 고친 값이 이어진다(한 식별 흐름 안에서만).
+    private var conditionsByIndex: [Int: PillConditions] = [:]
     private var identifiedIndices = Set<Int>()
     private var deletedIndices = Set<Int>()
     private var selectedCandidates: [Int: PillCandidateModel] = [:]
@@ -285,6 +287,23 @@ public final class DrugIdentificationVC: UIViewController {
 
     private func number(of index: Int) -> Int {
         (displayOrder.firstIndex(of: index) ?? 0) + 1
+    }
+
+    // MARK: - 수정 화면과 주고받기
+
+    func displayNumber(of index: Int) -> Int { number(of: index) }
+
+    /// 수동 추가로 새로 생길 카드의 번호.
+    func nextDisplayNumber() -> Int { displayOrder.count + 1 }
+
+    func isManual(_ index: Int) -> Bool { manualPills.contains { $0.index == index } }
+
+    func conditions(of pill: IdentifiedPill) -> PillConditions {
+        conditionsByIndex[pill.index] ?? PillConditions(model: pill.modelOutput)
+    }
+
+    func store(_ conditions: PillConditions, for index: Int) {
+        conditionsByIndex[index] = conditions
     }
 
     /// 식별 완료가 가장 우선 — 인식 실패 알약도 직접 입력해 고르면 식별 완료다.
