@@ -36,6 +36,8 @@ public final class DrugIdentificationViewModel {
     private var cancelBag = Set<AnyCancellable>()
 
     private let stateSubject = CurrentValueSubject<State, Never>(.loading)
+    /// 온디바이스 각인·마크 결과(pillId 별). 서버 속성 응답과 둘 다 와야 결과를 낸다.
+    private let faceModelsSubject = CurrentValueSubject<[String: PillFaceModelResult]?, Never>(nil)
 
     /// 분석 시작 시각 — `pill_identify_result.analysis_ms` 의 기준.
     /// 로딩 화면이 떠 있는 동안 사용자가 실제로 기다린 시간을 재므로,
@@ -98,6 +100,8 @@ public final class DrugIdentificationViewModel {
                 let pills = self.makeIdentifiedPills(from: detections)
                 self.pending = (pills, self.buildItems(from: pills))
                 self.requestAttributes(items: self.pending?.items ?? [])
+                // 서버 응답을 기다리는 동안 기기에서 각인·마크를 읽는다(이 백그라운드 스레드를 막는다).
+                self.faceModelsSubject.send(self.analyzeFaces(pills))
             } catch {
                 self.reportSegmentationFailure(error, stage: "inference")
             }
@@ -118,6 +122,21 @@ public final class DrugIdentificationViewModel {
                 boundingBox: detection.box,
                 attribute: nil
             )
+        }
+    }
+
+    /// 온디바이스 각인·마크(NM-459 · NM-512). 실패해도 식별은 이어 간다 — 모델값 없이 `전체` 로 시작하는
+    /// 지금까지의 동작과 같아지고, 원인은 Crashlytics 로 남긴다.
+    private func analyzeFaces(_ pills: [IdentifiedPill]) -> [String: PillFaceModelResult] {
+        do {
+            let results = try PillFaceAnalyzer.shared.analyze(pills.map { $0.thumbnail?.cgImage })
+            var byId: [String: PillFaceModelResult] = [:]
+            for (pill, result) in zip(pills, results) { byId[pill.pillId] = result }
+            return byId
+        } catch {
+            FirebaseService.log("pill face analysis failed")
+            FirebaseService.recordError(error)
+            return [:]
         }
     }
 
@@ -203,11 +222,13 @@ public final class DrugIdentificationViewModel {
             }
             .store(in: &cancelBag)
 
+        // 서버 속성과 기기 각인·마크가 **둘 다** 와야 결과를 낸다. 대개 서버가 늦지만, 기기 쪽이 늦으면 기다린다.
         pillUseCase.pillAttributes
+            .combineLatest(faceModelsSubject.compactMap { $0 })
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] attributes in
+            .sink { [weak self] attributes, faceModels in
                 guard let self, let pending = self.pending else { return }
-                let merged = self.merge(pills: pending.pills, with: attributes)
+                let merged = self.merge(pills: pending.pills, with: attributes, faceModels: faceModels)
                 if merged.isEmpty {
                     self.stateSubject.send(.empty)
                 } else {
@@ -231,20 +252,21 @@ public final class DrugIdentificationViewModel {
             .store(in: &cancelBag)
     }
 
-    // 속성 응답을 pillId 기준으로 크롭 결과와 병합
+    // 속성 응답·기기 모델값을 pillId 기준으로 크롭 결과와 병합
     private func merge(
         pills: [IdentifiedPill],
-        with attributes: [PillAttributeModel]
+        with attributes: [PillAttributeModel],
+        faceModels: [String: PillFaceModelResult]
     ) -> [IdentifiedPill] {
         let byId = Dictionary(attributes.map { ($0.pillId, $0) }, uniquingKeysWith: { first, _ in first })
         return pills.map { pill in
-            guard let attribute = byId[pill.pillId] else { return pill }
-            return IdentifiedPill(
+            IdentifiedPill(
                 index: pill.index,
                 pillId: pill.pillId,
                 thumbnail: pill.thumbnail,
                 boundingBox: pill.boundingBox,
-                attribute: attribute
+                attribute: byId[pill.pillId] ?? pill.attribute,
+                faceModel: faceModels[pill.pillId]
             )
         }
     }

@@ -42,6 +42,8 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
             // 조회 전용이라 카운트는 늘지 않는다(NM-331). 홈이 viewWillAppear 마다 하는 것과 같은
             // 이유로, 홈을 거치지 않고 탭으로 바로 들어온 경우에도 값을 최신으로 만든다.
             self.pillUseCase.fetchPillUsage()
+            // 각인·마크 모델을 촬영하는 동안 미리 연다 — 마크 ANE 첫 컴파일이 수 초 걸린다.
+            PillFaceAnalyzer.shared.prewarm()
             self.presentCameraIfAppropriate()
         }
     }

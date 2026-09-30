@@ -13,6 +13,8 @@ let project = Project.makeModule(
         Dep.Modules.DSKit.DSKit,
         Dep.Modules.Networks.Networks,
         Dep.Modules.SegmentationKit.SegmentationKit,
+        Dep.Modules.ImprintKit.ImprintKit,
+        Dep.Modules.MarkKit.MarkKit,
         Dep.Features.Base.Base,
         .SPM.SnapKit,
         .SPM.Then,

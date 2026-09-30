@@ -11,14 +11,28 @@ struct IdentifiedPill {
     let boundingBox: CGRect   // 원본 대비 정규화 (0~1)
     /// 서버 속성 추출 결과(/api/v1). 응답 전·수동 추가 알약은 nil.
     let attribute: PillAttributeModel?
+    /// 온디바이스 각인·마크 결과(NM-459 · NM-512). 수동 추가·크롭 없음·기기 분석 실패면 nil.
+    var faceModel: PillFaceModelResult? = nil
 
     /// 서버가 알약을 통째로 판정하지 못함(EXTRACTION_FAILED) — 결과 카드 '정보 인식 실패'.
     var isExtractionFailed: Bool { attribute?.error != nil }
 
     /// 수정 화면 조건의 원본(모델 출력). 추출 실패·수동 추가는 서버 값이 없다.
-    /// 각인·마크는 온디바이스 추론(NM-459 · NM-512)이 붙으면 여기로 들어온다.
+    /// 앞면 각인·마크·임베딩은 기기 모델값 — 서버 추출이 실패해도 그대로 쓴다(사진은 같은 한 장이다).
     var modelOutput: PillModelOutput {
-        attribute.map { PillModelOutput(attribute: $0) } ?? .empty
+        guard let attribute else {
+            return PillModelOutput(
+                frontImprint: faceModel?.imprint,
+                frontMarkScore: faceModel?.markScore,
+                frontEmbedding: faceModel?.embedding
+            )
+        }
+        return PillModelOutput(
+            attribute: attribute,
+            frontImprint: faceModel?.imprint,
+            frontMarkScore: faceModel?.markScore,
+            frontEmbedding: faceModel?.embedding
+        )
     }
 }
 

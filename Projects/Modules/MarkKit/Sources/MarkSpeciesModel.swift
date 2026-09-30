@@ -3,10 +3,12 @@ import Foundation
 
 public enum MarkSpeciesModelError: LocalizedError {
     case missingModel
+    case missingOutput
 
     public var errorDescription: String? {
         switch self {
         case .missingModel: return "앱 번들에서 \(MarkSpeciesModel.resourceName).mlmodelc를 찾지 못했습니다."
+        case .missingOutput: return "마크 모델 출력(prob · embedding)을 읽지 못했습니다."
         }
     }
 }
@@ -23,16 +25,19 @@ public final class MarkSpeciesModel {
 
     public let model: MLModel
 
-    public init() throws {
-        guard let url = Bundle(for: MarkSpeciesModel.self).url(forResource: Self.resourceName, withExtension: "mlmodelc") else {
+    /// **Neural Engine 으로 돌린다.** fp16 모델이라 ANE 에 올라간다.
+    ///
+    /// iPhone 12 실측(8방향 한 번): ANE 60ms · RAM +2MB, CPU 228ms, GPU 523ms(fp16 을 GPU 로 돌리면 오히려 느리다).
+    /// 임베딩 정확도 차이는 작다 — PyTorch 대비 코사인 최소(Mac, 크롭 6장 × 8방향) ANE 0.9993 · GPU 0.9995.
+    /// 전처리 한 단계(흑백 변환)만 달라도 유무 점수가 0.2 움직이는 것에 비하면 무시할 수 있다(INFO.md).
+    /// 첫 적재에 ANE 컴파일이 수 초 걸리니 앱이 미리 열어 둔다.
+    /// - Parameter url: 컴파일된 `.mlmodelc`. nil 이면 이 프레임워크 번들에서 찾는다(대조 도구가 경로를 준다).
+    public init(url: URL? = nil, computeUnits: MLComputeUnits = .cpuAndNeuralEngine) throws {
+        guard let url = url ?? Bundle(for: MarkSpeciesModel.self).url(forResource: Self.resourceName, withExtension: "mlmodelc") else {
             throw MarkSpeciesModelError.missingModel
         }
         let config = MLModelConfiguration()
-        // GPU 로 돌린다 — CPU 를 쓰지 않는다. 임베딩은 서버 카탈로그와 코사인으로 대조하므로 여기가 가장 민감하다.
-        // PyTorch 대비 임베딩 코사인 최소(크롭 6장 × 8방향, Mac 측정): cpuOnly 0.9953 · cpuAndNeuralEngine 0.9993
-        // · cpuAndGPU 0.9995 · all 0.9996. all 은 CoreML 이 연산 일부를 CPU 로 보낼 수 있어 쓰지 않는다.
-        // (CoreML 에 CPU 를 완전히 빼는 설정은 없다 — GPU 가 못 하는 연산만 CPU 로 떨어진다.)
-        config.computeUnits = .cpuAndGPU
+        config.computeUnits = computeUnits
         model = try MLModel(contentsOf: url, configuration: config)
     }
 }
