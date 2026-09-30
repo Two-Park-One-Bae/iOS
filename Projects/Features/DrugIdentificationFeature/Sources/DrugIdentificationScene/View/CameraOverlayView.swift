@@ -14,6 +14,9 @@ final class CameraOverlayView: UIView {
 
     private let flashButton = UIButton(type: .system)
 
+    /// 가이드 정사각형(창 좌표). 카메라가 미리보기를 이 중심에 맞춰, 보이는 정사각형이 곧 저장되는 사진이 된다.
+    private(set) var squareFrame: CGRect = .zero
+
     // MARK: - Init
 
     init() {
@@ -56,6 +59,7 @@ final class CameraOverlayView: UIView {
         let dimTopH = max(0, (viewfinderH - squareSize) / 2)
         let squareY = viewfinderTop + dimTopH
         let squareBottom = squareY + squareSize
+        squareFrame = CGRect(x: 0, y: squareY, width: squareSize, height: squareSize)
 
         // ─── Dim: Top (status bar + top bar → square) ───
         let topDim = UIView(frame: CGRect(x: 0, y: 0, width: w, height: squareY))

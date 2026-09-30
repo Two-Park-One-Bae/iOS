@@ -17,6 +17,8 @@ public final class CameraPicker: NSObject {
     /// 상주해 Jetsam(메모리 부족 강제종료)을 유발하므로, 진입 시 1회 축소한다.
     public var maxOutputDimension: CGFloat?
     public var customOverlay: UIView?
+    /// 정사각 모드에서 가이드 정사각형 중심의 y(창 좌표). 미리보기를 확대하지 않고 이 높이로 옮긴다.
+    public var squareGuideCenterY: CGFloat?
 
     // MARK: - Types
 
@@ -117,12 +119,16 @@ public final class CameraPicker: NSObject {
             picker.showsCameraControls = false
             picker.cameraOverlayView = overlay
 
-            let screen = UIScreen.main.bounds
-            let screenRatio = screen.height / screen.width
-            let cameraRatio: CGFloat = 4.0 / 3.0
-            if screenRatio > cameraRatio {
-                let scale = screenRatio / cameraRatio
-                picker.cameraViewTransform = CGAffineTransform(scaleX: scale, y: scale)
+            // **보이는 정사각형 = 저장되는 사진.** 저장은 4:3 사진의 가운데 정사각형(가로폭 전체)이다.
+            // 미리보기는 확대하지 않고(화면 폭 = 사진 가로폭) 가운데를 가이드 중심으로 옮기기만 한다.
+            //
+            // 예전엔 화면을 채우려고 1.6배쯤 확대했는데, 저장은 가로폭 전체라 사진이 가이드보다 1.6배
+            // 넓게(더 멀리서 찍은 것처럼) 나오고 세로 위치도 어긋났다.
+            // 컨트롤을 숨긴 UIImagePickerController 는 미리보기(화면 폭 × 4/3)를 화면 맨 위에 둔다
+            // (iPhone 16 Pro · iOS 26 에서 뷰 계층을 재서 확인: y 0~536).
+            if let centerY = squareGuideCenterY {
+                let previewHeight = UIScreen.main.bounds.width * 4 / 3
+                picker.cameraViewTransform = CGAffineTransform(translationX: 0, y: centerY - previewHeight / 2)
             }
         }
 
