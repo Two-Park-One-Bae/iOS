@@ -38,7 +38,10 @@ final class PillEditVC: UIViewController {
 
     private var listState: ListState = .loading
     private var selectedPillCode: String?
-    private weak var hintFooter: SelectHintFooter?
+    private weak var header: CandidateHeaderView?
+    private weak var truncatedFooter: CandidateTruncatedFooter?
+    /// 헤더 개수 — 조회 중 · 실패면 nil(개수 없이 `후보`).
+    private var summary: PillEditViewModel.CandidateSummary?
 
     /// 지금 열려 있는 편집(메뉴·입력 줄) — 이탈 계측(pill_flow_exit.editing_attribute)용.
     private var editingAttribute = "none"
@@ -75,9 +78,9 @@ final class PillEditVC: UIViewController {
             withReuseIdentifier: CandidateHeaderView.reuseID
         )
         $0.register(
-            SelectHintFooter.self,
+            CandidateTruncatedFooter.self,
             forSupplementaryViewOfKind: UICollectionView.elementKindSectionFooter,
-            withReuseIdentifier: SelectHintFooter.reuseID
+            withReuseIdentifier: CandidateTruncatedFooter.reuseID
         )
     }
 
@@ -220,9 +223,11 @@ final class PillEditVC: UIViewController {
         let item = NSCollectionLayoutItem(layoutSize: size)
         let group = NSCollectionLayoutGroup.vertical(layoutSize: size, repeatingSubitem: item, count: 1)
         let section = NSCollectionLayoutSection(group: group)
-        section.interGroupSpacing = 8
+        // 칸끼리 붙여 흰 카드 하나로 보인다 — 구분선은 셀이 그린다.
+        section.interGroupSpacing = 0
         // 상단 14 = "후보" 헤더 → 첫 후보 간격(헤더는 섹션 경계라 이 inset이 그 아래 여백이 됨).
-        section.contentInsets = NSDirectionalEdgeInsets(top: 14, leading: 20, bottom: 24, trailing: 20)
+        // 아래 여백 24 는 푸터(200개 초과 안내)가 갖는다 — 목록 → 안내 간격을 디자인(14 + 4)대로 두려고.
+        section.contentInsets = NSDirectionalEdgeInsets(top: 14, leading: 20, bottom: 0, trailing: 20)
 
         let headerSize = NSCollectionLayoutSize(
             widthDimension: .fractionalWidth(1), heightDimension: .estimated(24)
@@ -345,12 +350,19 @@ final class PillEditVC: UIViewController {
             }
             .store(in: &cancelBag)
 
+        // 개수는 목록보다 먼저 온다(ViewModel) — 목록을 다시 그릴 때 헤더 · 끝 안내가 함께 반영된다.
+        output.summary
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] in self?.summary = $0 }
+            .store(in: &cancelBag)
+
         output.searchFailed
             .receive(on: DispatchQueue.main)
             .sink { [weak self] in
                 guard let self else { return }
                 self.listState = .failed
                 self.selectedPillCode = nil
+                self.summary = nil
                 self.collectionView.reloadSections(IndexSet(integer: Section.candidates.rawValue))
                 self.updateFooterVisibility()
             }
@@ -363,6 +375,7 @@ final class PillEditVC: UIViewController {
                 guard let self, searching else { return }
                 self.listState = .loading
                 self.selectedPillCode = nil
+                self.summary = nil
                 self.collectionView.reloadSections(IndexSet(integer: Section.candidates.rawValue))
                 self.updateFooterVisibility()
             }
@@ -371,14 +384,22 @@ final class PillEditVC: UIViewController {
 
     // MARK: - Candidates
 
+    /// 서버가 200개에서 자른 결과일 때만 목록 끝 안내.
+    private var showsTruncatedNotice: Bool {
+        !currentResults.isEmpty && summary?.truncated == true
+    }
+
     private var currentResults: [PillCandidateModel] {
         if case .results(let c) = listState { return c }
         return []
     }
 
+    /// 목록 · 빈 상태를 그린다. 이어 받기로 뒤에 붙어도 고른 후보가 목록에 있으면 선택을 유지한다.
     private func renderCandidates(_ candidates: [PillCandidateModel]) {
         listState = candidates.isEmpty ? .empty : .results(candidates)
-        selectedPillCode = nil
+        if let selected = selectedPillCode, !candidates.contains(where: { $0.pillCode == selected }) {
+            selectedPillCode = nil
+        }
         collectionView.reloadSections(IndexSet(integer: Section.candidates.rawValue))
         updateFooterVisibility()
     }
@@ -389,7 +410,6 @@ final class PillEditVC: UIViewController {
         for case let cell as CandidateCell in collectionView.visibleCells {
             cell.setSelected(cell.pillCode == pillCode)
         }
-        hintFooter?.setVisible(false)
         updateFooterVisibility()
     }
 
@@ -461,7 +481,11 @@ extension PillEditVC: UICollectionViewDataSource {
                     withReuseIdentifier: CandidateCell.reuseID, for: indexPath
                 ) as! CandidateCell
                 let candidate = candidates[indexPath.item]
-                cell.configure(candidate: candidate, selected: candidate.pillCode == selectedPillCode)
+                cell.configure(
+                    candidate: candidate,
+                    selected: candidate.pillCode == selectedPillCode,
+                    position: .init(isFirst: indexPath.item == 0, isLast: indexPath.item == candidates.count - 1)
+                )
                 cell.onInfoTap = { [weak self] in
                     self?.onSelectDetail?(candidate.pillCode, candidate.licenseStatus)
                 }
@@ -486,17 +510,18 @@ extension PillEditVC: UICollectionViewDataSource {
         at indexPath: IndexPath
     ) -> UICollectionReusableView {
         if kind == UICollectionView.elementKindSectionHeader {
-            return collectionView.dequeueReusableSupplementaryView(
+            let header = collectionView.dequeueReusableSupplementaryView(
                 ofKind: kind, withReuseIdentifier: CandidateHeaderView.reuseID, for: indexPath
-            )
+            ) as! CandidateHeaderView
+            header.configure(count: summary?.count, truncated: summary?.truncated ?? false)
+            self.header = header
+            return header
         }
         let footer = collectionView.dequeueReusableSupplementaryView(
-            ofKind: kind, withReuseIdentifier: SelectHintFooter.reuseID, for: indexPath
-        ) as! SelectHintFooter
-        // 결과가 있고 아직 선택 전일 때만 안내 문구.
-        let showHint = !currentResults.isEmpty && selectedPillCode == nil
-        footer.setVisible(showHint)
-        hintFooter = footer
+            ofKind: kind, withReuseIdentifier: CandidateTruncatedFooter.reuseID, for: indexPath
+        ) as! CandidateTruncatedFooter
+        footer.setVisible(showsTruncatedNotice)
+        truncatedFooter = footer
         return footer
     }
 }

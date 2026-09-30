@@ -115,7 +115,7 @@ final class PillEditViewModel {
             isEmpty: candidatesSubject.map { $0.isEmpty }.eraseToAnyPublisher(),
             isSearching: searchingSubject.eraseToAnyPublisher(),
             searchFailed: searchFailedSubject.eraseToAnyPublisher(),
-            summary: summarySubject.removeDuplicates().eraseToAnyPublisher()
+            summary: summarySubject.eraseToAnyPublisher()
         )
     }
 
@@ -202,8 +202,9 @@ final class PillEditViewModel {
                 self.missingCount = 0
                 self.nextIndex = min(result.candidates.count, result.ids.count)
                 self.searchingSubject.send(false)
-                self.candidatesSubject.send(result.candidates)
+                // 개수를 먼저 — 화면은 목록을 다시 그릴 때 헤더도 함께 그린다.
                 self.sendSummary()
+                self.candidatesSubject.send(result.candidates)
             }
     }
 
@@ -228,8 +229,8 @@ final class PillEditViewModel {
                 self.missingCount += chunk.count - ordered.count
                 self.nextIndex += chunk.count
                 self.loadMoreCancellable = nil
-                self.candidatesSubject.send(self.candidatesSubject.value + ordered)
                 self.sendSummary()
+                self.candidatesSubject.send(self.candidatesSubject.value + ordered)
             }
     }
 

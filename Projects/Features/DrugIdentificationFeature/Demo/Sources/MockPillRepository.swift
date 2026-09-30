@@ -53,7 +53,8 @@ final class MockPillRepository: PillRepositoryProtocol {
 
     // MARK: 후보 (서버 /api/v1 흉내)
 
-    /// 데모 카탈로그 — 앞 셋은 이름 있는 품목, 뒤는 이어 받기(21번째~)를 보이려는 채움. 75개.
+    /// 데모 카탈로그 — 앞 셋은 이름 있는 품목, 뒤는 이어 받기(21번째~)를 보이려는 채움. 200개.
+    /// 보통은 앞 152개(마크 298개가 모두 나오는 데까지)를, 잘린 결과(truncated)는 서버처럼 200개를 돌려준다.
     private static let catalog: [PillCandidateModel] = {
         let named = [
             PillCandidateModel(
@@ -65,7 +66,7 @@ final class MockPillRepository: PillRepositoryProtocol {
             PillCandidateModel(
                 pillCode: "A11A5678", pillName: "게보린정", companyName: "삼진제약",
                 pillThumbnailUrl: nil, licenseStatus: .revoked,
-                front: PillFaceModel(imprint: nil, dividingLine: .plus, hasMark: true, markCode: "M001"),
+                front: PillFaceModel(imprint: nil, dividingLine: .plus, hasMark: true, markCode: "r0165"),
                 back: PillFaceModel(imprint: "SJ", dividingLine: nil, hasMark: false, markCode: nil)
             ),
             // 세부정보 404 데모 — 이 후보의 ⓘ를 누르면 '데이터 없음' 화면(⑩-e)이 뜬다.
@@ -74,34 +75,47 @@ final class MockPillRepository: PillRepositoryProtocol {
                 pillThumbnailUrl: nil, licenseStatus: .normal
             ),
         ]
-        let filler = (4...75).map { n in
+        func mark(_ n: Int, _ side: Int) -> String? {
+            let index = (n - 4) * 2 + side
+            return index < MockPillMarkCodes.all.count ? MockPillMarkCodes.all[index] : nil
+        }
+        let filler = (4...200).map { n in
             PillCandidateModel(
                 pillCode: String(format: "D%07d", n), pillName: "데모 후보 \(n)", companyName: "데모제약",
                 pillThumbnailUrl: nil, licenseStatus: .normal,
-                front: PillFaceModel(imprint: "D\(n)", dividingLine: nil, hasMark: n % 3 == 0, markCode: nil),
-                back: PillFaceModel(imprint: nil, dividingLine: nil, hasMark: false, markCode: nil)
+                // 앞 · 뒷면에 마크를 하나씩 순서대로 — 4~152번 후보가 앱에 넣은 마크 298개를 모두 한 번씩 보인다.
+                // 153번 이후는 마크 없음, 99번 뒷면은 앱에 없는 코드(일반 아이콘).
+                front: PillFaceModel(imprint: "D\(n)", dividingLine: nil, hasMark: mark(n, 0) != nil,
+                                              markCode: mark(n, 0)),
+                back: PillFaceModel(imprint: nil, dividingLine: nil, hasMark: n == 99 || mark(n, 1) != nil,
+                                             markCode: n == 99 ? "r9999" : mark(n, 1))
             )
         }
         return named + filler
     }()
 
     /// 그사이 사라진 품목 흉내 — ids 에는 있지만 items 조회에서 missing 으로 돌아온다.
-    private static let vanishedCode = String(format: "D%07d", 30)
+    private static let vanishedCode = String(format: "D%07d", 170)   // 마크 없는 후보 — 마크 전체 보기를 가리지 않게
 
     struct DemoSearchFailure: Error {}
 
     func fetchPillCandidates(query: PillCandidateQuery) -> AnyPublisher<PillCandidateResultModel, Error> {
-        // 데모: 모양 `기타` 를 고르면 0개(빈 상태), 제형 `기타` 를 고르면 조회 실패(다시 시도)를 보여 준다.
+        // 데모: 모양 `기타` 를 고르면 0개(빈 상태), 제형 `기타` 를 고르면 조회 실패(다시 시도),
+        // 앞면 구분선을 고르면 서버가 200개에서 자른 것처럼(truncated) `+` 헤더와 끝 안내를 보여 준다.
         if query.formulation == .other {
             return Fail(error: DemoSearchFailure())
                 .delay(for: .milliseconds(400), scheduler: DispatchQueue.main)
                 .eraseToAnyPublisher()
         }
-        let ids = query.shape == .other ? [] : Self.catalog.map(\.pillCode)
+        // 서버는 하드 조건을 통과한 후보가 200개를 넘으면 앞 200개만 ids 로 주고 truncated 를 켠다 —
+        // 그 너머는 이어 받을 수 없고, 목록 끝 안내로 조건을 더 좁히게 한다.
+        let truncated = query.front?.dividingLine != nil
+        let count = query.shape == .other ? 0 : (truncated ? 200 : 152)
+        let ids = Self.catalog.prefix(count).map(\.pillCode)
         let result = PillCandidateResultModel(
             ids: ids,
-            candidates: Array(Self.catalog.prefix(ids.isEmpty ? 0 : 20)),
-            truncated: false
+            candidates: Array(Self.catalog.prefix(min(20, count))),
+            truncated: truncated && count > 0
         )
         return Just(result)
             .setFailureType(to: Error.self)
