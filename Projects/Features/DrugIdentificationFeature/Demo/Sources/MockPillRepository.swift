@@ -91,7 +91,8 @@ final class MockPillRepository: PillRepositoryProtocol {
     struct DemoSearchFailure: Error {}
 
     func fetchPillCandidates(query: PillCandidateQuery) -> AnyPublisher<PillCandidateResultModel, Error> {
-        // 데모: 모양 `기타` 를 고르면 0개(빈 상태), 제형 `기타` 를 고르면 조회 실패(다시 시도)를 보여 준다.
+        // 데모: 모양 `기타` 를 고르면 0개(빈 상태), 제형 `기타` 를 고르면 조회 실패(다시 시도),
+        // 앞면 구분선을 고르면 서버가 200개에서 자른 것처럼(truncated) `+` 헤더와 끝 안내를 보여 준다.
         if query.formulation == .other {
             return Fail(error: DemoSearchFailure())
                 .delay(for: .milliseconds(400), scheduler: DispatchQueue.main)
@@ -101,7 +102,7 @@ final class MockPillRepository: PillRepositoryProtocol {
         let result = PillCandidateResultModel(
             ids: ids,
             candidates: Array(Self.catalog.prefix(ids.isEmpty ? 0 : 20)),
-            truncated: false
+            truncated: query.front?.dividingLine != nil && !ids.isEmpty
         )
         return Just(result)
             .setFailureType(to: Error.self)
