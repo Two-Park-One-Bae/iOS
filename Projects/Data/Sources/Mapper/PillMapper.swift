@@ -354,13 +354,17 @@ extension DividingLineModel {
 
 extension PillCandidateQuery {
     public func toNetwork() -> PillCandidateRequest {
-        PillCandidateRequest(
-            attributeToken: attributeToken,
-            colors:         colors.compactMap { $0.toNetwork() },
-            shape:          shape?.toNetwork(),
-            formulation:    formulation?.toNetwork(),
-            front:          front?.toNetwork(),
-            back:           back?.toNetwork()
+        let front = front?.toNetwork(), back = back?.toNetwork()
+        // 모델 버전은 임베딩이 실제로 실릴 때만 — 모양이 틀려 임베딩을 뺐으면 버전도 뺀다.
+        let sendsEmbedding = front?.markEmbedding != nil || back?.markEmbedding != nil
+        return PillCandidateRequest(
+            attributeToken:     attributeToken,
+            colors:             colors.compactMap { $0.toNetwork() },
+            shape:              shape?.toNetwork(),
+            formulation:        formulation?.toNetwork(),
+            front:              front,
+            back:               back,
+            markEmbeddingModel: sendsEmbedding ? markEmbeddingModel : nil
         )
     }
 }
