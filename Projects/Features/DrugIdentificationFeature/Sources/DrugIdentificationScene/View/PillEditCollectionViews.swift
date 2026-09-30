@@ -230,7 +230,7 @@ final class CandidateFaceSummaryView: UIStackView {
         }]
         if let imprint = face?.imprint, !imprint.isEmpty { items.append(imprintCell(imprint)) }
         if let line = face?.dividingLine, line != .unknown { items.append(dividingCell(line)) }
-        if face?.hasMark == true { items.append(markCell()) }
+        if face?.hasMark == true { items.append(markCell(code: face?.markCode)) }
         if items.count == 1 {
             items.append(UILabel().then {
                 $0.text = "—"
@@ -282,12 +282,31 @@ final class CandidateFaceSummaryView: UIStackView {
         return cell
     }
 
-    private func markCell() -> UIView {
+    /// 에셋 카탈로그 이미지 세트는 GIF 를 받지 않아 데이터 세트(`PillMarks/{markCode}`)로 담았다 — 한 번 풀면 캐시한다.
+    private static let markImages = NSCache<NSString, UIImage>()
+
+    private static func markImage(_ code: String) -> UIImage? {
+        if let cached = markImages.object(forKey: code as NSString) { return cached }
+        guard let data = NSDataAsset(name: "PillMarks/\(code)", bundle: .module)?.data,
+              let image = UIImage(data: data) else { return nil }
+        markImages.setObject(image, forKey: code as NSString)
+        return image
+    }
+
+    /// 식약처 마크 그림 — 에셋 `PillMarks/{markCode}`(여백을 잘라 낸 흑백 GIF 150px, 같은 파일이 S3 assets/pill-marks).
+    /// 앱에 없는 코드(데이터 갱신으로 새로 생긴 마크)는 일반 마크 아이콘으로 '있음'만 보인다.
+    private func markCell(code: String?) -> UIView {
         let cell = box(fill: DSColor.Neutral._0)
         cell.snp.makeConstraints { $0.width.equalTo(22) }
-        let icon = UIImageView(image: UIImage(systemName: "seal",
+        let icon: UIImageView
+        if let code, let image = Self.markImage(code) {
+            icon = UIImageView(image: image).then { $0.contentMode = .scaleAspectFit }
+            icon.snp.makeConstraints { $0.width.height.equalTo(18) }
+        } else {
+            icon = UIImageView(image: UIImage(systemName: "seal",
                                               withConfiguration: UIImage.SymbolConfiguration(pointSize: 12, weight: .semibold)))
-        icon.tintColor = DSColor.Neutral._700
+            icon.tintColor = DSColor.Neutral._700
+        }
         cell.addSubview(icon)
         icon.snp.makeConstraints { $0.center.equalToSuperview() }
         return cell

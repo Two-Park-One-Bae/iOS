@@ -66,7 +66,7 @@ final class MockPillRepository: PillRepositoryProtocol {
             PillCandidateModel(
                 pillCode: "A11A5678", pillName: "게보린정", companyName: "삼진제약",
                 pillThumbnailUrl: nil, licenseStatus: .revoked,
-                front: PillFaceModel(imprint: nil, dividingLine: .plus, hasMark: true, markCode: "M001"),
+                front: PillFaceModel(imprint: nil, dividingLine: .plus, hasMark: true, markCode: "r0165"),
                 back: PillFaceModel(imprint: "SJ", dividingLine: nil, hasMark: false, markCode: nil)
             ),
             // 세부정보 404 데모 — 이 후보의 ⓘ를 누르면 '데이터 없음' 화면(⑩-e)이 뜬다.
@@ -79,12 +79,16 @@ final class MockPillRepository: PillRepositoryProtocol {
             PillCandidateModel(
                 pillCode: String(format: "D%07d", n), pillName: "데모 후보 \(n)", companyName: "데모제약",
                 pillThumbnailUrl: nil, licenseStatus: .normal,
-                front: PillFaceModel(imprint: "D\(n)", dividingLine: nil, hasMark: n % 3 == 0, markCode: nil),
+                // 3의 배수는 마크 있음 — 앱에 있는 코드를 돌려 쓰고, 99 는 앱에 없는 코드(일반 아이콘)를 보인다.
+                front: PillFaceModel(imprint: "D\(n)", dividingLine: nil, hasMark: n % 3 == 0,
+                                              markCode: n == 99 ? "r9999" : MockPillRepository.demoMarkCodes[n % MockPillRepository.demoMarkCodes.count]),
                 back: PillFaceModel(imprint: nil, dividingLine: nil, hasMark: false, markCode: nil)
             )
         }
         return named + filler
     }()
+
+    private static let demoMarkCodes = ["r0027", "r0062", "r0393", "r0406", "r0408", "r0419", "r0044", "r0049"]
 
     /// 그사이 사라진 품목 흉내 — ids 에는 있지만 items 조회에서 missing 으로 돌아온다.
     private static let vanishedCode = String(format: "D%07d", 30)
