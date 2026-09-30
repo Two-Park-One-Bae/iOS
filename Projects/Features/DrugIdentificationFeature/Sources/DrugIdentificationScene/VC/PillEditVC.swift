@@ -6,7 +6,7 @@ import DSKit
 import Domain
 import Core
 
-// ⑧ 알약 수정 — 속성 편집(색상/모양/제형/각인 인라인 펼침) + 실시간 후보 + 선택/확인
+// ⑧ 알약 수정 — 속성 카드(접힘/펼침 · 3단 조건 · 칸 색 · 되돌리기, NM-490) + 실시간 후보 + 선택/확인
 //
 // 후보 리스트를 UIStackView 로 매 응답마다 재생성하던 구조가 Severe Hang(UIScrollView.layoutSubviews
 // + 대량 NSLayoutConstraint)을 유발해, 셀 재사용 UICollectionView 로 옮겼다.
@@ -22,6 +22,8 @@ final class PillEditVC: UIViewController {
     var onSelectDetail: ((String, LicenseStatus) -> Void)?
     // 후보 썸네일 탭 → 이미지 비교 뷰어 (NM-354). (candidate, 촬영 크롭, 소스 프레임(윈도우 좌표), 소스 이미지)
     var onSelectCompare: ((PillCandidateModel, UIImage?, CGRect, UIImage?) -> Void)?
+    /// 조건이 바뀔 때마다 — Coordinator 가 알약별로 보관해 화면을 다시 열어도 이어지게 한다.
+    var onConditionsChanged: ((PillConditions) -> Void)?
 
     // MARK: - Sections / State
 
@@ -38,15 +40,18 @@ final class PillEditVC: UIViewController {
     private var selectedPillCode: String?
     private weak var hintFooter: SelectHintFooter?
 
-    private enum Panel { case none, color, shape, formulation, imprint }
-    private var openPanel: Panel = .none
+    /// 지금 열려 있는 편집(메뉴·입력 줄) — 이탈 계측(pill_flow_exit.editing_attribute)용.
+    private var editingAttribute = "none"
+    private var dismissMenu: (() -> Void)?
+    /// 각인 입력 줄이 고치고 있는 면.
+    private var editingFace: PillFace?
     /// 체류시간(`pill_confirm.dwell_ms`) 누적기 — Coordinator 가 소유해 화면이 다시 만들어져도 이어진다.
     /// 주입되지 않으면(데모 등) 시간은 0 으로 나간다.
     var dwellTracker: PillDwellTracker?
 
     // MARK: - UI
 
-    private lazy var navBar = DSNavBar(title: "알약 \(viewModel.pillIndex) 수정").then {
+    private lazy var navBar = DSNavBar(title: "알약 \(viewModel.displayNumber) 수정").then {
         $0.translatesAutoresizingMaskIntoConstraints = false
     }
 
@@ -75,26 +80,21 @@ final class PillEditVC: UIViewController {
         )
     }
 
-    // 속성 카드 — VC가 소유, 섹션0 셀에 호스팅된다(칩·패널·각인 필드 상호작용은 VC가 계속 소유).
-    private lazy var attributeCardView = makeAttributeCard()
+    // 속성 카드 — VC가 소유, 섹션0 셀에 호스팅된다(메뉴·입력 줄 상호작용은 VC가 소유).
+    private lazy var attributeCardView = PillAttributeCardView(
+        title: "알약 \(viewModel.displayNumber)",
+        thumbnail: viewModel.thumbnail,
+        conditions: viewModel.conditions,
+        expanded: viewModel.startsExpanded
+    )
 
-    private let colorChip = AttributeChipButton()
-    private let shapeChip = AttributeChipButton()
-    private let formulationChip = AttributeChipButton()
-
-    private let imprintSummary = ImprintSummaryView()
-    private let imprintChevron = UIImageView().then {
-        $0.image = UIImage(systemName: "chevron.down", withConfiguration: UIImage.SymbolConfiguration(pointSize: 12, weight: .semibold))
-        $0.tintColor = DSColor.textTertiary
-        $0.contentMode = .scaleAspectFit
+    /// 키보드 위 각인 입력 줄. 화면에 보이지 않는 대리 필드의 inputAccessoryView 로 띄운 뒤
+    /// 실제 입력은 줄 안의 필드로 넘긴다 — 면 카드 칸이 좁아 입력은 화면 폭에서 한다.
+    private let imprintBar = ImprintInputBar()
+    private lazy var imprintProxy = UITextField().then {
+        $0.isHidden = true
+        $0.inputAccessoryView = imprintBar
     }
-
-    private let colorPanel = ColorPickerPanel()
-    private let colorDivider = PillEditVC.makeDividerLine()
-    private let transparencyRow = TransparencyRowView()
-    private let shapePanel = ShapePickerPanel()
-    private let formulationPanel = FormulationPickerPanel()
-    private lazy var imprintPanel = ImprintEditorPanel(front: viewModel.front, back: viewModel.back)
 
     private let footer = UIView().then {
         $0.backgroundColor = DSColor.bgApp
@@ -143,17 +143,7 @@ final class PillEditVC: UIViewController {
         navBar.onBackTapped = { [weak self] in
             self?.onBackTapped?()
         }
-        refreshChips()
-        colorPanel.setSelected(viewModel.colors)
-        shapePanel.setSelected(viewModel.shape)
-        formulationPanel.setSelected(viewModel.formulation)
-        transparencyRow.setOn(viewModel.isTransparent)
-        imprintSummary.update(front: viewModel.front, back: viewModel.back)
-        // 각인 수정은 화면 진입 시 기본으로 펼쳐 둔다(나머지 패널은 접힘). 이후 토글은 togglePanel이 처리.
-        openPanel = .imprint
-        [colorPanel, colorDivider, transparencyRow, shapePanel, formulationPanel].forEach { $0.isHidden = true }
-        imprintPanel.isHidden = false
-        imprintChevron.transform = CGAffineTransform(rotationAngle: .pi)
+        view.addSubview(imprintProxy)
         // footer 는 항상 보인다 — 고지가 들어 있어 선택 전에도 노출돼야 한다(⑧-a).
         // 후보를 골라야 나타나는 건 버튼뿐이라 buttonsRow 만 접어 둔다.
         buttonsRow.isHidden = true
@@ -253,123 +243,17 @@ final class PillEditVC: UIViewController {
         return section
     }
 
-    // MARK: - Attribute Card
-
-    private func makeAttributeCard() -> UIView {
-        let card = UIView().then {
-            $0.backgroundColor = DSColor.Neutral._0
-            $0.layer.cornerRadius = 16
-            $0.layer.masksToBounds = false
-            $0.layer.shadowColor = DSColor.textPrimary.cgColor
-            $0.layer.shadowOpacity = 0.04
-            $0.layer.shadowOffset = CGSize(width: 0, height: 1)
-            $0.layer.shadowRadius = 6
-        }
-
-        // Pill Header
-        let crop = UIImageView().then {
-            $0.backgroundColor = DSColor.Neutral._100
-            $0.layer.cornerRadius = 10
-            $0.clipsToBounds = true
-            $0.contentMode = .scaleAspectFit
-            $0.image = viewModel.thumbnail
-        }
-        crop.snp.makeConstraints { $0.width.height.equalTo(48) }
-        let hTitle = UILabel().then {
-            $0.text = "알약 \(viewModel.pillIndex)"
-            $0.font = DSKitFontFamily.Pretendard.bold.font(size: 15)
-            $0.textColor = DSColor.textPrimary
-        }
-        let hSub = UILabel().then {
-            $0.text = "속성을 수정하면 후보가 바뀌어요"
-            $0.font = DSKitFontFamily.Pretendard.regular.font(size: 12)
-            $0.textColor = DSColor.textTertiary
-        }
-        let hText = UIStackView(arrangedSubviews: [hTitle, hSub]).then { $0.axis = .vertical; $0.spacing = 2 }
-        let header = UIStackView(arrangedSubviews: [crop, hText]).then {
-            $0.axis = .horizontal; $0.spacing = 12; $0.alignment = .center
-        }
-
-        // 속성 Row
-        let attrLabel = makeRowLabel("속성")
-        let chipsRow = UIStackView(arrangedSubviews: [attrLabel, colorChip, shapeChip, formulationChip, UIView()]).then {
-            $0.axis = .horizontal; $0.spacing = 6; $0.alignment = .center
-        }
-
-        // 각인 Row
-        let imprintRow = UIStackView(arrangedSubviews: [imprintSummary, imprintChevron]).then {
-            $0.axis = .horizontal; $0.spacing = 10; $0.alignment = .center
-        }
-        imprintChevron.snp.makeConstraints { $0.width.height.equalTo(18) }
-        let imprintTap = UIControl()
-        imprintTap.addSubview(imprintRow)
-        imprintRow.snp.makeConstraints { $0.top.bottom.equalToSuperview().inset(10); $0.leading.trailing.equalToSuperview() }
-        imprintRow.isUserInteractionEnabled = false
-        imprintTap.addAction(UIAction { [weak self] _ in self?.togglePanel(.imprint) }, for: .touchUpInside)
-
-        let stack = UIStackView(arrangedSubviews: [
-            header, makeDivider(),
-            chipsRow, colorPanel, colorDivider, transparencyRow, shapePanel, formulationPanel,
-            makeDivider(),
-            imprintTap, imprintPanel
-        ]).then {
-            $0.axis = .vertical
-            $0.spacing = 10
-        }
-        card.addSubview(stack)
-        stack.snp.makeConstraints {
-            $0.top.equalToSuperview().offset(8)
-            $0.bottom.equalToSuperview().offset(-12)
-            $0.leading.trailing.equalToSuperview().inset(16)
-        }
-        return card
-    }
-
     // MARK: - Actions
 
     private func setActions() {
-        colorChip.addAction(UIAction { [weak self] _ in self?.togglePanel(.color) }, for: .touchUpInside)
-        shapeChip.addAction(UIAction { [weak self] _ in self?.togglePanel(.shape) }, for: .touchUpInside)
-        formulationChip.addAction(UIAction { [weak self] _ in self?.togglePanel(.formulation) }, for: .touchUpInside)
-
-        colorPanel.onSelectionChanged = { [weak self] colors in
-            self?.viewModel.updateColors(colors); self?.refreshChips()
+        attributeCardView.onAction = { [weak self] in self?.handle($0) }
+        imprintBar.onSubmit = { [weak self] text in
+            guard let self, let face = self.editingFace else { return }
+            self.viewModel.submitImprint(text, on: face)
+            self.closeImprintInput()
         }
-        transparencyRow.onToggle = { [weak self] on in
-            self?.viewModel.setTransparent(on)
-        }
-        shapePanel.onSelect = { [weak self] shape in
-            self?.viewModel.updateShape(shape); self?.refreshChips()
-        }
-        formulationPanel.onSelect = { [weak self] form in
-            self?.viewModel.updateFormulation(form); self?.refreshChips()
-        }
-        imprintPanel.onChange = { [weak self] front, back in
-            self?.viewModel.updateImprint(front: front, back: back)
-            self?.imprintSummary.update(front: front, back: back)
-        }
-
         cancelButton.addTarget(self, action: #selector(cancelTapped), for: .touchUpInside)
         confirmButton.addTarget(self, action: #selector(confirmTapped), for: .touchUpInside)
-    }
-
-    private func togglePanel(_ panel: Panel) {
-        openPanel = (openPanel == panel) ? .none : panel
-        let colorOpen = openPanel == .color
-        colorPanel.isHidden = !colorOpen
-        colorDivider.isHidden = !colorOpen
-        transparencyRow.isHidden = !colorOpen
-        shapePanel.isHidden = openPanel != .shape
-        formulationPanel.isHidden = openPanel != .formulation
-        imprintPanel.isHidden = openPanel != .imprint
-        colorChip.setExpanded(colorOpen)
-        shapeChip.setExpanded(openPanel == .shape)
-        formulationChip.setExpanded(openPanel == .formulation)
-        UIView.animate(withDuration: 0.2) {
-            self.imprintChevron.transform = (self.openPanel == .imprint) ? CGAffineTransform(rotationAngle: .pi) : .identity
-        }
-        // 패널 펼침/접힘으로 섹션0 셀 높이가 바뀌므로 self-sizing 을 다시 측정시킨다.
-        collectionView.performBatchUpdates(nil)
     }
 
     @objc private func cancelTapped() { onCancel?() }
@@ -431,15 +315,7 @@ final class PillEditVC: UIViewController {
         ))
     }
 
-    private var editingAttributeName: String {
-        switch openPanel {
-        case .none:        return "none"
-        case .color:       return "color"
-        case .shape:       return "shape"
-        case .formulation: return "formulation"
-        case .imprint:     return "imprint"
-        }
-    }
+    private var editingAttributeName: String { editingAttribute }
 
     private func dwellMs() -> Int {
         dwellTracker?.elapsedMs(pillIndex: viewModel.pillIndex) ?? 0
@@ -454,6 +330,18 @@ final class PillEditVC: UIViewController {
         output.candidates
             .receive(on: DispatchQueue.main)
             .sink { [weak self] candidates in self?.renderCandidates(candidates) }
+            .store(in: &cancelBag)
+
+        // 조건이 바뀌면 카드를 다시 그리고(칸 색 · 값), Coordinator 에 알린다.
+        viewModel.conditionsSubject
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] conditions in
+                guard let self else { return }
+                self.attributeCardView.update(conditions: conditions)
+                self.relayoutCard()
+                self.onConditionsChanged?(conditions)
+            }
             .store(in: &cancelBag)
 
         // 검색 시작 시에만 로딩 셀로 전환. 응답이 오면 candidates 싱크가 결과/빈상태를 그린다.
@@ -507,68 +395,6 @@ final class PillEditVC: UIViewController {
         if view.isHidden != hidden { view.isHidden = hidden }
     }
 
-    // MARK: - Chip Refresh
-
-    private func refreshChips() {
-        let colors = viewModel.colors
-        let dot = UIView().then {
-            $0.backgroundColor = colors.first?.swatchColor ?? DSColor.Neutral._300
-            $0.layer.cornerRadius = 7
-            $0.layer.borderWidth = 1
-            $0.layer.borderColor = DSColor.Neutral._200.cgColor
-        }
-        dot.snp.makeConstraints { $0.width.height.equalTo(14) }
-        // 다중 선택: 1개면 색 이름, 여러 개면 "첫색 외 N".
-        let colorValue: String
-        if viewModel.isTransparent {
-            colorValue = "무색"
-        } else if colors.isEmpty {
-            colorValue = "선택"
-        } else if colors.count == 1 {
-            colorValue = colors[0].displayName
-        } else {
-            colorValue = "\(colors[0].displayName) 외 \(colors.count - 1)"
-        }
-        colorChip.configure(leading: dot, value: colorValue)
-
-        if let shape = viewModel.shape {
-            // 모양 글리프는 bounds 비율이 모양(타원·장방형)을 결정한다 — 가로로 긴 비율이어야
-            // 원으로 찌부러지지 않는다. 결과 행(PillResultRowView)과 동일하게 맞춘다.
-            let glyph = ShapeGlyphView(shape: shape)
-            glyph.snp.makeConstraints { $0.width.equalTo(17); $0.height.equalTo(11) }
-            shapeChip.configure(leading: glyph, value: shape.displayName)
-        } else {
-            shapeChip.configure(leading: nil, value: "선택")
-        }
-
-        if let formulation = viewModel.formulation {
-            let icon = FormulationIconView(formulation: formulation)
-            icon.snp.makeConstraints { $0.width.height.equalTo(16) }
-            formulationChip.configure(leading: icon, value: formulation.displayName)
-        } else {
-            formulationChip.configure(leading: nil, value: "선택")
-        }
-    }
-
-    // MARK: - Factory
-
-    private func makeRowLabel(_ text: String) -> UILabel {
-        UILabel().then {
-            $0.text = text
-            $0.font = DSKitFontFamily.Pretendard.medium.font(size: 14)
-            $0.textColor = DSColor.textSecondary
-            $0.setContentHuggingPriority(.required, for: .horizontal)
-        }
-    }
-
-    private func makeDivider() -> UIView { PillEditVC.makeDividerLine() }
-
-    private static func makeDividerLine() -> UIView {
-        UIView().then {
-            $0.backgroundColor = DSColor.Neutral._200
-            $0.snp.makeConstraints { $0.height.equalTo(1) }
-        }
-    }
 }
 
 // MARK: - UICollectionViewDataSource
@@ -680,5 +506,262 @@ extension PillEditVC: UICollectionViewDelegate {
         guard let cell = collectionView.cellForItem(at: indexPath) as? CandidateCell,
               let code = cell.pillCode else { return }
         selectCandidate(pillCode: code)
+    }
+}
+
+// MARK: - 속성 카드 · 메뉴 · 각인 입력 (NM-513)
+
+private extension PillEditVC {
+
+    func handle(_ action: PillAttributeCardView.Action) {
+        switch action {
+        case .toggleExpanded:
+            attributeCardView.setExpanded(!attributeCardView.isExpanded)
+            relayoutCard()
+
+        case .colors(let anchor):
+            let userColors = viewModel.conditions.colors.userValue ?? []
+            let menu = ConditionGridMenuView(
+                items: Self.colorOrder.map { ConditionGridItem(id: $0.rawValue, label: $0.menuLabel, icon: Self.colorIcon($0)) },
+                selected: Set(userColors.map(\.rawValue)),
+                multiple: true,
+                modelPreview: modelColorPreview()
+            )
+            menu.onSelect = { [weak self, weak menu] id in
+                guard let self, let menu else { return }
+                // 색은 여러 개 고른다 — 칸을 누를 때마다 바로 반영하고 메뉴는 열어 둔다. `전체` 는 모두 풀고 닫는다.
+                self.viewModel.setColors(menu.selectedIDs.compactMap(PillColorModel.init(rawValue:)))
+                if id == nil { self.dismissMenu?() }
+            }
+            showMenu(menu, below: anchor, fullWidth: true, editing: "color")
+
+        case .shape(let anchor):
+            let menu = ConditionGridMenuView(
+                items: Self.shapeOrder.map { ConditionGridItem(id: $0.rawValue, label: $0.menuLabel, icon: Self.shapeIcon($0)) },
+                selected: Set([viewModel.conditions.shape.userValue?.rawValue].compactMap { $0 }),
+                multiple: false,
+                modelPreview: viewModel.conditions.model.shape.map(Self.shapeIcon)
+            )
+            menu.onSelect = { [weak self] id in
+                self?.viewModel.setShape(id.flatMap(PillShapeModel.init(rawValue:)))
+                self?.dismissMenu?()
+            }
+            showMenu(menu, below: anchor, fullWidth: true, editing: "shape")
+
+        case .formulation(let anchor):
+            let menu = ConditionGridMenuView(
+                items: Self.formulationOrder.map {
+                    ConditionGridItem(id: $0.rawValue, label: $0.displayName, icon: Self.formulationIcon($0))
+                },
+                selected: Set([viewModel.conditions.formulation.userValue?.rawValue].compactMap { $0 }),
+                multiple: false,
+                modelPreview: viewModel.conditions.model.formulation.map(Self.formulationIcon)
+            )
+            menu.onSelect = { [weak self] id in
+                self?.viewModel.setFormulation(id.flatMap(PillFormulationModel.init(rawValue:)))
+                self?.dismissMenu?()
+            }
+            showMenu(menu, below: anchor, fullWidth: true, editing: "formulation")
+
+        case let .imprintMenu(face, anchor):
+            let current = faceConditions(face).imprint
+            let selected: Int
+            switch current {
+            case .all:   selected = 0
+            case .none:  selected = 1
+            case .value: selected = 2
+            }
+            let menu = ConditionListMenuView(options: ["전체", "없음", "입력"], selectedIndex: selected)
+            menu.onSelect = { [weak self] index in
+                guard let self else { return }
+                self.dismissMenu?()
+                switch index {
+                case 0: self.viewModel.setImprint(.all, on: face)
+                case 1: self.viewModel.setImprint(.none, on: face)
+                default: self.openImprintInput(face)
+                }
+            }
+            showMenu(menu, below: anchor, fullWidth: false, editing: "imprint")
+
+        case .imprintField(let face):
+            openImprintInput(face)
+
+        case .revertImprint(let face):
+            viewModel.revertImprint(on: face)
+
+        case let .dividingLine(face, anchor):
+            let current = faceConditions(face).dividingLine
+            let selectedID: String?
+            switch current {
+            case .all:                selectedID = nil
+            case .none:               selectedID = "none"
+            case .value(let line):    selectedID = line.rawValue
+            }
+            let menu = ConditionGridMenuView(
+                items: [
+                    ConditionGridItem(id: "none", label: "없음", icon: Self.dividingIcon(nil)),
+                    ConditionGridItem(id: DividingLineModel.plus.rawValue, label: "(+)형", icon: Self.dividingIcon(.plus)),
+                    ConditionGridItem(id: DividingLineModel.minus.rawValue, label: "(−)형", icon: Self.dividingIcon(.minus)),
+                ],
+                selected: Set([selectedID].compactMap { $0 }),
+                multiple: false,
+                modelPreview: nil   // 구분선은 모델이 없다
+            )
+            menu.onSelect = { [weak self] id in
+                let condition: DividingLineCondition
+                switch id {
+                case nil:    condition = .all
+                case "none": condition = .none
+                default:     condition = .value(DividingLineModel(rawValue: id ?? "") ?? .unknown)
+                }
+                self?.viewModel.setDividingLine(condition, on: face)
+                self?.dismissMenu?()
+            }
+            showMenu(menu, below: anchor, fullWidth: true, editing: "dividing_line")
+
+        case let .mark(face, anchor):
+            let current = faceConditions(face).mark
+            let selected: Int
+            switch current {
+            case .all:     selected = 0
+            case .none:    selected = 1
+            case .present: selected = 2
+            }
+            let menu = ConditionListMenuView(options: ["전체", "없음", "있음"], selectedIndex: selected)
+            menu.onSelect = { [weak self] index in
+                guard let self else { return }
+                self.dismissMenu?()
+                // 메뉴에서 고른 `있음` 은 모델값이 아니라 사용자값이다.
+                let condition: MarkCondition = [MarkCondition.all, .none, .present(source: .user)][index]
+                self.viewModel.setMark(condition, on: face)
+            }
+            showMenu(menu, below: anchor, fullWidth: false, editing: "mark")
+        }
+    }
+
+    func faceConditions(_ face: PillFace) -> FaceConditions {
+        face == .front ? viewModel.conditions.front : viewModel.conditions.back
+    }
+
+    /// 카드 높이가 바뀌면(펼침 · 입력칸 등장) 섹션0 셀 self-sizing 을 다시 잰다.
+    /// 조합형 레이아웃은 내용만 바뀐 셀을 다시 재지 않는다 — reconfigure 로 셀 크기를 다시 묻는다.
+    /// (호스트 셀은 같은 카드를 다시 붙이지 않아 퍼스트 리스폰더가 유지된다.)
+    func relayoutCard() {
+        collectionView.performBatchUpdates {
+            collectionView.reconfigureItems(at: [IndexPath(item: 0, section: Section.attribute.rawValue)])
+        }
+    }
+
+    func showMenu(_ menu: UIView, below anchor: UIView, fullWidth: Bool, editing: String) {
+        dismissMenu?()
+        editingAttribute = editing
+        dismissMenu = ConditionMenuPresenter.present(menu, below: anchor, in: view, fullWidth: fullWidth) { [weak self] in
+            self?.dismissMenu = nil
+            self?.editingAttribute = "none"
+        }
+    }
+
+    // MARK: 각인 입력 줄
+
+    func openImprintInput(_ face: PillFace) {
+        editingFace = face
+        editingAttribute = "imprint"
+        let text: String
+        if case .value(let value, _) = faceConditions(face).imprint { text = value } else { text = "" }
+        imprintBar.prepare(faceTitle: face == .front ? "앞면" : "뒷면", text: text)
+        imprintProxy.becomeFirstResponder()
+        // 대리 필드로 키보드 + 입력 줄을 띄운 다음, 실제 입력은 줄 안의 필드로 넘긴다.
+        DispatchQueue.main.async { [weak self] in self?.imprintBar.field.becomeFirstResponder() }
+    }
+
+    /// 확인하지 않고 닫으면 값은 그대로다 — 조건은 확인했을 때만 바뀐다.
+    func closeImprintInput() {
+        editingFace = nil
+        editingAttribute = "none"
+        // 입력 줄의 필드는 키보드 창에 붙어 있어 view.endEditing 이 닿지 않는다 — 직접 내린다.
+        imprintBar.field.resignFirstResponder()
+        imprintProxy.resignFirstResponder()
+    }
+
+    // MARK: 메뉴 칸 그림
+
+    /// 메뉴 칸 순서 — 디자인 격자(4열) 그대로.
+    static let colorOrder: [PillColorModel] = [
+        .white, .yellow, .orange, .pink, .red, .brown, .lightGreen, .green,
+        .teal, .blue, .navy, .magenta, .purple, .gray, .black, .colorless,
+    ]
+    static let shapeOrder: [PillShapeModel] = [
+        .round, .oval, .oblong, .semicircle, .triangle, .square, .diamond, .pentagon, .hexagon, .octagon, .other,
+    ]
+    static let formulationOrder: [PillFormulationModel] = [.tablet, .hardCapsule, .softCapsule, .other]
+
+    static func colorIcon(_ color: PillColorModel) -> UIView {
+        let dot = UIView().then {
+            $0.backgroundColor = color.swatchColor ?? DSColor.Neutral._0
+            $0.layer.cornerRadius = 14
+            $0.layer.borderWidth = 1
+            $0.layer.borderColor = DSColor.Neutral._300.cgColor
+            $0.clipsToBounds = true
+            $0.snp.makeConstraints { $0.width.height.equalTo(28) }
+        }
+        if color == .colorless {
+            // 무색 — 흰 원에 사선.
+            let slash = CAShapeLayer()
+            let path = UIBezierPath()
+            path.move(to: CGPoint(x: 5, y: 23))
+            path.addLine(to: CGPoint(x: 23, y: 5))
+            slash.path = path.cgPath
+            slash.strokeColor = DSColor.Neutral._400.cgColor
+            slash.lineWidth = 1.5
+            dot.layer.addSublayer(slash)
+        }
+        return dot
+    }
+
+    static func shapeIcon(_ shape: PillShapeModel) -> UIView {
+        ShapeGlyphView(shape: shape).then {
+            $0.setTint(DSColor.textSecondary)
+            $0.snp.makeConstraints { $0.width.equalTo(32); $0.height.equalTo(28) }
+        }
+    }
+
+    static func formulationIcon(_ formulation: PillFormulationModel) -> UIView {
+        guard formulation != .other, formulation != .unknown else {
+            return UIView().then { $0.snp.makeConstraints { $0.width.height.equalTo(1) } }
+        }
+        return FormulationIconView(formulation: formulation).then {
+            $0.setTint(DSColor.textSecondary)
+            $0.snp.makeConstraints { $0.width.equalTo(formulation == .tablet ? 24 : 32); $0.height.equalTo(24) }
+        }
+    }
+
+    static func dividingIcon(_ line: DividingLineModel?) -> UIView {
+        DividingLineGlyphView(line: line, tint: DSColor.Neutral._700).then {
+            $0.snp.makeConstraints { $0.width.height.equalTo(24) }
+        }
+    }
+
+    /// 색 메뉴 `전체` 옆 '사진 기준' — 모델이 잰 색.
+    func modelColorPreview() -> UIView? {
+        let colors = viewModel.conditions.model.colorHexes.compactMap(UIColor.init(pillHex:))
+        guard !colors.isEmpty else { return nil }
+        return ColorPieView(colors: colors).then { $0.snp.makeConstraints { $0.width.height.equalTo(20) } }
+    }
+}
+
+private extension PillColorModel {
+    /// 메뉴 라벨 — 디자인 표기(자주 · 무색).
+    var menuLabel: String {
+        switch self {
+        case .magenta:   return "자주"
+        case .colorless: return "무색"
+        default:         return displayName
+        }
+    }
+}
+
+private extension PillShapeModel {
+    var menuLabel: String {
+        self == .diamond ? "마름모형" : displayName
     }
 }
