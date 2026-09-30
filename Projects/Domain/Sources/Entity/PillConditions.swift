@@ -39,6 +39,8 @@ public struct PillModelOutput: Equatable {
     /// 마크 조건과 무관하게 항상 보낸다. 요청 필드 이름은 spec 의 `markEmbedding`, 전송 형식(base64 · fp16)과
     /// 함께 후보 조회 요청을 만들 때 맞춘다(NM-514).
     public let frontEmbedding: [Float]?
+    /// 앞면 임베딩을 뽑은 마크 모델 버전(ML 레포 모델 폴더 이름) — 요청 `markEmbeddingModel`(spec NM-533).
+    public let frontEmbeddingModel: String?
 
     public init(
         attributeToken: String? = nil,
@@ -47,7 +49,8 @@ public struct PillModelOutput: Equatable {
         formulation: PillFormulationModel? = nil,
         frontImprint: String? = nil,
         frontMarkScore: Float? = nil,
-        frontEmbedding: [Float]? = nil
+        frontEmbedding: [Float]? = nil,
+        frontEmbeddingModel: String? = nil
     ) {
         self.attributeToken = attributeToken
         self.colorHexes = colorHexes
@@ -56,6 +59,7 @@ public struct PillModelOutput: Equatable {
         self.frontImprint = frontImprint.flatMap { $0.isEmpty ? nil : $0 }
         self.frontMarkScore = frontMarkScore
         self.frontEmbedding = frontEmbedding
+        self.frontEmbeddingModel = frontEmbeddingModel
     }
 
     /// 수동 추가(NM-187) — 사진이 없어 모델 출력이 없다.
@@ -66,7 +70,8 @@ public struct PillModelOutput: Equatable {
         attribute: PillAttributeModel,
         frontImprint: String? = nil,
         frontMarkScore: Float? = nil,
-        frontEmbedding: [Float]? = nil
+        frontEmbedding: [Float]? = nil,
+        frontEmbeddingModel: String? = nil
     ) {
         let ok = attribute.error == nil
         self.init(
@@ -76,7 +81,8 @@ public struct PillModelOutput: Equatable {
             formulation: ok ? attribute.formulation : nil,
             frontImprint: frontImprint,
             frontMarkScore: frontMarkScore,
-            frontEmbedding: frontEmbedding
+            frontEmbedding: frontEmbedding,
+            frontEmbeddingModel: frontEmbeddingModel
         )
     }
 }
@@ -279,7 +285,9 @@ public struct PillConditions: Equatable {
             shape: shape.userValue,
             formulation: formulation.userValue,
             front: Self.faceQuery(front, embedding: model.frontEmbedding),
-            back: Self.faceQuery(back, embedding: nil)
+            back: Self.faceQuery(back, embedding: nil),
+            // 임베딩을 보낼 때만 — 어느 면이든 markEmbedding 이 있으면 필수, 없으면 서버가 400(spec NM-533).
+            markEmbeddingModel: model.frontEmbedding == nil ? nil : model.frontEmbeddingModel
         )
     }
 
@@ -332,6 +340,8 @@ public struct PillCandidateQuery: Equatable {
     public var formulation: PillFormulationModel?
     public var front: PillFaceQuery?
     public var back: PillFaceQuery?
+    /// 면 임베딩을 뽑은 마크 모델 버전 — 어느 면이든 임베딩이 있으면 필수(spec NM-533).
+    public var markEmbeddingModel: String?
 
     public init(
         attributeToken: String?,
@@ -339,7 +349,8 @@ public struct PillCandidateQuery: Equatable {
         shape: PillShapeModel?,
         formulation: PillFormulationModel?,
         front: PillFaceQuery?,
-        back: PillFaceQuery?
+        back: PillFaceQuery?,
+        markEmbeddingModel: String? = nil
     ) {
         self.attributeToken = attributeToken
         self.colors = colors
@@ -347,6 +358,7 @@ public struct PillCandidateQuery: Equatable {
         self.formulation = formulation
         self.front = front
         self.back = back
+        self.markEmbeddingModel = markEmbeddingModel
     }
 
     /// `INVALID_ATTRIBUTE_TOKEN` 재조회용 — 후보는 나오고 정렬만 덜 맞는다. 화면에 따로 표시하지 않는다.

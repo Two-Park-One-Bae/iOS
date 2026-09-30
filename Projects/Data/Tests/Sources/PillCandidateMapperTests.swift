@@ -87,6 +87,28 @@ final class PillCandidateMapperTests: XCTestCase {
         XCTAssertNil(MarkEmbeddingEncoder.base64([Float](repeating: 0.1, count: 768)))
     }
 
+    /// 임베딩이 있으면 모델 버전이 필수(없으면 서버 400 INVALID_REQUEST, spec NM-533).
+    func test_임베딩을_보내면_마크_모델_버전도_보낸다() throws {
+        let face = PillFaceQuery(imprint: nil, imprintSource: nil, dividingLine: nil, hasMark: nil,
+                                 embedding: [Float](repeating: 0.01, count: 8 * 768))
+        let json = try encode(PillCandidateQuery(attributeToken: nil, colors: [], shape: nil, formulation: nil,
+                                                 front: face, back: nil, markEmbeddingModel: "20260925-convnext-species"))
+
+        XCTAssertEqual(json["markEmbeddingModel"] as? String, "20260925-convnext-species")
+        XCTAssertNotNil((json["front"] as? [String: Any])?["markEmbedding"])
+    }
+
+    /// 모양이 틀려 임베딩을 뺐으면 버전도 뺀다 — 임베딩 없는 버전만으로는 의미가 없다.
+    func test_임베딩이_빠지면_모델_버전도_보내지_않는다() throws {
+        let face = PillFaceQuery(imprint: nil, imprintSource: nil, dividingLine: nil, hasMark: true,
+                                 embedding: [Float](repeating: 0.01, count: 768))
+        let json = try encode(PillCandidateQuery(attributeToken: nil, colors: [], shape: nil, formulation: nil,
+                                                 front: face, back: nil, markEmbeddingModel: "20260925-convnext-species"))
+
+        XCTAssertNil(json["markEmbeddingModel"])
+        XCTAssertNil((json["front"] as? [String: Any])?["markEmbedding"])
+    }
+
     private func encode(_ query: PillCandidateQuery) throws -> [String: Any] {
         let data = try JSONEncoder().encode(query.toNetwork())
         return try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])

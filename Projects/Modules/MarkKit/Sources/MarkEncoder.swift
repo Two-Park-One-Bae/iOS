@@ -21,6 +21,10 @@ public struct MarkReading: Sendable, Equatable {
 public final class MarkEncoder: @unchecked Sendable {
 
     public static let rotations = 8
+    /// 이 인코더가 쓰는 모델 버전 — ML 레포 모델 폴더 이름(`models/mark/{modelVersion}`).
+    /// 후보 조회 요청의 `markEmbeddingModel` 로 간다(spec NM-533) — 서버가 같은 버전의 카탈로그 임베딩과만 비교한다.
+    /// 모델을 바꾸면 models.lock 경로와 함께 고친다(테스트가 둘을 대조한다).
+    public static let modelVersion = "20260925-convnext-species"
     static let noneClass = 0
 
     private let species: MarkSpeciesModel

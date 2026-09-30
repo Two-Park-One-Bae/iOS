@@ -13,7 +13,8 @@ final class PillConditionsTests: XCTestCase {
         formulation: .tablet,
         frontImprint: "AX",
         frontMarkScore: 0.93,
-        frontEmbedding: [0.1, 0.2]
+        frontEmbedding: [0.1, 0.2],
+        frontEmbeddingModel: "mark-v1"
     )
 
     // MARK: - 초기 상태
@@ -210,6 +211,16 @@ final class PillConditionsTests: XCTestCase {
             c.setMark(mark, on: .front)
             XCTAssertEqual(c.query.front?.embedding, [0.1, 0.2], "\(mark)")
         }
+    }
+
+    /// 임베딩을 보내면 뽑은 모델 버전도 함께(spec NM-533) — 없으면 서버가 400.
+    func test_임베딩을_보내면_마크_모델_버전도_함께_보낸다() {
+        XCTAssertEqual(PillConditions(model: model).query.markEmbeddingModel, "mark-v1")
+    }
+
+    func test_임베딩이_없으면_마크_모델_버전도_없다() {
+        let noEmbedding = PillModelOutput(attributeToken: "tok", frontEmbeddingModel: "mark-v1")
+        XCTAssertNil(PillConditions(model: noEmbedding).query.markEmbeddingModel)
     }
 
     func test_수동_추가는_토큰도_조건도_없다() {
