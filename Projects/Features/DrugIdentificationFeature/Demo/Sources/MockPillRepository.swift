@@ -53,7 +53,8 @@ final class MockPillRepository: PillRepositoryProtocol {
 
     // MARK: 후보 (서버 /api/v1 흉내)
 
-    /// 데모 카탈로그 — 앞 셋은 이름 있는 품목, 뒤는 이어 받기(21번째~)를 보이려는 채움. 75개.
+    /// 데모 카탈로그 — 앞 셋은 이름 있는 품목, 뒤는 이어 받기(21번째~)를 보이려는 채움. 200개.
+    /// 보통은 앞 75개를, 잘린 결과(truncated)는 서버처럼 200개를 돌려준다.
     private static let catalog: [PillCandidateModel] = {
         let named = [
             PillCandidateModel(
@@ -74,7 +75,7 @@ final class MockPillRepository: PillRepositoryProtocol {
                 pillThumbnailUrl: nil, licenseStatus: .normal
             ),
         ]
-        let filler = (4...75).map { n in
+        let filler = (4...200).map { n in
             PillCandidateModel(
                 pillCode: String(format: "D%07d", n), pillName: "데모 후보 \(n)", companyName: "데모제약",
                 pillThumbnailUrl: nil, licenseStatus: .normal,
@@ -98,11 +99,15 @@ final class MockPillRepository: PillRepositoryProtocol {
                 .delay(for: .milliseconds(400), scheduler: DispatchQueue.main)
                 .eraseToAnyPublisher()
         }
-        let ids = query.shape == .other ? [] : Self.catalog.map(\.pillCode)
+        // 서버는 하드 조건을 통과한 후보가 200개를 넘으면 앞 200개만 ids 로 주고 truncated 를 켠다 —
+        // 그 너머는 이어 받을 수 없고, 목록 끝 안내로 조건을 더 좁히게 한다.
+        let truncated = query.front?.dividingLine != nil
+        let count = query.shape == .other ? 0 : (truncated ? 200 : 75)
+        let ids = Self.catalog.prefix(count).map(\.pillCode)
         let result = PillCandidateResultModel(
             ids: ids,
-            candidates: Array(Self.catalog.prefix(ids.isEmpty ? 0 : 20)),
-            truncated: query.front?.dividingLine != nil && !ids.isEmpty
+            candidates: Array(Self.catalog.prefix(min(20, count))),
+            truncated: truncated && count > 0
         )
         return Just(result)
             .setFailureType(to: Error.self)

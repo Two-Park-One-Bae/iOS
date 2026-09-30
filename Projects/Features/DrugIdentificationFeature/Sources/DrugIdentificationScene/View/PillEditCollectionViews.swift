@@ -104,6 +104,8 @@ final class CandidateCell: UICollectionViewCell {
             $0.alignment = .leading
         }
         nameRow.snp.makeConstraints { $0.width.equalTo(texts) }
+        // 면 요약이 넘치면 줄 안에서 각인이 줄어든다(칸 밖으로 밀려나지 않게).
+        faceSummary.snp.makeConstraints { $0.width.lessThanOrEqualTo(texts) }
 
         info.setImage(DSIcon.info.uiImage, for: .normal)
         info.tintColor = DSColor.Primary._500
@@ -125,10 +127,15 @@ final class CandidateCell: UICollectionViewCell {
 
     @objc private func thumbTapped() { onThumbnailTap?() }
 
+    /// 업체명은 4자를 넘으면 말줄임 — 이름에 자리를 내준다(spec pill-recognition 후보 목록).
+    private static func shortCompany(_ name: String) -> String {
+        name.count > 4 ? String(name.prefix(4)) + "…" : name
+    }
+
     func configure(candidate: PillCandidateModel, selected: Bool, position: Position) {
         pillCode = candidate.pillCode
         nameLabel.text = candidate.pillName ?? "이름 미상"
-        companyLabel.text = candidate.companyName
+        companyLabel.text = candidate.companyName.map(Self.shortCompany)
         companyLabel.isHidden = candidate.companyName == nil
         licenseBadge.isHidden = candidate.licenseStatus != .revoked
         faceSummary.configure(front: candidate.front, back: candidate.back)
@@ -251,6 +258,9 @@ final class CandidateFaceSummaryView: UIStackView {
     private func imprintCell(_ imprint: String) -> UIView {
         let cell = box(fill: DSColor.Neutral._100)
         let label = UILabel().then {
+            // 넘치면 각인만 말줄임 — 구분선 · 마크 칸은 지킨다(spec).
+            $0.lineBreakMode = .byTruncatingTail
+            $0.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
             $0.attributedText = NSAttributedString(string: imprint, attributes: [
                 .font: DSKitFontFamily.Pretendard.bold.font(size: 12),
                 .foregroundColor: DSColor.textPrimary,
@@ -259,6 +269,7 @@ final class CandidateFaceSummaryView: UIStackView {
         }
         cell.addSubview(label)
         label.snp.makeConstraints { $0.centerY.equalToSuperview(); $0.leading.trailing.equalToSuperview().inset(5) }
+        cell.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         return cell
     }
 
