@@ -158,7 +158,8 @@ final class PillResultRowView: UIView {
     private func makeAttrs() -> UIView {
         let attr = pill.attribute
 
-        let colorGroup = makeGroup(label: "색상", chip: makeColorChip(colors: attr.colors, transparent: attr.isTransparent))
+        // v1 속성에는 색 이름 · 투명 · 면 정보가 없다 — 결과 카드 개편(B) 전까지 색은 '미상', 면 요약은 비워 둔다.
+        let colorGroup = makeGroup(label: "색상", chip: makeColorChip(colors: [], transparent: false))
         let shapeGroup = makeGroup(label: "모양", chip: makeShapeChip(attr.shape))
         let formGroup  = makeGroup(label: "제형", chip: makeFormulationChip(attr.formulation))
 
@@ -169,7 +170,7 @@ final class PillResultRowView: UIView {
         }
 
         let summary = ImprintSummaryView()
-        summary.update(front: attr.front, back: attr.back)
+        summary.update(front: nil, back: nil)
 
         let container = UIStackView(arrangedSubviews: [chipsRow, summary]).then {
             $0.axis = .vertical

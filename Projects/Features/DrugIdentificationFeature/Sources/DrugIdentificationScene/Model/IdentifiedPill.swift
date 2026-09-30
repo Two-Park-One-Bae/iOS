@@ -86,11 +86,3 @@ extension DividingLineModel {
         }
     }
 }
-
-extension PillAttributeModel {
-    // "하양, 노랑" 형태
-    var colorsText: String {
-        guard !colors.isEmpty else { return "미상" }
-        return colors.map(\.displayName).joined(separator: ", ")
-    }
-}

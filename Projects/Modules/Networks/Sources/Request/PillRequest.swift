@@ -18,7 +18,7 @@ public struct PillImageRequest: Encodable {
     }
 }
 
-// POST /api/v0/pill-attributes 요청 바디 — 크롭만 전달한다.
+// POST /api/v1/pill-attributes 요청 바디 — 크롭만 전달한다.
 // 원본은 /api/v0/pill-images/upload-url로 S3에 직접 업로드하며 식별 요청과 분리된다 (NM-348).
 public struct PillAttributeRequest: Encodable {
     public let items: [PillAttributeItemRequest]

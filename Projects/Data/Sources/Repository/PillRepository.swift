@@ -21,15 +21,14 @@ public final class PillRepository: PillRepositoryProtocol {
     public func fetchPillAttributes(
         items: [(pillId: String, croppedImage: String)]
     ) -> AnyPublisher<PillAttributeResultModel, Error> {
-        // OpenAPI 스키마에 맞춰 이미지를 {mimeType, data}로 감싼다. 크롭 썸네일은 png(ViewModel 기준).
+        // OpenAPI 스키마에 맞춰 이미지를 {mimeType, data}로 감싼다 — 크롭은 마스크를 알파에 담은 PNG (spec Image: image/png 만 허용).
         // 원본은 이 요청에 싣지 않는다 — pill-images/upload-url로 S3 직접 업로드(NM-348).
-        let requestItems = items.map {
+        let request = PillAttributeRequest(items: items.map {
             PillAttributeItemRequest(
                 pillId: $0.pillId,
                 croppedImage: PillImageRequest(mimeType: "image/png", data: $0.croppedImage)
             )
-        }
-        let request = PillAttributeRequest(items: requestItems)
+        })
 
         return service.fetchPillAttributes(request: request)
             .map { $0.toDomain() }

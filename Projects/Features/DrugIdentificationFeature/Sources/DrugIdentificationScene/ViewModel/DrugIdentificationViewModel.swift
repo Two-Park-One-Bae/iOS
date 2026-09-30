@@ -112,10 +112,8 @@ public final class DrugIdentificationViewModel {
         let crops = RFDetrSegmentor.croppedImages(from: image, detections: detections)
         return detections.enumerated().map { offset, detection in
             let placeholder = PillAttributeModel(
-                pillId: "\(detection.id)",
-                colors: [], isTransparent: false,
-                shape: nil, formulation: nil,
-                front: nil, back: nil, error: nil
+                pillId: "\(detection.id)", attributeToken: nil, colorHexes: [],
+                shape: nil, formulation: nil, error: nil
             )
             return IdentifiedPill(
                 index: offset + 1,

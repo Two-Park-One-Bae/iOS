@@ -9,7 +9,7 @@ import Foundation
 import Moya
 
 public enum PillAPI {
-    // POST /api/v0/pill-attributes — 크롭 이미지 → 색·모양·제형 추출
+    // POST /api/v1/pill-attributes — 크롭 이미지 → 속성 토큰 + 표시값(색 hex · 대표 모양 · 대표 제형) (NM-487 · NM-521)
     case pillAttributes(request: PillAttributeRequest)
     // POST /api/v0/pill-candidates — 수정 속성 → 후보 알약 조회
     case pillCandidates(request: PillCandidateRequest)
@@ -23,7 +23,14 @@ public enum PillAPI {
 }
 
 extension PillAPI: BaseAPI {
-    public static var apiType: APIType = .pill  // baseURL = NetworkConfig.baseURL + "/api/v0"
+    public static var apiType: APIType = .pill  // baseURL = NetworkConfig.baseURL + "/api/{apiVersion}"
+
+    public var apiVersion: String {
+        switch self {
+        case .pillAttributes: return "v1"
+        default:              return "v0"
+        }
+    }
 
     public var path: String {
         switch self {

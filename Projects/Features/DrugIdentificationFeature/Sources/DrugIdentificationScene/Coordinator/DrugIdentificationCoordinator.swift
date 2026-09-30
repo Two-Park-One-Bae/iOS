@@ -332,8 +332,8 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
         guard let resultVC else { return }
         let index = resultVC.nextManualIndex()
         let empty = PillAttributeModel(
-            pillId: "manual-\(index)", colors: [], isTransparent: false,
-            shape: nil, formulation: nil, front: nil, back: nil, error: nil
+            pillId: "manual-\(index)", attributeToken: nil, colorHexes: [],
+            shape: nil, formulation: nil, error: nil
         )
         let viewModel = PillEditViewModel(pillIndex: index, attribute: empty, thumbnail: nil, isManual: true)
         let vc = PillEditVC(viewModel: viewModel)

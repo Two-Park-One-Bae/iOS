@@ -289,8 +289,8 @@ public final class DrugIdentificationVC: UIViewController {
             thumbnail: nil,
             boundingBox: .zero,
             attribute: PillAttributeModel(
-                pillId: "manual-\(index)", colors: [], isTransparent: false,
-                shape: nil, formulation: nil, front: nil, back: nil, error: nil
+                pillId: "manual-\(index)", attributeToken: nil, colorHexes: [],
+                shape: nil, formulation: nil, error: nil
             )
         )
         manualPills.append(pill)

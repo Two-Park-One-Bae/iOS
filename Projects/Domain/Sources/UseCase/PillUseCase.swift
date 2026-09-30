@@ -88,10 +88,8 @@ public final class DefaultPillUseCase: PillUseCase {
                 return Empty<PillAttributeResultModel, Never>()
             }
             .sink { [weak self] result in
-                // usage가 nil이면 서버가 아직 0.13.0 미적용 — 잔여를 '미확인'으로 두고 덮어쓰지 않는다
-                if let usage = result.usage {
-                    self?.pillUsage.send(usage)
-                }
+                // v1 응답은 usage 가 필수다 — 이번 요청 차감이 반영된 잔여
+                self?.pillUsage.send(result.usage)
                 self?.pillAttributes.send(result.items)
             }
             .store(in: &cancellables)

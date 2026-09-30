@@ -9,7 +9,7 @@ import Combine
 import Foundation
 
 public protocol PillRepositoryProtocol {
-    // 크롭 이미지 → 색·모양·제형 추출 (원본은 별도 S3 업로드, NM-348)
+    // 크롭 이미지 → 속성 토큰 + 표시값 추출 (서버 /api/v1, NM-487 · NM-521). 원본은 별도 S3 업로드(NM-348)
     // 한도 도달 시 PillLimitExceededError로 실패한다 (429 LIMIT_EXCEEDED · 미차감)
     func fetchPillAttributes(
         items: [(pillId: String, croppedImage: String)]
