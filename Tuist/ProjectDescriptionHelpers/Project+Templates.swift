@@ -84,6 +84,8 @@ public extension Project {
                     deploymentTargets: Environment.deploymentTarget,
                     infoPlist: .extendingDefault(with: [
                         "UIRequiresFullScreen": true,
+                        // 앱과 같이 라이트 모드 고정 — 데모가 다크 모드로 뜨면 화면이 앱과 달라 보인다.
+                        "UIUserInterfaceStyle": "Light",
                         "UILaunchScreen": ["UIColorName": "", "UIImageName": ""],
                         "NSCameraUsageDescription": "카메라로 알약을 촬영합니다.",
                         "NSPhotoLibraryUsageDescription": "갤러리에서 알약 사진을 선택합니다.",
