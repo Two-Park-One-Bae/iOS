@@ -54,7 +54,7 @@ final class MockPillRepository: PillRepositoryProtocol {
     // MARK: 후보 (서버 /api/v1 흉내)
 
     /// 데모 카탈로그 — 앞 셋은 이름 있는 품목, 뒤는 이어 받기(21번째~)를 보이려는 채움. 200개.
-    /// 보통은 앞 75개를, 잘린 결과(truncated)는 서버처럼 200개를 돌려준다.
+    /// 보통은 앞 151개(마크 296개가 모두 나오는 데까지)를, 잘린 결과(truncated)는 서버처럼 200개를 돌려준다.
     private static let catalog: [PillCandidateModel] = {
         let named = [
             PillCandidateModel(
@@ -75,23 +75,27 @@ final class MockPillRepository: PillRepositoryProtocol {
                 pillThumbnailUrl: nil, licenseStatus: .normal
             ),
         ]
+        func mark(_ n: Int, _ side: Int) -> String? {
+            let index = (n - 4) * 2 + side
+            return index < MockPillMarkCodes.all.count ? MockPillMarkCodes.all[index] : nil
+        }
         let filler = (4...200).map { n in
             PillCandidateModel(
                 pillCode: String(format: "D%07d", n), pillName: "데모 후보 \(n)", companyName: "데모제약",
                 pillThumbnailUrl: nil, licenseStatus: .normal,
-                // 3의 배수는 마크 있음 — 앱에 있는 코드를 돌려 쓰고, 99 는 앱에 없는 코드(일반 아이콘)를 보인다.
-                front: PillFaceModel(imprint: "D\(n)", dividingLine: nil, hasMark: n % 3 == 0,
-                                              markCode: n == 99 ? "r9999" : MockPillRepository.demoMarkCodes[n % MockPillRepository.demoMarkCodes.count]),
-                back: PillFaceModel(imprint: nil, dividingLine: nil, hasMark: false, markCode: nil)
+                // 앞 · 뒷면에 마크를 하나씩 순서대로 — 4~151번 후보가 앱에 넣은 마크 296개를 모두 한 번씩 보인다.
+                // 152번 이후는 마크 없음, 99번 뒷면은 앱에 없는 코드(일반 아이콘).
+                front: PillFaceModel(imprint: "D\(n)", dividingLine: nil, hasMark: mark(n, 0) != nil,
+                                              markCode: mark(n, 0)),
+                back: PillFaceModel(imprint: nil, dividingLine: nil, hasMark: n == 99 || mark(n, 1) != nil,
+                                             markCode: n == 99 ? "r9999" : mark(n, 1))
             )
         }
         return named + filler
     }()
 
-    private static let demoMarkCodes = ["r0027", "r0062", "r0393", "r0406", "r0408", "r0419", "r0044", "r0049"]
-
     /// 그사이 사라진 품목 흉내 — ids 에는 있지만 items 조회에서 missing 으로 돌아온다.
-    private static let vanishedCode = String(format: "D%07d", 30)
+    private static let vanishedCode = String(format: "D%07d", 170)   // 마크 없는 후보 — 마크 전체 보기를 가리지 않게
 
     struct DemoSearchFailure: Error {}
 
@@ -106,7 +110,7 @@ final class MockPillRepository: PillRepositoryProtocol {
         // 서버는 하드 조건을 통과한 후보가 200개를 넘으면 앞 200개만 ids 로 주고 truncated 를 켠다 —
         // 그 너머는 이어 받을 수 없고, 목록 끝 안내로 조건을 더 좁히게 한다.
         let truncated = query.front?.dividingLine != nil
-        let count = query.shape == .other ? 0 : (truncated ? 200 : 75)
+        let count = query.shape == .other ? 0 : (truncated ? 200 : 151)
         let ids = Self.catalog.prefix(count).map(\.pillCode)
         let result = PillCandidateResultModel(
             ids: ids,
