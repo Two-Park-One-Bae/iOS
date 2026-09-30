@@ -7,35 +7,33 @@
 
 import Foundation
 
-// 알약 1개의 색·모양·제형 분석 결과 (비즈니스 모델)
+/// 알약 1개의 속성 추출 결과 (서버 /api/v1 — NM-487 · NM-521).
+///
+/// 서버가 색 이름을 주지 않는다. 모델 출력은 **속성 토큰**으로 받아 후보 조회에 그대로 돌려주고(정렬용),
+/// 화면에는 표시값(`colorHexes` · 대표 모양 · 대표 제형)만 쓴다.
+/// 표시값은 검색 조건이 아니다 — 사용자가 직접 고른 값만 조건이 된다(spec candidate.md 「모델값과 사용자값」).
 public struct PillAttributeModel: Equatable {
     public let pillId: String
-    public let colors: [PillColorModel]
-    public let isTransparent: Bool
+    public let attributeToken: String?
+    public let colorHexes: [String]
     public let shape: PillShapeModel?
     public let formulation: PillFormulationModel?
-    public let front: PillFaceModel?
-    public let back: PillFaceModel?
-    // 개별 알약 추출 실패 시 에러 코드. 성공 시 nil
+    /// `EXTRACTION_FAILED` 등. nil 이 아니면 나머지는 비어 있다 — 수정 화면은 모든 칸 `전체` 로 연다.
     public let error: String?
 
     public init(
         pillId: String,
-        colors: [PillColorModel],
-        isTransparent: Bool,
+        attributeToken: String?,
+        colorHexes: [String],
         shape: PillShapeModel?,
         formulation: PillFormulationModel?,
-        front: PillFaceModel?,
-        back: PillFaceModel?,
         error: String?
     ) {
         self.pillId = pillId
-        self.colors = colors
-        self.isTransparent = isTransparent
+        self.attributeToken = attributeToken
+        self.colorHexes = colorHexes
         self.shape = shape
         self.formulation = formulation
-        self.front = front
-        self.back = back
         self.error = error
     }
 }

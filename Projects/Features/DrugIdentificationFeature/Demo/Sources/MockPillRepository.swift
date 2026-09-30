@@ -15,34 +15,16 @@ final class MockPillRepository: PillRepositoryProtocol {
     func fetchPillAttributes(
         items: [(pillId: String, croppedImage: String)]
     ) -> AnyPublisher<PillAttributeResultModel, Error> {
-        let stub = items.enumerated().map { index, item -> PillAttributeModel in
-            // 두 번째 알약은 색·모양·제형·각인 인식 실패 카드로 반환
-            if index == 1 {
-                return PillAttributeModel(
-                    pillId:        item.pillId,
-                    colors:        [],
-                    isTransparent: false,
-                    shape:         nil,
-                    formulation:   nil,
-                    front:         nil,
-                    back:          nil,
-                    error:         "RECOGNITION_FAILED"
-                )
-            }
-            return PillAttributeModel(
-                pillId:        item.pillId,
-                colors:        [.white, .yellow],
-                isTransparent: false,
-                shape:         .oval,
-                formulation:   .tablet,
-                front:         PillFaceModel(imprint: "ABC", dividingLine: .minus, hasMark: false),
-                back:          PillFaceModel(imprint: nil, dividingLine: nil, hasMark: false),
-                error:         nil
-            )
-        }
+        // 두 번째 알약은 추출 실패 — 부분 실패가 없어 실패면 나머지가 모두 비어 있다.
         // 데모는 한도를 소진하지 않는다 — 잔여를 넉넉히 준다. 한도 UI는 fetchPillUsage 스텁으로 확인.
-        let result = PillAttributeResultModel(items: stub, usage: Self.stubUsage(remaining: 12))
-        return Just(result)
+        let stub = items.enumerated().map { index, item in
+            index == 1
+                ? PillAttributeModel(pillId: item.pillId, attributeToken: nil, colorHexes: [],
+                                       shape: nil, formulation: nil, error: "EXTRACTION_FAILED")
+                : PillAttributeModel(pillId: item.pillId, attributeToken: "demo-token-\(index)",
+                                       colorHexes: ["#E6E3DD"], shape: .round, formulation: .tablet, error: nil)
+        }
+        return Just(PillAttributeResultModel(items: stub, usage: Self.stubUsage(remaining: 12)))
             .setFailureType(to: Error.self)
             .eraseToAnyPublisher()
     }

@@ -17,17 +17,18 @@ public enum APIType {
 
 public protocol BaseAPI: TargetType, AccessTokenAuthorizable {
     static var apiType: APIType { get }
+    /// 경로 앞의 API 버전(`/api/{apiVersion}`). 엔드포인트마다 다를 수 있다 —
+    /// 알약 식별의 breaking 변경은 `/api/v1` 로 분기했고 나머지는 `/api/v0` 에 남았다(spec NM-521).
+    var apiVersion: String { get }
 }
 
 public extension BaseAPI {
-    var baseURL: URL {
-        var base = NetworkConfig.baseURL
+    var apiVersion: String { "v0" }
 
+    var baseURL: URL {
         // 인증 엔드포인트도 전부 /api/v0 아래에 있다 (spec: openapi.yaml).
         // 루트 경로는 헬스 체크(/actuator/health)뿐이고 앱이 호출하지 않는다.
-        switch Self.apiType {
-        case .auth, .pill, .rag, .timer: base += "/api/v0"
-        }
+        let base = NetworkConfig.baseURL + "/api/\(apiVersion)"
 
         guard let url = URL(string: base) else {
             fatalError("baseURL을 구성할 수 없습니다.")

@@ -42,10 +42,7 @@ extension PillUsageEntity {
 
 extension PillAttributeResponseEntity {
     public func toDomain() -> PillAttributeResultModel {
-        PillAttributeResultModel(
-            items: items.map { $0.toDomain() },
-            usage: usage?.toDomain()
-        )
+        PillAttributeResultModel(items: items.map { $0.toDomain() }, usage: usage.toDomain())
     }
 }
 
@@ -54,15 +51,19 @@ extension PillAttributeResponseEntity {
 extension PillAttributeEntity {
     public func toDomain() -> PillAttributeModel {
         PillAttributeModel(
-            pillId:        pillId,
-            colors:        colors?.compactMap { $0.toDomain() } ?? [],
-            isTransparent: isTransparent,
-            shape:         shape?.toDomain(),
-            formulation:   formulation?.toDomain(),
-            front:         front?.toDomain(),
-            back:          back?.toDomain(),
-            error:         error
+            pillId:         pillId,
+            attributeToken: attributeToken,
+            // 화면이 그대로 색으로 그리는 값이라 형식이 어긋난 것은 버린다 — 잘못된 hex 하나로 견본 전체가 깨지지 않게.
+            colorHexes:     colorHexes?.filter(Self.isHexColor) ?? [],
+            shape:          shape?.toDomain(),
+            formulation:    formulation?.toDomain(),
+            error:          error
         )
+    }
+
+    /// spec pattern `^#[0-9A-Fa-f]{6}$`.
+    static func isHexColor(_ value: String) -> Bool {
+        value.count == 7 && value.first == "#" && value.dropFirst().allSatisfy(\.isHexDigit)
     }
 }
 
@@ -138,7 +139,8 @@ extension DividingLine {
         switch self {
         case .plus:    return .plus
         case .minus:   return .minus
-        case .unknown: return nil
+        // NONE 은 요청 전용이라 응답에 오지 않는다 — 와도 v0 규칙(없음 = null)대로 둔다.
+        case .none, .unknown: return nil
         }
     }
 }

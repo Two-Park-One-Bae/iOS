@@ -47,14 +47,12 @@ public enum PillLimitAlertText {
     }
 }
 
-/// 속성분류 결과 + 이번 요청이 반영된 사용량 (API 0.13.0 `{ items, usage }`).
-///
-/// `usage`는 옵셔널이다 — 0.13.0 미적용 서버는 bare array를 주고, 그때는 잔여를 '미확인'으로 둔다.
-public struct PillAttributeResultModel {
+/// 속성 추출 결과 + 이번 요청이 반영된 사용량 (`{ items, usage }` — v1 은 usage 가 필수다).
+public struct PillAttributeResultModel: Equatable {
     public let items: [PillAttributeModel]
-    public let usage: PillUsageModel?
+    public let usage: PillUsageModel
 
-    public init(items: [PillAttributeModel], usage: PillUsageModel?) {
+    public init(items: [PillAttributeModel], usage: PillUsageModel) {
         self.items = items
         self.usage = usage
     }

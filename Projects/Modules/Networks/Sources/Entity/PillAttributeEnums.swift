@@ -67,7 +67,9 @@ public enum PillFormulation: String, Codable {
 }
 
 // 구분선. 각인 텍스트에서 파생 (십자분할선 → PLUS, 분할선 → MINUS)
+// NONE 은 v1 후보 조회 요청 전용 — "구분선 없는 알약만". 응답 면 정보는 없음을 null 로 둔다(spec DividingLine).
 public enum DividingLine: String, Codable {
+    case none  = "NONE"
     case plus  = "PLUS"
     case minus = "MINUS"
     case unknown

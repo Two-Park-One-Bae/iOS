@@ -60,12 +60,13 @@ final class PillEditViewModel {
         self.pillIndex = pillIndex
         self.thumbnail = thumbnail
         self.isManual = isManual
-        self.colors = attribute.colors
-        self.isTransparent = attribute.isTransparent
+        // v1 속성에는 색 이름 · 투명 · 면 정보가 없다 — 수정 화면 개편(C) 전까지 대표 모양 · 제형만 채운다.
+        self.colors = []
+        self.isTransparent = false
         self.shape = attribute.shape
         self.formulation = attribute.formulation
-        self.front = attribute.front
-        self.back = attribute.back
+        self.front = nil
+        self.back = nil
     }
 
     // MARK: - Transform
