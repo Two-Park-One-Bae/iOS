@@ -7,7 +7,7 @@ import MarkKit
 struct PillFaceModelResult: Equatable {
     /// 각인 확신 글자. 보류·판독 실패면 nil — 수정 화면은 `전체` 로 시작한다.
     let imprint: String?
-    /// 마크 유무 점수 `1 − P(없음)`. 조건으로 접는 규칙(0.80)은 도메인 `PillMarkRule` 이 갖는다.
+    /// 마크 유무 점수 `1 − P(없음)`. 조건으로 접는 규칙(각인 있음 0.80 · 없음 0.60)은 도메인 `PillMarkRule` 이 갖는다.
     let markScore: Float
     /// 8방향 × 768 임베딩 — 요청 `markEmbedding` 으로 서버에 간다.
     let embedding: [Float]

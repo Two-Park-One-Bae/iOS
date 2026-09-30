@@ -18,6 +18,15 @@ final class IdentifiedPillModelOutputTests: XCTestCase {
         XCTAssertEqual(conditions.front.mark, .present(source: .model))
     }
 
+    func test_마크_임계는_같은_면의_각인_유무로_나뉜다() {
+        // NM-527 — 각인 확신 글자가 있으면 0.80, 없으면 0.60.
+        let withImprint = PillFaceModelResult(imprint: "AX", markScore: 0.70, embedding: embedding)
+        let withoutImprint = PillFaceModelResult(imprint: nil, markScore: 0.70, embedding: embedding)
+        XCTAssertEqual(PillConditions(model: pill(face: withImprint).modelOutput).front.mark, .all)
+        XCTAssertEqual(PillConditions(model: pill(face: withoutImprint).modelOutput).front.mark, .present(source: .model))
+        XCTAssertEqual(PillConditions(model: pill(face: withoutImprint).modelOutput).query.front?.hasMark, true)
+    }
+
     func test_임베딩은_마크_조건과_무관하게_앞면_요청에_실린다() {
         let face = PillFaceModelResult(imprint: nil, markScore: 0.10, embedding: embedding)
         let conditions = PillConditions(model: pill(face: face).modelOutput)

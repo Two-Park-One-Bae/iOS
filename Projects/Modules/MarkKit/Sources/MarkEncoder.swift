@@ -4,7 +4,7 @@ import ImprintKit
 
 /// 한 면의 마크 결과 — 정본 `mark_species_infer.py` 의 유무·임베딩.
 public struct MarkReading: Sendable, Equatable {
-    /// 유무 점수 `1 − P(없음)`, 8방향 확률 평균에서. 조건으로 접는 규칙(0.80)은 도메인 `PillMarkRule` 이 갖는다.
+    /// 유무 점수 `1 − P(없음)`, 8방향 확률 평균에서. 조건으로 접는 규칙(각인 있음 0.80 · 없음 0.60)은 도메인 `PillMarkRule` 이 갖는다.
     public let presence: Float
     /// 8방향 × 768, 방향 순서(0°, 45°, …) 로 이어 붙인 L2 정규화 임베딩. 서버가 후보 면과 코사인 **최댓값**을 쓴다.
     public let embedding: [Float]
