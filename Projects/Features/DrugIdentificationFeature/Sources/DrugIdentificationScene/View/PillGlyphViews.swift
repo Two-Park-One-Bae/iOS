@@ -77,8 +77,8 @@ private struct ShapeSpec {
     enum Kind {
         case ellipse
         case roundedRect
-        /// 위쪽 두 모서리만 둥근 사각형(반원형).
-        case topRounded
+        /// 원의 위쪽 절반(반원형) — 가로:세로 = 2:1.
+        case semicircle
         /// 정다각형 — 꼭짓점 수 · 첫 꼭짓점 각도(0 = 위).
         case polygon(sides: Int, rotation: CGFloat)
 
@@ -88,15 +88,18 @@ private struct ShapeSpec {
                 return CGPath(ellipseIn: box, transform: nil)
             case .roundedRect:
                 return UIBezierPath(roundedRect: box, cornerRadius: r).cgPath
-            case .topRounded:
-                return UIBezierPath(roundedRect: box, byRoundingCorners: [.topLeft, .topRight],
-                                    cornerRadii: CGSize(width: r, height: r)).cgPath
+            case .semicircle:
+                let radius = min(box.width / 2, box.height)
+                let center = CGPoint(x: box.midX, y: box.midY + radius / 2)
+                let path = UIBezierPath(arcCenter: center, radius: radius, startAngle: .pi, endAngle: 0, clockwise: true)
+                path.close()
+                return path.cgPath
             case .polygon(let sides, let rotation):
                 return Self.roundedPolygon(sides: sides, rotation: rotation, in: box, cornerRadius: r)
             }
         }
 
-        /// 정다각형 꼭짓점을 박스에 꽉 차게 늘린 뒤, 꼭짓점마다 반경 r 로 둥글린다.
+        /// 정다각형을 비율 그대로(늘리지 않고) 박스 가운데에 맞춘 뒤, 꼭짓점마다 반경 r 로 둥글린다.
         private static func roundedPolygon(sides: Int, rotation: CGFloat, in box: CGRect, cornerRadius r: CGFloat) -> CGPath {
             let unit = (0..<sides).map { i -> CGPoint in
                 let angle = -CGFloat.pi / 2 + rotation + CGFloat(i) * 2 * .pi / CGFloat(sides)
@@ -104,10 +107,9 @@ private struct ShapeSpec {
             }
             let minX = unit.map(\.x).min()!, maxX = unit.map(\.x).max()!
             let minY = unit.map(\.y).min()!, maxY = unit.map(\.y).max()!
-            let points = unit.map {
-                CGPoint(x: box.minX + ($0.x - minX) / (maxX - minX) * box.width,
-                        y: box.minY + ($0.y - minY) / (maxY - minY) * box.height)
-            }
+            let scale = min(box.width / (maxX - minX), box.height / (maxY - minY))
+            let origin = CGPoint(x: box.midX - (maxX + minX) / 2 * scale, y: box.midY - (maxY + minY) / 2 * scale)
+            let points = unit.map { CGPoint(x: origin.x + $0.x * scale, y: origin.y + $0.y * scale) }
             let path = CGMutablePath()
             let last = points[sides - 1], first = points[0]
             path.move(to: CGPoint(x: (last.x + first.x) / 2, y: (last.y + first.y) / 2))
@@ -119,7 +121,8 @@ private struct ShapeSpec {
         }
     }
 
-    /// 디자인 모양 메뉴의 그림 크기(pt) — 비율과 모서리 반경의 기준.
+    /// 그림 크기(pt) — 디자인 모양 메뉴 기준. 비율과 모서리 반경의 기준.
+    /// 정다각형은 이 박스 안에 제 비율로 들어간다. 반원 · 사각형은 디자인보다 키워 원과 무게를 맞췄다.
     let size: CGSize
     let cornerRadius: CGFloat
     let kind: Kind
@@ -132,12 +135,12 @@ private extension PillShapeModel {
         case .round:      return ShapeSpec(size: CGSize(width: 19, height: 19), cornerRadius: 0, kind: .ellipse)
         case .oval:       return ShapeSpec(size: CGSize(width: 23, height: 14), cornerRadius: 0, kind: .ellipse)
         case .oblong:     return ShapeSpec(size: CGSize(width: 24, height: 12), cornerRadius: 6, kind: .roundedRect)
-        case .semicircle: return ShapeSpec(size: CGSize(width: 23, height: 13), cornerRadius: 11, kind: .topRounded)
+        case .semicircle: return ShapeSpec(size: CGSize(width: 24, height: 12), cornerRadius: 0, kind: .semicircle)
         case .triangle:   return ShapeSpec(size: CGSize(width: 26, height: 23), cornerRadius: 3, kind: .polygon(sides: 3, rotation: 0))
-        case .square:     return ShapeSpec(size: CGSize(width: 17, height: 17), cornerRadius: 4, kind: .roundedRect)
+        case .square:     return ShapeSpec(size: CGSize(width: 19, height: 19), cornerRadius: 4, kind: .roundedRect)
         case .diamond:    return ShapeSpec(size: CGSize(width: 24, height: 24), cornerRadius: 3, kind: .polygon(sides: 4, rotation: 0))
         case .pentagon:   return ShapeSpec(size: CGSize(width: 21, height: 21), cornerRadius: 3, kind: .polygon(sides: 5, rotation: 0))
-        case .hexagon:    return ShapeSpec(size: CGSize(width: 20, height: 20), cornerRadius: 3, kind: .polygon(sides: 6, rotation: 0))
+        case .hexagon:    return ShapeSpec(size: CGSize(width: 21, height: 21), cornerRadius: 3, kind: .polygon(sides: 6, rotation: 0))
         case .octagon:    return ShapeSpec(size: CGSize(width: 19, height: 19), cornerRadius: 2, kind: .polygon(sides: 8, rotation: .pi / 8))
         case .other, .unknown: return nil
         }
