@@ -13,6 +13,8 @@ public extension Project {
         hasResources: Bool = false,
         // 프레임워크 타깃에 붙일 빌드 스크립트 (예: 번들할 모델이 받아져 있는지 검사).
         scripts: [TargetScript] = [],
+        // 프레임워크 타깃에만 더할 빌드 설정 (예: 화소 루프 모듈을 Debug 에서도 최적화).
+        frameworkSettings: SettingsDictionary = [:],
         // 모듈별로 추가할 커스텀 타깃·스킴 (예: 버전별 데모 앱 + 위젯 익스텐션).
         extraTargets: [Target] = [],
         extraSchemes: [Scheme] = []
@@ -39,7 +41,7 @@ public extension Project {
                     resources: hasResources ? ["Resources/**"] : nil,
                     scripts: scripts,
                     dependencies: allDependencies,
-                    settings: .settings(base: XCConfig.base)
+                    settings: .settings(base: XCConfig.base.merging(frameworkSettings) { _, new in new })
                 )
             )
         }
