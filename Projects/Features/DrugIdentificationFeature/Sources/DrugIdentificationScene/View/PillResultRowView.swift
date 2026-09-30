@@ -58,10 +58,13 @@ final class PillResultRowView: UIView {
         $0.font = DSKitFontFamily.Pretendard.bold.font(size: 13)
         $0.textAlignment = .center
     }
-    private let thumb = UIImageView().then {
+    // 크롭은 알약 둘레에 딱 맞게 잘려 있어 칸을 꽉 채우면 둥근 모서리에 가장자리가 먹힌다 — 안쪽으로 들여 전체를 보인다.
+    private let thumbBox = UIView().then {
         $0.backgroundColor = DSColor.Neutral._100
         $0.layer.cornerRadius = 10
         $0.clipsToBounds = true
+    }
+    private let thumb = UIImageView().then {
         $0.contentMode = .scaleAspectFit
     }
     private let titleLabel = UILabel().then {
@@ -97,7 +100,9 @@ final class PillResultRowView: UIView {
         badge.addSubview(badgeLabel)
         badgeLabel.snp.makeConstraints { $0.center.equalToSuperview() }
         badge.snp.makeConstraints { $0.width.height.equalTo(26) }
-        thumb.snp.makeConstraints { $0.width.height.equalTo(40) }
+        thumbBox.addSubview(thumb)
+        thumb.snp.makeConstraints { $0.edges.equalToSuperview().inset(4) }
+        thumbBox.snp.makeConstraints { $0.width.height.equalTo(40) }
         menuButton.snp.makeConstraints { $0.width.height.equalTo(28) }
         menuButton.addAction(UIAction { [weak self] _ in self?.onMenu?() }, for: .touchUpInside)
 
@@ -114,7 +119,7 @@ final class PillResultRowView: UIView {
             $0.axis = .vertical
             $0.spacing = 2
         }
-        let row = UIStackView(arrangedSubviews: [badge, thumb, texts, menuButton]).then {
+        let row = UIStackView(arrangedSubviews: [badge, thumbBox, texts, menuButton]).then {
             $0.axis = .horizontal
             $0.spacing = 10
             $0.alignment = .center

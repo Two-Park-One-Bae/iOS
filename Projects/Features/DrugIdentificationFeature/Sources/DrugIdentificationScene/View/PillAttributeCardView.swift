@@ -85,12 +85,15 @@ final class PillAttributeCardView: UIView {
     // MARK: 알약과 외형
 
     private func makeHeader() -> UIView {
-        let crop = UIImageView(image: thumbnail).then {
+        // 크롭은 알약 둘레에 딱 맞게 잘려 있어 칸을 꽉 채우면 둥근 모서리에 가장자리가 먹힌다 — 안쪽으로 들여 전체를 보인다.
+        let crop = UIView().then {
             $0.backgroundColor = DSColor.Neutral._100
             $0.layer.cornerRadius = 10
             $0.clipsToBounds = true
-            $0.contentMode = .scaleAspectFit
         }
+        let cropImage = UIImageView(image: thumbnail).then { $0.contentMode = .scaleAspectFit }
+        crop.addSubview(cropImage)
+        cropImage.snp.makeConstraints { $0.edges.equalToSuperview().inset(4) }
         crop.snp.makeConstraints { $0.width.height.equalTo(44) }
 
         let name = UILabel().then {
