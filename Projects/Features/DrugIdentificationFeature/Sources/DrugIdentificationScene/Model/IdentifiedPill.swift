@@ -24,14 +24,16 @@ struct IdentifiedPill {
             return PillModelOutput(
                 frontImprint: faceModel?.imprint,
                 frontMarkScore: faceModel?.markScore,
-                frontEmbedding: faceModel?.embedding
+                frontEmbedding: faceModel?.embedding,
+                frontEmbeddingModel: faceModel?.embeddingModel
             )
         }
         return PillModelOutput(
             attribute: attribute,
             frontImprint: faceModel?.imprint,
             frontMarkScore: faceModel?.markScore,
-            frontEmbedding: faceModel?.embedding
+            frontEmbedding: faceModel?.embedding,
+            frontEmbeddingModel: faceModel?.embeddingModel
         )
     }
 }

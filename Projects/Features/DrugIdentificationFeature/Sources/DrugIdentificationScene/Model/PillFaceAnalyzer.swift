@@ -11,6 +11,8 @@ struct PillFaceModelResult: Equatable {
     let markScore: Float
     /// 8방향 × 768 임베딩 — 요청 `markEmbedding` 으로 서버에 간다.
     let embedding: [Float]
+    /// 임베딩을 뽑은 마크 모델 버전 — 요청 `markEmbeddingModel`(임베딩이 있으면 필수).
+    var embeddingModel: String = MarkEncoder.modelVersion
 }
 
 /// 각인(ImprintKit)·마크(MarkKit) 모델을 한 번 열어 두고 크롭마다 돌린다.

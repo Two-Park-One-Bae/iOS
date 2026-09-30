@@ -44,6 +44,8 @@ public struct PillAttributeItemRequest: Encodable {
 public struct PillCandidateRequest: Encodable {
     // 속성 추출 응답의 attributeToken 그대로 — 무엇을 고쳤든 항상. 수동 추가·추출 실패는 nil.
     public let attributeToken: String?
+    // 면 markEmbedding 을 뽑은 마크 모델 버전(ML 레포 모델 폴더 이름). 어느 면이든 임베딩이 있으면 필수 — 없으면 400 (NM-533)
+    public let markEmbeddingModel: String?
     // 사용자가 고른 색만(점수). 빈 배열이면 사용자색 항 없음.
     public let colors: [PillColor]
     // 사용자가 고른 모양·제형만 — 하드 필터. 대표값을 그대로 보내지 않는다.
@@ -58,9 +60,11 @@ public struct PillCandidateRequest: Encodable {
         shape: PillShape?,
         formulation: PillFormulation?,
         front: PillFaceRequest?,
-        back: PillFaceRequest?
+        back: PillFaceRequest?,
+        markEmbeddingModel: String? = nil
     ) {
         self.attributeToken = attributeToken
+        self.markEmbeddingModel = markEmbeddingModel
         self.colors = colors
         self.shape = shape
         self.formulation = formulation
