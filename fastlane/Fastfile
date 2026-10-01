@@ -225,9 +225,20 @@ platform :ios do
 
     upload_dsyms_to_crashlytics(FIREBASE_ENV_DEV)
 
+    # 내부 그룹에 이 빌드를 직접 배포한다(NM-536).
+    # 내부 그룹이 '모든 빌드 자동 배포'면 외부 레인의 prod 빌드까지 받아, 내부 테스터의 QA 가
+    # prod 서버 · Firebase · Amplitude · S3 원본 업로드로 섞였다. 그래서 그룹을 자동 배포 없이 다시 만들었고
+    # (App Store Connect 'NurseMate Dev' — 이 설정은 그룹을 만든 뒤 바꿀 수 없다),
+    # 내부 빌드는 여기서 그룹을 지정해야만 테스터에게 간다.
+    #
+    # 그룹 배포는 빌드 처리가 끝나야 가능해서 처리 완료를 기다린다 — 최근 외부 레인 실측 3~6분.
+    # submit_beta_review 는 기본값이 true 라, groups 만 주면 내부 그룹인데도 Beta App Review 에 제출된다
+    # (fastlane #19918). 내부 테스트는 심사가 필요 없으니 끈다.
     upload_to_testflight(
       api_key: key,
-      skip_waiting_for_build_processing: true
+      groups: ["NurseMate Dev"],   # App Store Connect 내부 그룹명과 대소문자까지 정확히 일치해야 함
+      submit_beta_review: false,
+      skip_waiting_for_build_processing: false
     )
   end
 
