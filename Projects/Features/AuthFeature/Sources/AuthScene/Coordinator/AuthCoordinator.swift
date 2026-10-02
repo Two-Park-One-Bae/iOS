@@ -75,7 +75,7 @@ public final class AuthCoordinator: BaseCoordinator {
      */
     private func presentConsent() {
         guard useCase.user.value?.needsReconsent == true else {
-            presentConsentSheet()
+            presentConsentSheet(isReconsent: false)
             return
         }
 
@@ -84,13 +84,26 @@ public final class AuthCoordinator: BaseCoordinator {
             message: "서비스를 계속 이용하려면 변경된 약관에 다시 동의해 주세요.",
             confirmTitle: "확인"
         ) { [weak self] in
-            self?.presentConsentSheet()
+            self?.presentConsentSheet(isReconsent: true)
         }
     }
 
-    private func presentConsentSheet() {
+    /// - Parameter isReconsent: 개정으로 **다시** 받는 동의인지. 광고 어트리뷰션의 가입 집계를 가른다.
+    private func presentConsentSheet(isReconsent: Bool) {
         let viewModel = ConsentViewModel()
         viewModel.onCompleted = { [weak self] in
+            /*
+             Meta 가입 전환 (NM-465). **최초 동의를 마친 순간에만** 보낸다.
+
+             `onFinished` 가 불리는 자리는 둘인데 뜻이 다르다.
+               - 여기(동의 완료)      : 신규 가입자가 절차를 마친 순간  → 가입 1건
+               - handle(.home)       : 이미 동의를 마친 회원의 **재로그인** → 가입이 아니다
+             개정 재동의도 제외한다 — 같은 사람이 두 번 집계된다.
+
+             Meta 는 유입 경로를 몰라 전원의 이벤트를 받고 자기 쪽에서 매칭하므로,
+             여기서 잘못 세면 캠페인 전환수가 그대로 부풀려진다.
+             */
+            if !isReconsent { MetaAdsService.logCompleteRegistration() }
             self?.navigationController.dismiss(animated: true) { self?.onFinished() }
         }
         viewModel.onCancelled = { [weak self] in

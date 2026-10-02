@@ -48,6 +48,8 @@ jobs:
           CLARITY_PROJECT_ID: ${{ secrets.CLARITY_PROJECT_ID }}
           DEVELOPMENT_TEAM: ${{ secrets.DEVELOPMENT_TEAM }}
           KAKAO_NATIVE_APP_KEY: ${{ secrets.KAKAO_NATIVE_APP_KEY }}
+          META_APP_ID: ${{ secrets.META_APP_ID }}
+          META_CLIENT_TOKEN: ${{ secrets.META_CLIENT_TOKEN }}
         run: |
           mkdir -p XCConfig
           # xcconfig 은 값 안의 "//" 를 주석 처리하므로 스킴의 "://" 에 $() 를 끼워 회피.
@@ -67,6 +69,8 @@ jobs:
           CLARITY_PROJECT_ID = ${CLARITY_PROJECT_ID}
           DEVELOPMENT_TEAM = ${DEVELOPMENT_TEAM}
           KAKAO_NATIVE_APP_KEY = ${KAKAO_NATIVE_APP_KEY}
+          META_APP_ID = ${META_APP_ID}
+          META_CLIENT_TOKEN = ${META_CLIENT_TOKEN}
           EOF
 
           # GOOGLE_REVERSED_CLIENT_ID_* 는 여기서 쓰지 않는다 —

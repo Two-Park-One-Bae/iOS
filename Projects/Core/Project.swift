@@ -16,5 +16,7 @@ let project = Project.makeModule(
         // ·GoogleUtilities)를 끌고 온다. 상위 모듈에서 링크하면 사본이 둘이 되어 런타임에 크래시하므로
         // Firebase 를 이미 들고 있는 Core 한 곳에서만 링크한다 (GoogleSignInService 참고).
         .SPM.GoogleSignIn,
+        // Meta 광고 어트리뷰션 (NM-465) — MetaAdsService 가 감싼다.
+        .SPM.FacebookCore,
     ]
 )
