@@ -96,6 +96,8 @@ enum RegisterDependencies {
         container.register(AuthUseCase.self) {
             DefaultAuthUseCase(repository: container.resolve(AuthRepositoryProtocol.self))
         }
+        // 유입 경로 측정 — 가입 이벤트 하나 (NM-547). 에어브릿지 SDK 는 App 만 링크하므로 여기서 꽂는다.
+        container.register(AttributionTracking.self) { AirbridgeService.Tracker() }
 
         /*
          TimerUseCase 등록 — 단순 생성이 아니라 세 가지 배선이 함께 이뤄진다.

@@ -64,6 +64,9 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
+        // 에어브릿지는 didFinishLaunching 맨 위에서 초기화해야 설치·딥링크를 놓치지 않는다(SDK 요구사항).
+        AirbridgeService.configure()
+
         RegisterDependencies.register()
         // App Check 팩토리는 반드시 FirebaseApp.configure() 이전에 설정해야 적용된다.
         AppCheckService.configure()

@@ -12,6 +12,7 @@ import Domain
 final class ConsentViewModelTests: XCTestCase {
 
     private var useCase: StubAuthUseCase!
+    private var attribution: SpyAttribution!
     private var sut: ConsentViewModel!
     private var cancelBag = Set<AnyCancellable>()
 
@@ -21,6 +22,9 @@ final class ConsentViewModelTests: XCTestCase {
         useCase = stub
         // ConsentViewModel 이 init 시점에 @Injected 로 꺼내므로 생성 전에 등록해야 한다.
         DIContainer.shared.register(AuthUseCase.self) { stub }
+        let spy = SpyAttribution()
+        attribution = spy
+        DIContainer.shared.register(AttributionTracking.self) { spy }
         sut = ConsentViewModel()
     }
 
@@ -28,6 +32,7 @@ final class ConsentViewModelTests: XCTestCase {
         cancelBag.removeAll()
         sut = nil
         useCase = nil
+        attribution = nil
         super.tearDown()
     }
 
@@ -131,6 +136,29 @@ final class ConsentViewModelTests: XCTestCase {
         wait(for: [settled], timeout: 2)
     }
 
+    // MARK: - 가입 이벤트 (NM-547)
+
+    func test_최초_동의를_저장하면_가입을_한_번_보낸다() {
+        useCase.user.send(.stub(consents: [.init(type: .terms, agreed: false, version: nil, satisfied: false)]))
+        agreeAndWait(result: .success(.home))
+
+        XCTAssertEqual(attribution.signUpCount, 1)
+    }
+
+    func test_약관_개정_재동의는_가입이_아니다() {
+        useCase.user.send(.stub(consents: [.init(type: .terms, agreed: true, version: "1", satisfied: false)]))
+        agreeAndWait(result: .success(.home))
+
+        XCTAssertEqual(attribution.signUpCount, 0)
+    }
+
+    func test_동의저장이_실패하면_가입을_보내지_않는다() {
+        useCase.user.send(.stub(consents: []))
+        agreeAndWait(result: .failure(AuthError.consentVersionMismatch))
+
+        XCTAssertEqual(attribution.signUpCount, 0)
+    }
+
     // MARK: - 취소
 
     /// 동의 없이 홈으로 가는 경로는 없다 — 취소의 결과는 로그아웃뿐이다.
@@ -154,6 +182,16 @@ final class ConsentViewModelTests: XCTestCase {
         sut.load()
         wait(for: [loaded], timeout: 2)
         bag.removeAll()
+    }
+
+    /// 저장 요청이 끝날 때까지(isLoading 이 true → false) 기다린다.
+    private func agreeAndWait(result: Result<AuthRoute, Error>) {
+        loadDefinitions([.stub(.terms), .stub(.privacy)])
+        useCase.agreeResult = result
+        let settled = expectation(description: "저장 완료")
+        sut.isLoading.dropFirst(2).first().sink { _ in settled.fulfill() }.store(in: &cancelBag)
+        sut.agree()
+        wait(for: [settled], timeout: 2)
     }
 
     private func latestCanProceed() -> Bool {
@@ -196,6 +234,11 @@ private final class StubAuthUseCase: AuthUseCase {
     func deleteAccount() async throws {}
 }
 
+private final class SpyAttribution: AttributionTracking {
+    private(set) var signUpCount = 0
+    func signUp() { signUpCount += 1 }
+}
+
 // MARK: - Fixtures
 
 private extension ConsentDefinition {
@@ -207,5 +250,12 @@ private extension ConsentDefinition {
             policyUrl: URL(string: "https://nursemate.app/policy"),
             title: type == .terms ? "이용약관" : "개인정보처리방침"
         )
+    }
+}
+
+private extension AuthUser {
+    static func stub(consents: [ConsentStatus]) -> AuthUser {
+        AuthUser(userId: "uid", provider: .google, providerUserId: "p",
+                 consents: consents, onboardingRequired: true)
     }
 }
