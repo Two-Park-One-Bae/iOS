@@ -6,6 +6,16 @@ import ConfigPlugin
 
 let project = Project(
     name: "App",
+    // 에어브릿지(어트리뷰션·딥링크)는 Tuist/Package.swift 가 아니라 여기서 받는다.
+    // 에어브릿지 문서가 Tuist 의 XcodeProj 기반 통합을 지원하지 않는다고 못박아 두어서,
+    // Xcode 기본 패키지 통합(project.packages)으로 App 타깃에만 붙인다.
+    // 버전은 고정한다 — 릴리스 노트: https://help.airbridge.io/developers/release-note-ios-sdk
+    packages: [
+        .remote(
+            url: "https://github.com/ab180/airbridge-ios-sdk-deployment",
+            requirement: .exact("4.11.1")
+        ),
+    ],
     settings: .settings(base: XCConfig.base, configurations: XCConfig.app),
     targets: [
         .target(
@@ -39,6 +49,10 @@ let project = Project(
                 "FirebaseAutomaticScreenReportingEnabled": false,
                 "NSCameraUsageDescription": "알약 사진 촬영을 위해 카메라 접근이 필요합니다.",
                 "NSPhotoLibraryUsageDescription": "앨범에서 알약 사진을 선택하기 위해 접근이 필요합니다.",
+                // ATT 프롬프트 문구 — 에어브릿지가 IDFA 로 광고 성과를 측정한다 (AirbridgeService 참고).
+                "NSUserTrackingUsageDescription": "맞춤형 광고 제공과 광고 성과 측정을 위해 사용됩니다. 허용하지 않아도 모든 기능을 그대로 쓸 수 있습니다.",
+                // 에어브릿지 SDK 토큰. 값은 gitignore 된 Secrets.xcconfig 에만 둔다 — 비어 있으면 초기화를 건너뛴다.
+                "AIRBRIDGE_APP_TOKEN": "$(AIRBRIDGE_APP_TOKEN)",
                 // 카카오 SDK 초기화 키 (NM-410). 값은 gitignore 된 Secrets.xcconfig 에만 둔다.
                 "KAKAO_NATIVE_APP_KEY": "$(KAKAO_NATIVE_APP_KEY)",
                 // 앱을 여는 URL 스킴 세 갈래.
@@ -81,6 +95,11 @@ let project = Project(
                 "com.apple.security.application-groups": .array([.string("group.app.nursemate.timer")]),
                 // Apple 로그인 (NM-410). Apple Developer 의 App ID 에서도 함께 켜야 한다.
                 "com.apple.developer.applesignin": .array([.string("Default")]),
+                // 에어브릿지 트래킹 링크의 유니버설 링크 도메인. 앱 이름(nursemate)이 서브도메인이다.
+                "com.apple.developer.associated-domains": .array([
+                    .string("applinks:nursemate.airbridge.io"),
+                    .string("applinks:nursemate.abr.ge"),
+                ]),
             ]),
             // GoogleService-Info.plist 는 Resources 가 아니라 Firebase/<구성>/ 에 둔다.
             // 두 벌을 다 번들에 넣으면 Firebase 가 루트에서 못 찾으므로, 빌드 후 하나만 복사한다.
@@ -111,6 +130,14 @@ let project = Project(
                 Dep.Core.Core,
                 // AppCoordinator 가 로그아웃·탈퇴 확인 다이얼로그를 직접 띄운다 (NM-410)
                 Dep.Modules.DSKit.DSKit,
+                // 에어브릿지 SDK 와 그 시스템 프레임워크 (선택 링크 — 에어브릿지 설치 가이드 그대로).
+                .package(product: "Airbridge", type: .runtime),
+                .sdk(name: "AdSupport", type: .framework, status: .optional),
+                .sdk(name: "AdServices", type: .framework, status: .optional),
+                .sdk(name: "CoreTelephony", type: .framework, status: .optional),
+                .sdk(name: "StoreKit", type: .framework, status: .optional),
+                .sdk(name: "AppTrackingTransparency", type: .framework, status: .optional),
+                .sdk(name: "WebKit", type: .framework, status: .optional),
                 .target(name: "TimerWidget"),
                 // 워치 앱 embed — 폰 설치 시 워치에 자동 설치(별도 다운 X),
                 // 폰↔워치 companion 쌍으로 인식돼 WCSession 동기화가 성립한다.
@@ -242,7 +269,10 @@ let project = Project(
                     // 날아간다. 스킴 편집기에서 체크박스만 켜면 되게 해 둔다.
                     launchArguments: [
                         .launchArgument(name: "-FIRDebugEnabled", isEnabled: false),
-                        .launchArgument(name: "-FIRAnalyticsDebugEnabled", isEnabled: false)
+                        .launchArgument(name: "-FIRAnalyticsDebugEnabled", isEnabled: false),
+                        // 개발 빌드에서도 에어브릿지를 켠다(기본은 내부 빌드에서 꺼짐 — AirbridgeService 참고).
+                        // 이벤트가 **운영 앱**으로 가므로 SDK 연동 검증할 때만 켠다.
+                        .launchArgument(name: "-AirbridgeEnabled", isEnabled: false)
                     ]
                 ),
                 // 스킴 env var 의 `$(...)` 를 App 타깃 빌드세팅 기준으로 확장한다.

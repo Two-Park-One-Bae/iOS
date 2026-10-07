@@ -15,6 +15,8 @@ final class AuthDemoAppDelegate: UIResponder, UIApplicationDelegate {
         // Login·Consent ViewModel 이 @Injected 로 AuthUseCase 를 받으므로 데모에서도 등록이 필요하다.
         // scenario 를 바꾸면 재방문(로그인 직후 홈)·약관 개정(저장 시 400 → 재조회) 흐름을 볼 수 있다.
         DIContainer.shared.register(AuthUseCase.self) { MockAuthUseCase(scenario: .newUser) }
+        // ConsentViewModel 이 가입 이벤트(NM-547)를 보낼 곳. 데모에선 콘솔에만 찍는다.
+        DIContainer.shared.register(AttributionTracking.self) { PrintAttribution() }
         return true
     }
 
@@ -135,4 +137,8 @@ private final class HomeStubViewController: UIViewController {
             confirmed: { [weak self] in self?.onSignOut() }
         )
     }
+}
+
+private struct PrintAttribution: AttributionTracking {
+    func signUp() { print("[Attribution] 가입") }
 }

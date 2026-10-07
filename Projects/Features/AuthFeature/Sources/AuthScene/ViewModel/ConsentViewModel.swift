@@ -41,6 +41,7 @@ public final class ConsentViewModel {
     }
 
     @Injected private var useCase: AuthUseCase
+    @Injected private var attribution: AttributionTracking
 
     public init() {}
 
@@ -79,9 +80,15 @@ public final class ConsentViewModel {
         guard !isLoading.value else { return }
         isLoading.send(true)
 
+        // 최초 가입인지는 저장 **전** 회원 상태로 가른다 — 약관 개정 재동의는 가입이 아니다 (NM-547).
+        let isFirstTime = useCase.user.value?.needsReconsent != true
+
         Task { @MainActor in
             do {
                 let route = try await useCase.agreeToConsents(definitions.value)
+                // ⚠️ **저장이 성공한 뒤에만** 보낸다. 누른 시점에 보내면 400(버전 불일치)으로
+                //    되돌아온 사람까지 가입으로 세어, 같은 사람이 두 번 가입한 것이 된다.
+                if isFirstTime { attribution.signUp() }
                 isLoading.send(false)
                 // 응답의 onboardingRequired 만 신뢰한다. 아직 미충족이면 화면에 남는다.
                 if route == .home { onCompleted?() }

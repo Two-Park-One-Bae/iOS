@@ -78,7 +78,18 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
         // 콜드런치 딥링크는 저장만 — 탭바가 뜬 뒤(onTabBarReady) 처리한다.
         // 미로그인 상태면 로그인·동의를 마치고 탭바가 뜰 때 실행된다 (NM-410).
-        pendingURL = connectionOptions.urlContexts.first?.url
+        //
+        // 에어브릿지 트래킹 링크(스킴·유니버설 링크)면 SDK 가 원래 스킴 딥링크로 되돌려 route 로 넘긴다.
+        let isAirbridgeLink = AirbridgeService.handle(connectionOptions: connectionOptions) { [weak self] url in
+            self?.route(url)
+        }
+        if !isAirbridgeLink {
+            pendingURL = connectionOptions.urlContexts.first?.url
+        }
+        // 설치 전에 누른 트래킹 링크(지연 딥링크) — 설치 후 첫 실행에서만 온다.
+        AirbridgeService.handleDeferredDeeplink { [weak self] url in
+            self?.route(url)
+        }
     }
 
     /*
@@ -93,7 +104,44 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         // 소셜 로그인 복귀 URL(카카오톡·구글)을 먼저 본다 — 스킴이 nursemate 가 아니라
         // 아래 딥링크 라우팅에서는 어차피 걸러진다. 처리했으면 여기서 끝낸다 (NM-410).
         guard !SocialLoginSDK.handle(url: url) else { return }
-        handle(url: url)
+        // 에어브릿지 스킴 딥링크(…?airbridge_referrer=)면 변환된 URL 이 route 로 온다.
+        let isAirbridgeLink = AirbridgeService.handle(openURLContexts: URLContexts) { [weak self] url in
+            self?.route(url)
+        }
+        guard !isAirbridgeLink else { return }
+        // 로그아웃 상태(로그인 화면)에서 온 링크는 보관했다가 재로그인 뒤 탭바에서 처리한다.
+        route(url)
+    }
+
+    /*
+     scene(_:continue:)
+
+     앱이 떠 있는 상태에서 유니버설 링크(https://nursemate.airbridge.io·abr.ge)가 들어올 때 호출된다.
+     이 앱의 유니버설 링크는 에어브릿지 도메인뿐이라 그 외는 처리할 것이 없다.
+     */
+    func scene(_ scene: UIScene, continue userActivity: NSUserActivity) {
+        _ = AirbridgeService.handle(userActivity: userActivity) { [weak self] url in
+            self?.route(url)
+        }
+    }
+
+    /*
+     실행 중에 들어온 딥링크(위젯 nursemate://·에어브릿지가 되돌려 준 스킴 딥링크)의 합류 지점.
+
+     에어브릿지 SDK 콜백은 스레드·시점이 일정하지 않다(지연 딥링크는 서버 응답 뒤에 온다).
+     로그아웃해 로그인 화면이 떠 있을 때 온 링크도 바로 처리하면 받을 탭바가 없어 버려진다.
+     그래서 메인으로 옮긴 뒤, 탭바가 이미 떠 있으면 바로 처리하고 아니면 콜드런치 딥링크처럼
+     pendingURL 에 두었다가 onTabBarReady 에서 처리한다.
+     */
+    private func route(_ url: URL) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            if appCoordinator?.isTabBarShown == true {
+                handle(url: url)
+            } else {
+                pendingURL = url
+            }
+        }
     }
 
     /*

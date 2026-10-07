@@ -36,7 +36,7 @@ final class AppCoordinator: BaseCoordinator {
     private var authCoordinator: CoordinatorProtocol?
 
     /*
-     탭바가 화면에 올라온 직후 1회 실행할 작업 (NM-372).
+     탭바가 화면에 올라올 때마다 실행할 작업 (NM-372).
 
      SceneDelegate가 콜드런치 딥링크 처리를 여기에 건다. 스플래시가 떠 있는 동안
      딥링크를 처리하면 탭 전환 신호가 버려지고(옵저버·탭바 미존재) 모달이 스플래시
@@ -44,8 +44,15 @@ final class AppCoordinator: BaseCoordinator {
 
      로그인 화면을 거쳐 들어온 경우에도 탭바가 뜬 뒤 여기서 처리된다 — 미로그인 상태에서
      딥링크를 열면 링크는 보관됐다가 로그인·동의를 마친 뒤에 실행된다.
+
+     **한 번이 아니라 탭바가 뜰 때마다** 부른다. 로그아웃 → (앱을 끄지 않은 채) 링크 → 재로그인이면
+     두 번째 탭바에서 처리해야 하기 때문이다 — 1회로 끝내면 그 링크가 보관된 채 영영 실행되지 않는다.
      */
     var onTabBarReady: (() -> Void)?
+
+    /// 지금 탭바가 떠 있는지. 딥링크를 바로 처리할지, 보관했다가 `onTabBarReady` 에서 처리할지 가른다.
+    /// 로그아웃하면 `detachCurrentFlow` 가 탭바를 놓아 false 로 돌아간다.
+    var isTabBarShown: Bool { tabBarCoordinator != nil }
 
     @Injected private var authUseCase: AuthUseCase
     @Injected private var authBuilder: AuthFeatureBuildable
@@ -96,7 +103,7 @@ final class AppCoordinator: BaseCoordinator {
         } completion: { _ in
             // 탭바로 곧장 들어간 경우에만 여기서 딥링크를 처리한다.
             // 로그인을 거치는 경로는 탭바가 뜨는 showTabBar() 에서 다시 흘려보낸다.
-            if route == .home { self.flushTabBarReady() }
+            if route == .home { self.onTabBarReady?() }
         }
     }
 
@@ -190,13 +197,7 @@ final class AppCoordinator: BaseCoordinator {
         addChild(tabBarCoordinator)
         tabBarCoordinator.start()
 
-        flushTabBarReady()
-    }
-
-    private func flushTabBarReady() {
-        let ready = onTabBarReady
-        onTabBarReady = nil
-        ready?()
+        onTabBarReady?()
     }
 
     /*

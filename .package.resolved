@@ -1,0 +1,15 @@
+{
+  "originHash" : "366fcc4ad3237d93bb01d7b69c6122fb87cfb40e45edf76268ba859202a18e0a",
+  "pins" : [
+    {
+      "identity" : "airbridge-ios-sdk-deployment",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/ab180/airbridge-ios-sdk-deployment",
+      "state" : {
+        "revision" : "dcef6b3589142c4b566c02333ffcd3c78e58ed81",
+        "version" : "4.11.1"
+      }
+    }
+  ],
+  "version" : 3
+}
