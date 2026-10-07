@@ -53,6 +53,8 @@ public struct StartPresetTimerIntent: AppIntent {
 // MARK: - 딥링크
 
 public enum TimerWidgetDeepLink {
+    /// 라이브 액티비티 탭 → 타이머 탭. 특수 경로가 없어 SceneDelegate 의 기본 분기(.openTimerTab)로 간다.
+    public static let timerTab = URL(string: "nursemate://timer")!
     /// 프리셋 관리(타이머 탭) 진입.
     public static let pickPreset = URL(string: "nursemate://timer/preset/pick")!
     /// 미설정 위젯 탭 → 위젯 설정 방법 온보딩.

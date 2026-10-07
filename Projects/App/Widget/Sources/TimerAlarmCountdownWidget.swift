@@ -17,6 +17,7 @@ struct TimerAlarmCountdownWidget: Widget {
             AlarmLockScreenCard(info: AlarmDisplayInfo(context: context))
                 .activityBackgroundTint(Color.timerCardBackground)
                 .activitySystemActionForegroundColor(.white)
+                .widgetURL(TimerWidgetDeepLink.timerTab)
         } dynamicIsland: { context in
             let info = AlarmDisplayInfo(context: context)
             return DynamicIsland {
@@ -42,6 +43,7 @@ struct TimerAlarmCountdownWidget: Widget {
                 AlarmLeadingBadge(info: info, size: 20)
             }
             .keylineTint(info.isRinging ? Color.timerRinging : Color.timerBlue)
+            .widgetURL(TimerWidgetDeepLink.timerTab)
         }
     }
 }
