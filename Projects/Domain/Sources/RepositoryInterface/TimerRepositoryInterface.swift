@@ -37,6 +37,12 @@ public protocol TimerAlarmScheduling {
     ///   디자인 '시스템 알람' 화면(spec/design wrEli·ZFXjS) 정합.
     func scheduleAlarm(id: UUID, label: String, categoryName: String, body: String, fireDate: Date)
     func cancelAlarm(id: UUID)
+    /// 알람을 지우지 않고 멈춘다 — Live Activity 가 '일시정지됨'으로 남는다.
+    func pauseAlarm(id: UUID)
+    /// 멈춘 알람을 이어간다. 시스템에 알람이 없으면(재설치 등) fireDate 로 새로 예약한다.
+    func resumeAlarm(id: UUID, label: String, categoryName: String, body: String, fireDate: Date)
+    /// 남은 시간을 바꿔 정지 상태로 다시 예약 — 정지된 알람의 남은 시간은 바꿀 수 없어서(정지 중 연장).
+    func reschedulePausedAlarm(id: UUID, label: String, categoryName: String, body: String, remaining: Int)
 }
 
 public enum TimerAlarmAuthorizationStatus: Equatable, Sendable {
