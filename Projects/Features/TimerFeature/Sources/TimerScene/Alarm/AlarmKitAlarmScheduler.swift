@@ -34,7 +34,46 @@ public final class AlarmKitAlarmScheduler: TimerAlarmScheduling {
     }
 
     public func scheduleAlarm(id: UUID, label: String, categoryName: String, body: String, fireDate: Date) {
-        let remaining = max(1, Int(fireDate.timeIntervalSinceNow.rounded()))
+        let configuration = Self.configuration(id: id, label: label, categoryName: categoryName, remaining: Int(fireDate.timeIntervalSinceNow.rounded()))
+        Task { try? await AlarmManager.shared.schedule(id: id, configuration: configuration) }
+    }
+
+    public func cancelAlarm(id: UUID) {
+        Task { try? await AlarmManager.shared.cancel(id: id) }
+    }
+
+    // 취소하지 않고 AlarmKit pause — 알람에 붙은 Live Activity 가 '일시정지됨'(Paused 표현)으로 남는다.
+    // 예전엔 cancel 이라 정지하는 순간 LA 가 사라졌다.
+    public func pauseAlarm(id: UUID) {
+        try? AlarmManager.shared.pause(id: id)
+    }
+
+    public func resumeAlarm(id: UUID, label: String, categoryName: String, body: String, fireDate: Date) {
+        do {
+            try AlarmManager.shared.resume(id: id)
+        } catch {
+            // 시스템에 정지된 알람이 없음(예전 빌드에서 정지해 cancel 된 타이머 등) → 새로 예약
+            scheduleAlarm(id: id, label: label, categoryName: categoryName, body: body, fireDate: fireDate)
+        }
+    }
+
+    public func reschedulePausedAlarm(id: UUID, label: String, categoryName: String, body: String, remaining: Int) {
+        let configuration = Self.configuration(id: id, label: label, categoryName: categoryName, remaining: remaining)
+        Task {
+            // 정지된 알람의 남은 시간은 바꿀 수 없다 → 지우고 새 남은 시간으로 예약한 뒤 바로 정지
+            try? AlarmManager.shared.cancel(id: id)
+            _ = try? await AlarmManager.shared.schedule(id: id, configuration: configuration)
+            try? AlarmManager.shared.pause(id: id)
+        }
+    }
+
+    private static func configuration(
+        id: UUID,
+        label: String,
+        categoryName: String,
+        remaining: Int
+    ) -> AlarmManager.AlarmConfiguration<CareTimerAlarmMetadata> {
+        let remaining = max(1, remaining)
         let tint = Color(red: 0.937, green: 0.267, blue: 0.267)   // 빨강 #EF4444 (경고·알람)
 
         // 분류 태그 + 처치명을 헤드라인으로: "[처치] 수혈 바이탈".
@@ -63,19 +102,13 @@ public final class AlarmKitAlarmScheduler: TimerAlarmScheduling {
         // (AlarmKit 알람은 발화 시 항상 진동하므로 무음도 진동은 남음 — AlarmVibeDemo 검증)
         let useSound = RingModeStore.shared.current == .sound
 
-        let configuration = AlarmManager.AlarmConfiguration(
+        return AlarmManager.AlarmConfiguration(
             countdownDuration: Alarm.CountdownDuration(preAlert: TimeInterval(remaining), postAlert: nil),
             schedule: nil,
             attributes: attributes,
             stopIntent: TimerStopIntent(id: id.uuidString),
             sound: useSound ? .default : .named("silence.caf")
         )
-
-        Task { try? await AlarmManager.shared.schedule(id: id, configuration: configuration) }
-    }
-
-    public func cancelAlarm(id: UUID) {
-        Task { try? await AlarmManager.shared.cancel(id: id) }
     }
 
     private static func map(_ state: AlarmManager.AuthorizationState) -> TimerAlarmAuthorizationStatus {

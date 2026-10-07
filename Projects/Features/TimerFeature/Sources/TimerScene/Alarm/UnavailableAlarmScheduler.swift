@@ -30,4 +30,10 @@ public final class UnavailableAlarmScheduler: TimerAlarmScheduling {
     public func scheduleAlarm(id: UUID, label: String, categoryName: String, body: String, fireDate: Date) {}
 
     public func cancelAlarm(id: UUID) {}
+
+    public func pauseAlarm(id: UUID) {}
+
+    public func resumeAlarm(id: UUID, label: String, categoryName: String, body: String, fireDate: Date) {}
+
+    public func reschedulePausedAlarm(id: UUID, label: String, categoryName: String, body: String, remaining: Int) {}
 }

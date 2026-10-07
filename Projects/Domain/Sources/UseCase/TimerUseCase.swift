@@ -118,7 +118,8 @@ public final class DefaultTimerUseCase: TimerUseCase {
             list[i].remaining = list[i].remainingSeconds()
             list[i].state = .paused
         }
-        alarmScheduler.cancelAlarm(id: id)
+        // cancel 이 아니라 pause — 알람이 남아야 Live Activity 가 '일시정지됨'으로 유지된다
+        alarmScheduler.pauseAlarm(id: id)
     }
 
     public func resume(id: UUID) {
@@ -132,12 +133,13 @@ public final class DefaultTimerUseCase: TimerUseCase {
             scheduled = (list[i].label, list[i].category.displayName, alarmBody(duration: list[i].duration), endAt)
         }
         if let scheduled {
-            alarmScheduler.scheduleAlarm(id: id, label: scheduled.label, categoryName: scheduled.categoryName, body: scheduled.body, fireDate: scheduled.endAt)
+            alarmScheduler.resumeAlarm(id: id, label: scheduled.label, categoryName: scheduled.categoryName, body: scheduled.body, fireDate: scheduled.endAt)
         }
     }
 
     public func extend(id: UUID, by seconds: Int) {
         var scheduled: (label: String, categoryName: String, body: String, endAt: Date)?
+        var pausedRescheduled: (label: String, categoryName: String, body: String, remaining: Int)?
         mutate { list in
             guard let i = list.firstIndex(where: { $0.id == id }) else { return }
             switch list[i].state {
@@ -146,12 +148,17 @@ public final class DefaultTimerUseCase: TimerUseCase {
                 scheduled = (list[i].label, list[i].category.displayName, alarmBody(duration: list[i].duration), list[i].endAt)
             case .paused:
                 list[i].remaining = max(0, (list[i].remaining ?? 0) + seconds)
+                pausedRescheduled = (list[i].label, list[i].category.displayName, alarmBody(duration: list[i].duration), list[i].remaining ?? 0)
             case .ringing:
                 break // 울림 중엔 시간 조정 불가 ([완료]로만 종료)
             }
         }
         if let scheduled {
             alarmScheduler.scheduleAlarm(id: id, label: scheduled.label, categoryName: scheduled.categoryName, body: scheduled.body, fireDate: scheduled.endAt)
+        }
+        // 정지된 알람도 남은 시간을 맞춰둬야 재개 시 시스템 카운트다운이 모델과 어긋나지 않는다
+        if let pausedRescheduled {
+            alarmScheduler.reschedulePausedAlarm(id: id, label: pausedRescheduled.label, categoryName: pausedRescheduled.categoryName, body: pausedRescheduled.body, remaining: pausedRescheduled.remaining)
         }
     }
 
