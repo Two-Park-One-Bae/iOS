@@ -20,6 +20,8 @@ import Foundation
 public protocol AttributionTracking {
     /// 가입했다 — **최초 필수 동의 저장이 성공한 그 순간**에만 부른다.
     ///
+    /// 국외 이전 동의(`OVERSEAS`, NM-548)가 없으면 구현이 보내지 않는다 — 호출부는 가르지 않는다.
+    ///
     /// 약관 개정 재동의는 가입이 아니다. 같은 사람이 약관이 바뀔 때마다 새로 가입한 것으로
     /// 세이면 광고 성과가 부풀려진다. 최초인지는 호출부가 `AuthUser.needsReconsent` 로 가른다.
     func signUp()

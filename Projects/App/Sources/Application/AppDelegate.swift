@@ -1,6 +1,7 @@
 import UIKit
 import Core
 import Data
+import Domain
 import TimerFeature
 
 
@@ -90,6 +91,10 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         // (NM-458 로 Amplitude 를 걷어내기 전에는 여기서 내부 빌드를 막았다. 그건 Amplitude
         //  프로젝트가 하나뿐이라 내부 데이터가 운영 지표에 그대로 섞였기 때문이다.)
         AnalyticsIdentity.start()
+
+        // 에어브릿지는 국외 이전 동의(OVERSEAS)가 있는 회원에게만 켠다 (NM-548). 초기화는 맨 위에서 이미
+        // 했고(추적은 멈춘 채), 여기서 회원 상태를 이어 붙인다 — DI 등록 뒤라야 UseCase 를 꺼낼 수 있다.
+        AirbridgeService.observeOverseasConsent(of: DIContainer.shared.resolve(AuthUseCase.self).user)
 
         // 앱 실행 이벤트는 따로 찍지 않는다 — GA4 가 `first_open`·`session_start` 로 자동 수집한다.
 
