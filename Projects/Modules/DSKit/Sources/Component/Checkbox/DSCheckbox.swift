@@ -42,6 +42,8 @@ public final class DSCheckbox: UIView {
     }
 
     public private(set) var isChecked: Bool = false
+    /// 바꿀 수 없는 항목(예: 약관 및 동의 화면의 필수 항목)은 Neutral 로 눌러 둔다 (디자인 NM-548).
+    public private(set) var isEnabled: Bool = true
 
     private let checkView = UIImageView()
 
@@ -73,9 +75,19 @@ public final class DSCheckbox: UIView {
 
     public func setChecked(_ checked: Bool) {
         isChecked = checked
-        backgroundColor = checked ? DSColor.Primary._500 : DSColor.Neutral._0
-        layer.borderColor = (checked ? DSColor.Primary._500 : DSColor.Neutral._200).cgColor
-        checkView.isHidden = !checked
+        render()
+    }
+
+    public func setEnabled(_ enabled: Bool) {
+        isEnabled = enabled
+        render()
+    }
+
+    private func render() {
+        let fill = isEnabled ? DSColor.Primary._500 : DSColor.Neutral._300
+        backgroundColor = isChecked ? fill : DSColor.Neutral._0
+        layer.borderColor = (isChecked ? fill : DSColor.Neutral._200).cgColor
+        checkView.isHidden = !isChecked
     }
 }
 
@@ -83,9 +95,12 @@ public final class DSCheckbox: UIView {
 
 #if DEBUG
 #Preview("DSCheckbox") {
+    let locked = DSCheckbox(size: .small, isChecked: true)
+    locked.setEnabled(false)
     let stack = UIStackView(arrangedSubviews: [
         DSCheckbox(size: .large, isChecked: true),
         DSCheckbox(size: .small, isChecked: false),
+        locked,
     ])
     stack.spacing = 12
     stack.alignment = .center

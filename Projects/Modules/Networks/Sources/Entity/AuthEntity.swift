@@ -29,9 +29,9 @@ public struct UserEntity: Decodable {
 public struct ConsentStatusEntity: Decodable {
     public let type: String
     public let agreed: Bool
-    /// 동의한 문서 버전. 미동의면 null.
+    /// 응답한(동의·거부) 문서 버전. 한 번도 묻지 않았으면 null.
     public let version: String?
-    /// 현재 필수 버전 충족 여부(동의 & 최신 버전).
+    /// 현재 버전 충족 여부(동의 & 최신 버전).
     public let satisfied: Bool
 }
 

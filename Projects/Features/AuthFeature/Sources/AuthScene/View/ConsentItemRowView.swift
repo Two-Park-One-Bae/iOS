@@ -19,40 +19,54 @@ import Then
 final class ConsentItemRowView: UIView {
 
     private let definition: ConsentDefinition
+    private let isLocked: Bool
     private let onToggle: () -> Void
     private let onOpenPolicy: () -> Void
 
     private let checkbox = DSCheckbox(size: .small)
 
+    /// - Parameter isLocked: 체크를 바꿀 수 없는 행(약관 및 동의 화면의 필수 항목). 체크된 채 흐리게 그리고
+    ///   행 탭을 무시한다. '보기'는 그대로 열린다.
     init(
         definition: ConsentDefinition,
+        isLocked: Bool = false,
         onToggle: @escaping () -> Void,
         onOpenPolicy: @escaping () -> Void
     ) {
         self.definition = definition
+        self.isLocked = isLocked
         self.onToggle = onToggle
         self.onOpenPolicy = onOpenPolicy
         super.init(frame: .zero)
         setup()
+        if isLocked {
+            checkbox.setChecked(true)
+            checkbox.setEnabled(false)
+        }
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
     func setChecked(_ checked: Bool) {
+        guard !isLocked else { return }
         checkbox.setChecked(checked)
     }
 
     private func setup() {
+        // 선택 항목은 회색으로 둔다 — 필수와 같은 강조색이면 꼭 체크해야 하는 것처럼 읽힌다 (디자인 NM-548).
         let requiredLabel = UILabel().then {
             $0.text = definition.isRequired ? "필수" : "선택"
             $0.font = DSKitFontFamily.Pretendard.semiBold.font(size: 12)
-            $0.textColor = DSColor.Primary._600
+            $0.textColor = definition.isRequired ? DSColor.Primary._600 : DSColor.textTertiary
         }
 
+        // "개인정보 국외 이전 및 제3자 제공" 처럼 긴 제목은 '보기'를 밀어내지 않고 줄을 바꾼다.
         let titleLabel = UILabel().then {
             $0.text = definition.title
             $0.font = DSKitFontFamily.Pretendard.regular.font(size: 15)
             $0.textColor = DSColor.textPrimary
+            $0.numberOfLines = 0
+            $0.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         }
 
         let labelStack = UIStackView(arrangedSubviews: [requiredLabel, titleLabel]).then {
@@ -111,7 +125,10 @@ final class ConsentItemRowView: UIView {
         return (stack, recognizer)
     }
 
-    @objc private func rowTapped() { onToggle() }
+    @objc private func rowTapped() {
+        guard !isLocked else { return }
+        onToggle()
+    }
 
     @objc private func policyTapped() { onOpenPolicy() }
 }

@@ -55,9 +55,12 @@ public final class ConsentViewModel {
 
             do {
                 let loaded = try await useCase.fetchConsentDefinitions()
-                definitions.send(loaded)
+                definitions.send(Self.itemsToAsk(loaded, user: useCase.user.value))
                 // 재조회(버전 변경) 상황에서 예전 체크가 남으면 새 버전에 동의한 것처럼 보인다 — 초기화한다.
+                // 선택 항목도 미체크로 시작한다 — 기본값으로 체크해 두면 동의가 아니다 (NM-548).
                 checked.send([])
+            } catch AuthError.updateRequired {
+                errorMessage.send(ConsentMessage.updateRequired)
             } catch {
                 errorMessage.send("약관을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.")
             }
@@ -85,7 +88,7 @@ public final class ConsentViewModel {
 
         Task { @MainActor in
             do {
-                let route = try await useCase.agreeToConsents(definitions.value)
+                let route = try await useCase.agreeToConsents(definitions.value, checked: checked.value)
                 // ⚠️ **저장이 성공한 뒤에만** 보낸다. 누른 시점에 보내면 400(버전 불일치)으로
                 //    되돌아온 사람까지 가입으로 세어, 같은 사람이 두 번 가입한 것이 된다.
                 if isFirstTime { attribution.signUp() }
@@ -99,13 +102,28 @@ public final class ConsentViewModel {
                 // 문구는 정본을 그대로 쓴다. 사용자에게 보이는 자리는 「변경」으로 통일한다 —
                 // 계약 서술은 「개정」이지만 화면에서 세 단어(변경·업데이트·개정)가 섞여 있었다.
                 isLoading.send(false)
-                errorMessage.send("약관이 변경되어 다시 불러왔어요. 확인 후 동의해 주세요.")
+                errorMessage.send(ConsentMessage.reloaded)
                 load()
             } catch {
                 isLoading.send(false)
                 errorMessage.send("동의 저장에 실패했어요. 잠시 후 다시 시도해 주세요.")
             }
         }
+    }
+
+    /*
+     화면에 보일 항목 (spec: feature/auth/README.md §동의 온보딩 "항목 표시").
+
+     필수는 언제나 보인다. 선택 항목은 그 회원이 **현재 버전에 아직 응답하지 않았을 때만** 보인다 —
+     동의했든 거부했든 이미 답한 사람에게 같은 버전을 다시 묻지 않는다. 선택 항목만을 위해 이 화면을
+     따로 띄우지도 않으므로, 여기서 빠진 항목은 설정의 약관 및 동의 화면에서 바꾼다.
+
+     순서는 필수가 먼저, 선택이 뒤 — 서버가 준 순서는 각 묶음 안에서 지킨다.
+     */
+    static func itemsToAsk(_ definitions: [ConsentDefinition], user: AuthUser?) -> [ConsentDefinition] {
+        let required = definitions.filter(\.isRequired)
+        let optional = definitions.filter { !$0.isRequired && user?.hasResponded(to: $0) != true }
+        return required + optional
     }
 
     /// 취소 확인 다이얼로그에서 로그아웃을 고른 뒤 호출된다.

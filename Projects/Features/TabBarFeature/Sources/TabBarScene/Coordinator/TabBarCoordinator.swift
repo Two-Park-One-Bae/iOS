@@ -17,7 +17,9 @@ public final class TabBarCoordinator: CoordinatorProtocol {
     private let drugBuilder: DrugIdentificationFeatureBuildable
     private var tabBarVC: TabBarVC?
 
-    /// 설정 탭의 계정 행 처리 (NM-410). 탭바는 인증을 모르고 그대로 전달만 한다.
+    /// 설정 탭의 약관·계정 행 처리 (NM-548 · NM-410). 탭바는 인증을 모르고 그대로 전달만 한다.
+    /// 약관 및 동의 화면은 설정 탭 스택에 push 한다 — 화면을 만드는 건 주입한 쪽이다.
+    private let makeConsentSettings: () -> UIViewController
     private let onLogout: () -> Void
     private let onDeleteAccount: () -> Void
 
@@ -28,6 +30,7 @@ public final class TabBarCoordinator: CoordinatorProtocol {
         homeBuilder: HomeFeatureBuildable,
         timerBuilder: TimerFeatureBuildable,
         drugBuilder: DrugIdentificationFeatureBuildable,
+        makeConsentSettings: @escaping () -> UIViewController,
         onLogout: @escaping () -> Void,
         onDeleteAccount: @escaping () -> Void
     ) {
@@ -35,6 +38,7 @@ public final class TabBarCoordinator: CoordinatorProtocol {
         self.homeBuilder = homeBuilder
         self.timerBuilder = timerBuilder
         self.drugBuilder = drugBuilder
+        self.makeConsentSettings = makeConsentSettings
         self.onLogout = onLogout
         self.onDeleteAccount = onDeleteAccount
     }
@@ -94,11 +98,15 @@ public final class TabBarCoordinator: CoordinatorProtocol {
         addChild(timerCoordinator)
         timerNav.tabBarItem = UITabBarItem(title: "타이머", image: DSIcon.timer.uiImage, tag: 2)
 
+        let settingsNav = UINavigationController()
         let settingsVC = timerBuilder.makeSettingsViewController(
+            onConsents: { [weak settingsNav, makeConsentSettings = self.makeConsentSettings] in
+                settingsNav?.pushViewController(makeConsentSettings(), animated: true)
+            },
             onLogout: onLogout,
             onDeleteAccount: onDeleteAccount
         )
-        let settingsNav = UINavigationController(rootViewController: settingsVC)
+        settingsNav.setViewControllers([settingsVC], animated: false)
         settingsNav.setNavigationBarHidden(true, animated: false)
         settingsNav.tabBarItem = UITabBarItem(title: "설정", image: DSIcon.settings.uiImage, tag: 3)
 

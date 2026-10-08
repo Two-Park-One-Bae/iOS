@@ -22,6 +22,7 @@ final class TabBarDemoAppDelegate: UIResponder, UIApplicationDelegate {
             homeBuilder: StubHomeFeatureBuilder(),
             timerBuilder: StubTimerFeatureBuilder(),
             drugBuilder: StubDrugIdentificationFeatureBuilder(),
+            makeConsentSettings: { StubCoordinator.makeViewController("약관 및 동의 (Stub)") },
             onLogout: {},
             onDeleteAccount: {}
         )
@@ -48,6 +49,7 @@ final class StubTimerFeatureBuilder: TimerFeatureBuildable {
     }
 
     func makeSettingsViewController(
+        onConsents: @escaping () -> Void,
         onLogout: @escaping () -> Void,
         onDeleteAccount: @escaping () -> Void
     ) -> UIViewController {

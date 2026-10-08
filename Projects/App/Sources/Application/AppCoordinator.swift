@@ -190,6 +190,7 @@ final class AppCoordinator: BaseCoordinator {
             homeBuilder: HomeFeatureBuilder(),
             timerBuilder: TimerBuilder(),
             drugBuilder: DrugIdentificationBuilder(),
+            makeConsentSettings: { [authBuilder = self.authBuilder] in authBuilder.makeConsentSettingsViewController() },
             onLogout: { [weak self] in self?.confirmSignOut() },
             onDeleteAccount: { [weak self] in self?.confirmAccountDeletion() }
         )

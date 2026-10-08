@@ -14,10 +14,27 @@ final class AuthDemoAppDelegate: UIResponder, UIApplicationDelegate {
     ) -> Bool {
         // Login·Consent ViewModel 이 @Injected 로 AuthUseCase 를 받으므로 데모에서도 등록이 필요하다.
         // scenario 를 바꾸면 재방문(로그인 직후 홈)·약관 개정(저장 시 400 → 재조회) 흐름을 볼 수 있다.
-        DIContainer.shared.register(AuthUseCase.self) { MockAuthUseCase(scenario: .newUser) }
+        //
+        // 약관 및 동의 화면의 저장 결과는 스킴 실행 인자로 고른다 (NM-548) —
+        //   `-optionalSave bump`(400 → 재조회) · `-optionalSave fail`(실패 → 되돌림). 없으면 성공.
+        let mock = MockAuthUseCase(scenario: .newUser, optionalSaveResult: Self.optionalSaveResult)
+        DIContainer.shared.register(AuthUseCase.self) { mock }
         // ConsentViewModel 이 가입 이벤트(NM-547)를 보낼 곳. 데모에선 콘솔에만 찍는다.
         DIContainer.shared.register(AttributionTracking.self) { PrintAttribution() }
         return true
+    }
+
+    private static var optionalSaveResult: MockAuthUseCase.OptionalSaveResult {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let index = arguments.firstIndex(of: "-optionalSave"),
+              arguments.indices.contains(index + 1) else {
+            return .success
+        }
+        switch arguments[index + 1] {
+        case "bump": return .versionBumped
+        case "fail": return .failure
+        default:     return .success
+        }
     }
 
     func application(
@@ -81,7 +98,14 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     private func showHomeStub() {
         guard let nav = window?.rootViewController as? UINavigationController else { return }
-        nav.setViewControllers([HomeStubViewController { [weak self] in self?.startAuth() }], animated: true)
+        let home = HomeStubViewController(
+            onSignOut: { [weak self] in self?.startAuth() },
+            onConsents: { [weak nav] in
+                // 앱에서는 설정 탭 스택에 push 한다 — 데모는 홈 자리에서 바로 들어간다.
+                nav?.pushViewController(AuthBuilder().makeConsentSettingsViewController(), animated: true)
+            }
+        )
+        nav.setViewControllers([home], animated: true)
     }
 }
 
@@ -89,9 +113,11 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 private final class HomeStubViewController: UIViewController {
 
     private let onSignOut: () -> Void
+    private let onConsents: () -> Void
 
-    init(onSignOut: @escaping () -> Void) {
+    init(onSignOut: @escaping () -> Void, onConsents: @escaping () -> Void) {
         self.onSignOut = onSignOut
+        self.onConsents = onConsents
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -114,7 +140,11 @@ private final class HomeStubViewController: UIViewController {
         let signOutButton = SecondaryButton(title: "로그아웃")
         signOutButton.addAction(UIAction { [weak self] _ in self?.confirmSignOut() }, for: .touchUpInside)
 
-        let stack = UIStackView(arrangedSubviews: [label, caption, signOutButton])
+        // 앱에서는 설정 > 약관 및 동의 행이다 (NM-548).
+        let consentsButton = SecondaryButton(title: "약관 및 동의")
+        consentsButton.addAction(UIAction { [weak self] _ in self?.onConsents() }, for: .touchUpInside)
+
+        let stack = UIStackView(arrangedSubviews: [label, caption, consentsButton, signOutButton])
         stack.axis = .vertical
         stack.spacing = 12
         stack.alignment = .center

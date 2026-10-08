@@ -47,8 +47,27 @@ public extension AuthUser {
     ///
     /// `agreed && !satisfied` = "동의는 했는데 그 버전이 현재 필수 버전이 아니다" = 개정.
     /// 한 번도 동의한 적 없는 항목은 `agreed == false` 라 걸리지 않는다.
+    ///
+    /// 선택 항목(`OVERSEAS`)도 여기 걸리지만 판정을 흐리지 않는다 — 선택 항목이 옛 버전이라도
+    /// `onboardingRequired` 가 오르지 않아 동의 화면 자체가 뜨지 않고, 고지사항이 바뀌어 버전이
+    /// 오르면 방침도 함께 개정되므로(spec: domains/auth.md §선택 동의) 필수 쪽이 먼저 걸린다.
     var needsReconsent: Bool {
         consents.contains { $0.agreed && !$0.satisfied }
+    }
+
+    /// 그 항목의 **현재 버전**에 동의해 둔 상태인가(`agreed && satisfied`).
+    ///
+    /// 옛 버전에 동의한 상태는 다시 동의하기 전까지 미동의로 다룬다 (spec: domains/auth.md §선택 동의).
+    func hasAgreed(to type: ConsentType) -> Bool {
+        consents.contains { $0.type == type && $0.agreed && $0.satisfied }
+    }
+
+    /// 이 버전에 이미 응답했는가 — 동의든 거부든.
+    ///
+    /// 선택 항목을 동의 화면에 다시 보일지 가르는 값이다. 거부도 현재 버전으로 기록되므로
+    /// (`ConsentStatus.version`), 거부한 사람에게 같은 버전을 다시 묻지 않는다.
+    func hasResponded(to definition: ConsentDefinition) -> Bool {
+        consents.contains { $0.type == definition.type && $0.version == definition.version }
     }
 }
 
@@ -62,17 +81,21 @@ public enum AuthProvider: String, CaseIterable, Equatable {
 // MARK: - 동의
 
 public enum ConsentType: String, Equatable {
-    case terms   = "TERMS"
-    case privacy = "PRIVACY"
+    case terms    = "TERMS"
+    case privacy  = "PRIVACY"
+    /// 개인정보 국외 이전 및 제3자 제공 — **선택** (NM-548). 광고 유입 측정(에어브릿지)이 이 동의에 기댄다.
+    /// 필수 여부는 서버의 `ConsentDefinition.required` 가 정한다.
+    case overseas = "OVERSEAS"
 }
 
 /// 회원별 동의 상태 (`User.consents`).
 public struct ConsentStatus: Equatable {
     public let type: ConsentType
     public let agreed: Bool
-    /// 동의한 문서 버전. 미동의면 nil.
+    /// 응답한(동의·거부) 문서 버전. 한 번도 묻지 않았으면 nil.
+    /// 선택 항목은 거부도 현재 버전으로 남는다 — nil 과 거부를 이 값으로 가른다.
     public let version: String?
-    /// 현재 필수 버전 충족 여부(동의 & 최신 버전).
+    /// 현재 버전 충족 여부(동의 & 최신 버전).
     public let satisfied: Bool
 
     public init(type: ConsentType, agreed: Bool, version: String?, satisfied: Bool) {
@@ -146,6 +169,8 @@ public enum AuthError: Error, Equatable {
     case serverError
     /// 동의 저장 400(버전 불일치 등) — 오류로 끝내지 않고 `GET /consents` 재조회 후 화면을 다시 그린다.
     case consentVersionMismatch
+    /// 동의 정의에 이 앱이 모르는 **필수** 항목이 있다 — 저장할 수 없으므로 앱 업데이트를 안내한다 (NM-548).
+    case updateRequired
     /// 탈퇴 500 — 계정이 남아 있을 수 있어 **로그아웃하지 않고** 재시도한다.
     case accountDeletionFailed
     /// 401 — 세션 만료(탈퇴·토큰 폐기 포함). 재시도로 풀리지 않으므로 **조용히 로그아웃**한다
