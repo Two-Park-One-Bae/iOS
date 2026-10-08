@@ -27,7 +27,7 @@ public protocol AuthRepositoryProtocol {
     /// 동의 화면을 그릴 항목·버전·문서 URL. 인증 불필요(로그인 전에도 부를 수 있다).
     func fetchConsentDefinitions() async throws -> [ConsentDefinition]
 
-    /// 필수 항목 **전체**를 한 번에 저장하고 갱신된 회원 정보를 받는다.
+    /// 보낸 항목만 저장하고 갱신된 회원 정보를 받는다. 필수는 `agreed=true` 만, 선택은 둘 다 받는다.
     /// 버전 불일치(400)는 `AuthError.consentVersionMismatch` 로 올라온다.
     func saveConsents(_ agreements: [ConsentAgreement]) async throws -> AuthUser
 

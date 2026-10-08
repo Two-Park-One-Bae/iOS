@@ -50,13 +50,21 @@ public final class AuthRepository: AuthRepositoryProtocol {
     }
 
     public func fetchConsentDefinitions() async throws -> [ConsentDefinition] {
+        let entities: [ConsentDefinitionEntity]
         do {
-            // 모르는 항목(서버가 새 ConsentType 을 추가)은 버린다 — 화면에 빈 줄이 뜨는 것보다 낫고,
-            // 필수 충족 판정은 어차피 서버의 onboardingRequired 가 한다.
-            return try await service.fetchConsentDefinitions().compactMap { $0.toDomain() }
+            entities = try await service.fetchConsentDefinitions()
         } catch {
             throw AuthErrorMapper.map(error)
         }
+
+        // 모르는 **선택** 항목은 버린다(표시·전송하지 않음) — 서버가 먼저 추가해도 앱이 막히지 않는다.
+        // 모르는 **필수** 항목은 버릴 수 없다. 버리면 그 항목을 빼고 저장해 onboardingRequired 가
+        // 끝내 풀리지 않는데, 화면은 아무 이유도 말하지 못한다 — 업데이트를 안내한다
+        // (spec: domains/auth.md §선택 동의 "모르는 항목").
+        if entities.contains(where: { $0.required && ConsentType(rawValue: $0.type) == nil }) {
+            throw AuthError.updateRequired
+        }
+        return entities.compactMap { $0.toDomain() }
     }
 
     public func saveConsents(_ agreements: [ConsentAgreement]) async throws -> AuthUser {

@@ -14,4 +14,8 @@ public final class AuthBuilder: AuthFeatureBuildable {
     ) -> CoordinatorProtocol {
         AuthCoordinator(navigationController: navigationController, startAt: route, onFinished: onFinished)
     }
+
+    public func makeConsentSettingsViewController() -> UIViewController {
+        ConsentSettingsVC(viewModel: ConsentSettingsViewModel())
+    }
 }

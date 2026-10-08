@@ -4,7 +4,7 @@ import DSKit
 import Core
 import TimerShared
 
-// Xoc5z — 설정 · 타이머 섹션(NM-308) + 계정 섹션(NM-410).
+// Xoc5z — 설정 · 타이머 섹션(NM-308) + 약관 섹션(NM-548) + 계정 섹션(NM-410).
 //
 // 계정 섹션의 실제 동작(로그아웃·탈퇴)은 여기서 하지 않는다. TimerFeature 가 인증을 알게 되면
 // 타이머 화면이 Auth 계층에 묶이므로, 콜백만 노출하고 조립은 App 이 한다.
@@ -12,6 +12,8 @@ public final class SettingsViewController: UIViewController {
 
     private let selector = RingModeSelectorView(selected: RingModeStore.shared.current)
 
+    /// 약관 및 동의 행을 눌렀을 때. 화면은 AuthFeature 에 있어 주입한 쪽이 띄운다.
+    public var onConsentsTapped: (() -> Void)?
     /// 계정 행을 눌렀을 때. 확인 다이얼로그·실제 처리는 주입한 쪽 책임이다.
     public var onLogoutTapped: (() -> Void)?
     public var onDeleteAccountTapped: (() -> Void)?
@@ -43,13 +45,15 @@ public final class SettingsViewController: UIViewController {
         note.numberOfLines = 0
 
         let timerSection = makeSectionLabel("타이머")
+        let termsSection = makeSectionLabel("약관")
+        let consentsRow = makeConsentsRow()
         let accountSection = makeSectionLabel("계정")
         let card = makeRingModeCard()
         let logoutRow = makeLogoutRow()
         let deleteRow = makeDeleteAccountRow()
 
         let root = UIStackView(arrangedSubviews: [
-            title, timerSection, card, note, accountSection, logoutRow, deleteRow,
+            title, timerSection, card, note, termsSection, consentsRow, accountSection, logoutRow, deleteRow,
         ])
         root.axis = .vertical
         root.spacing = 12
@@ -57,6 +61,8 @@ public final class SettingsViewController: UIViewController {
         root.setCustomSpacing(8, after: card)
         // 섹션 사이는 넉넉히 띄우고, 섹션 라벨과 첫 행은 붙인다 (디자인 Xoc5z).
         root.setCustomSpacing(24, after: note)
+        root.setCustomSpacing(4, after: termsSection)
+        root.setCustomSpacing(24, after: consentsRow)
         root.setCustomSpacing(4, after: accountSection)
 
         view.addSubview(root)
@@ -102,6 +108,15 @@ public final class SettingsViewController: UIViewController {
         card.addSubview(cardStack)
         cardStack.snp.makeConstraints { $0.edges.equalToSuperview() }
         return card
+    }
+
+    /// 이용약관·개인정보처리방침 링크 행을 따로 두지 않는다 — 들어간 화면의 `보기`로 확인한다 (spec NM-548).
+    private func makeConsentsRow() -> UIView {
+        let row = DSListRow(style: .compact, icon: .fileText, title: "약관 및 동의", subtitle: "")
+        row.setIconBackground(DSColor.Primary._50)
+        row.setIconTint(DSColor.Primary._500)
+        row.onTap { [weak self] in self?.onConsentsTapped?() }
+        return row
     }
 
     private func makeLogoutRow() -> UIView {

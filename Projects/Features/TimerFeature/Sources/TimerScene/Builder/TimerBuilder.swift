@@ -11,10 +11,12 @@ public final class TimerBuilder: TimerFeatureBuildable {
     }
 
     public func makeSettingsViewController(
+        onConsents: @escaping () -> Void,
         onLogout: @escaping () -> Void,
         onDeleteAccount: @escaping () -> Void
     ) -> UIViewController {
         let viewController = SettingsViewController()
+        viewController.onConsentsTapped = onConsents
         viewController.onLogoutTapped = onLogout
         viewController.onDeleteAccountTapped = onDeleteAccount
         return viewController

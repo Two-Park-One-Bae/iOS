@@ -90,7 +90,7 @@ final class AuthUseCaseTests: XCTestCase {
         let route = try await sut.agreeToConsents([
             .stub(type: .terms, version: "1.2", isRequired: true),
             .stub(type: .privacy, version: "2.0", isRequired: true),
-        ])
+        ], checked: [.terms, .privacy])
 
         XCTAssertEqual(route, .home)
         XCTAssertEqual(repository.savedAgreements.count, 2)
@@ -102,9 +102,40 @@ final class AuthUseCaseTests: XCTestCase {
     func test_agreeToConsents_응답이_미충족이면_동의화면에_머문다() async throws {
         repository.saveConsentsResult = .success(.stub(onboardingRequired: true))
 
-        let route = try await sut.agreeToConsents([.stub(type: .terms, version: "1.0", isRequired: true)])
+        let route = try await sut.agreeToConsents([.stub(type: .terms, version: "1.0", isRequired: true)], checked: [.terms])
 
         XCTAssertEqual(route, .consent)
+    }
+
+    // MARK: - 선택 동의 (NM-548)
+
+    /// 체크하지 않은 선택 항목도 `agreed=false` 로 보낸다 — 현재 버전에 응답했다는 기록이 남아야 다시 묻지 않는다.
+    func test_agreeToConsents_선택항목은_체크여부_그대로_보낸다() async throws {
+        repository.saveConsentsResult = .success(.stub(onboardingRequired: false))
+
+        _ = try await sut.agreeToConsents([
+            .stub(type: .terms, version: "1.0", isRequired: true),
+            .stub(type: .overseas, version: "1.0", isRequired: false),
+        ], checked: [.terms])
+
+        XCTAssertEqual(repository.savedAgreements, [
+            ConsentAgreement(type: .terms, version: "1.0", agreed: true),
+            ConsentAgreement(type: .overseas, version: "1.0", agreed: false),
+        ])
+    }
+
+    func test_updateOptionalConsents_보낸항목만_저장하고_회원을_갱신한다() async throws {
+        let updated = AuthUser.stub(
+            onboardingRequired: false,
+            consents: [.stub(type: .overseas, agreed: false, version: "1.0", satisfied: false)]
+        )
+        repository.saveConsentsResult = .success(updated)
+        let change = ConsentAgreement(type: .overseas, version: "1.0", agreed: false)
+
+        try await sut.updateOptionalConsents([change])
+
+        XCTAssertEqual(repository.savedAgreements, [change])
+        XCTAssertEqual(sut.user.value, updated)
     }
 
     // MARK: - 로그아웃 · 탈퇴
@@ -255,6 +286,47 @@ final class AuthUserReconsentTests: XCTestCase {
             ]
         )
         XCTAssertTrue(user.needsReconsent)
+    }
+}
+
+// MARK: - 동의 상태 판별 (NM-548)
+
+final class AuthUserConsentTests: XCTestCase {
+
+    /// 옛 버전에 동의한 상태는 다시 동의하기 전까지 미동의다 — 측정 SDK 를 켜지 않는다.
+    func test_옛버전_동의는_동의가_아니다() {
+        let user = AuthUser.stub(
+            onboardingRequired: false,
+            consents: [.stub(type: .overseas, agreed: true, version: "1.0", satisfied: false)]
+        )
+        XCTAssertFalse(user.hasAgreed(to: .overseas))
+    }
+
+    func test_현재버전_동의는_동의다() {
+        let user = AuthUser.stub(
+            onboardingRequired: false,
+            consents: [.stub(type: .overseas, agreed: true, version: "1.0", satisfied: true)]
+        )
+        XCTAssertTrue(user.hasAgreed(to: .overseas))
+    }
+
+    /// 거부도 현재 버전으로 남는다 — 응답한 것이다.
+    func test_현재버전_거부는_응답이다() {
+        let user = AuthUser.stub(
+            onboardingRequired: false,
+            consents: [.stub(type: .overseas, agreed: false, version: "1.0", satisfied: false)]
+        )
+        XCTAssertTrue(user.hasResponded(to: .stub(type: .overseas, version: "1.0", isRequired: false)))
+        XCTAssertFalse(user.hasResponded(to: .stub(type: .overseas, version: "2.0", isRequired: false)))
+    }
+
+    /// version 이 null 이면 한 번도 묻지 않은 것이다.
+    func test_버전이_없으면_응답하지_않은_것이다() {
+        let user = AuthUser.stub(
+            onboardingRequired: false,
+            consents: [.stub(type: .overseas, agreed: false, version: nil, satisfied: false)]
+        )
+        XCTAssertFalse(user.hasResponded(to: .stub(type: .overseas, version: "1.0", isRequired: false)))
     }
 }
 

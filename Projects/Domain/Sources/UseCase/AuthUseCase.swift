@@ -25,8 +25,16 @@ public protocol AuthUseCase {
     /// 동의 화면 재료. 400 재조회 경로에서도 같은 호출을 쓴다.
     func fetchConsentDefinitions() async throws -> [ConsentDefinition]
 
-    /// 필수 동의 저장 → 갱신된 회원 기준으로 다음 화면을 정한다.
-    func agreeToConsents(_ definitions: [ConsentDefinition]) async throws -> AuthRoute
+    /// 동의 온보딩 저장 → 갱신된 회원 기준으로 다음 화면을 정한다.
+    ///
+    /// - Parameters:
+    ///   - definitions: 화면에 보인 항목.
+    ///   - checked: 체크된 항목. 필수는 체크돼 있어야 하고, 선택은 체크 여부 그대로 저장한다.
+    func agreeToConsents(_ definitions: [ConsentDefinition], checked: Set<ConsentType>) async throws -> AuthRoute
+
+    /// 약관 및 동의 화면 — 선택 항목의 동의·철회 (NM-548). **보낸 항목만** 갱신된다.
+    /// 버전 불일치(400)는 `AuthError.consentVersionMismatch`.
+    func updateOptionalConsents(_ changes: [ConsentAgreement]) async throws
 
     /// 로그아웃. 실패해도 로컬 상태는 비운다 — 화면에 이전 계정 정보가 남는 편이 더 나쁘다.
     func signOut()
@@ -98,16 +106,24 @@ public final class DefaultAuthUseCase: AuthUseCase {
         try await repository.fetchConsentDefinitions()
     }
 
-    public func agreeToConsents(_ definitions: [ConsentDefinition]) async throws -> AuthRoute {
-        // 필수 항목 전체를 현재 버전 · agreed=true 로 한 번에 보낸다. 부분 저장은 없다.
-        let agreements = definitions
-            .filter(\.isRequired)
-            .map { ConsentAgreement(type: $0.type, version: $0.version, agreed: true) }
+    public func agreeToConsents(_ definitions: [ConsentDefinition], checked: Set<ConsentType>) async throws -> AuthRoute {
+        // 필수 항목 전체는 현재 버전 · agreed=true 로, 화면에 보인 선택 항목은 체크 여부 그대로 한 번에 보낸다.
+        // 선택 항목의 거부(false)도 보낸다 — 현재 버전에 응답했다는 기록이 남아야 다시 묻지 않는다
+        // (spec: feature/auth/README.md §동의 온보딩).
+        let agreements = definitions.map {
+            ConsentAgreement(type: $0.type, version: $0.version, agreed: $0.isRequired || checked.contains($0.type))
+        }
 
         let updated = try await repository.saveConsents(agreements)
         user.send(updated)
         // 응답의 onboardingRequired 만 신뢰한다 — 저장에 성공했으니 충족됐다고 앱이 단정하지 않는다.
         return updated.onboardingRequired ? .consent : .home
+    }
+
+    public func updateOptionalConsents(_ changes: [ConsentAgreement]) async throws {
+        guard !changes.isEmpty else { return }
+        // 응답의 회원으로 바꿔 끼운다 — 측정 SDK 가 이 값을 보고 바로 켜고 끈다(철회 즉시 멈춤).
+        user.send(try await repository.saveConsents(changes))
     }
 
     // MARK: - 로그아웃 · 탈퇴

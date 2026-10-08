@@ -13,4 +13,7 @@ public protocol AuthFeatureBuildable {
         startAt route: AuthRoute,
         onFinished: @escaping () -> Void
     ) -> CoordinatorProtocol
+
+    /// 설정 > 약관 및 동의 — 약관 확인과 선택 동의의 철회·재동의 (NM-548). 설정 탭 스택에 push 한다.
+    func makeConsentSettingsViewController() -> UIViewController
 }

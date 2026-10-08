@@ -4,11 +4,13 @@
 //
 
 import UIKit
+import Combine
 import StoreKit
 import AppTrackingTransparency
 
 import Airbridge
 import Core
+import Domain
 
 /// 에어브릿지 SDK — 유입 경로 측정(설치 어트리뷰션·트래킹 링크 딥링크)과 가입 이벤트.
 ///
@@ -34,6 +36,18 @@ import Core
 ///   (저장하면 TestFlight → App Store 로 갈아탄 기기가 영영 수집되지 않는다.
 ///    `AppTransaction` 은 StoreKit 이 기기에 캐시해 두 번째 실행부터는 오프라인에서도 바로 온다.)
 /// - SDK 연동 검증은 스킴의 `-AirbridgeEnabled` 실행 인자로 우회한다 — 이벤트가 **운영 앱**으로 간다.
+///
+/// ## 국외 이전 동의가 있어야 켠다 (NM-548)
+///
+/// 에어브릿지로 개인정보가 국외 수탁사와 광고 매체(Meta)로 나가므로, 선택 동의 `OVERSEAS` 의
+/// 「별도의 동의」에 기댄다. 동의 전 전송이 없어야 하므로 **로그인한 회원의 `OVERSEAS` 가
+/// `agreed && satisfied` 일 때만** 추적한다. 로그인 전·로그아웃·탈퇴·철회 때는 멈춘다 —
+/// 병동 공용 기기에서 앞사람의 동의로 뒷사람이 측정되면 안 된다 (spec: domains/auth.md §선택 동의).
+///
+/// 그래서 추적은 **설치 경로 · 동의** 두 조건이 모두 참일 때만 켜진다(`applyTrackingState`).
+/// 두 값은 따로 도착하므로(설치 경로는 실행 직후 비동기로, 동의는 회원 조회 뒤에) 어느 쪽이
+/// 바뀌어도 같은 자리에서 다시 판정한다. 판정·SDK 호출은 전부 메인 큐에서 한다 — 가입 이벤트가
+/// 추적 시작보다 먼저 나가 버려지지 않도록 순서를 메인 큐 하나로 세운다(`Tracker.signUp`).
 enum AirbridgeService {
 
     /// 대시보드 앱 이름(서브도메인). 유니버설 링크 도메인 `nursemate.airbridge.io` 와 같은 값이다.
@@ -43,6 +57,12 @@ enum AirbridgeService {
     private(set) static var isEnabled = false
 
     private static var activeObserver: NSObjectProtocol?
+
+    /// App Store 설치본인가(또는 `-AirbridgeEnabled`). 확인 전에는 false.
+    private static var isEligibleInstall = false
+    /// 로그인한 회원이 국외 이전에 동의했는가. 로그인 전·로그아웃 뒤에는 false.
+    private static var hasOverseasConsent = false
+    private static var consentSubscription: AnyCancellable?
 
     /// `application(_:didFinishLaunchingWithOptions:)` 에서 **가장 먼저** 호출한다(에어브릿지 요구사항).
     static func configure() {
@@ -75,22 +95,57 @@ enum AirbridgeService {
     // MARK: - 설치 경로
 
     private static func startTrackingIfAppStoreInstall() async {
-        if ProcessInfo.processInfo.arguments.contains("-AirbridgeEnabled") {
-            Airbridge.startTracking()
-            return
+        let eligible = await isAppStoreInstall()
+        DispatchQueue.main.async {
+            isEligibleInstall = eligible
+            applyTrackingState()
         }
+    }
+
+    private static func isAppStoreInstall() async -> Bool {
+        if ProcessInfo.processInfo.arguments.contains("-AirbridgeEnabled") { return true }
         do {
             // 서명 검증 실패여도 환경 값은 읽는다 — 여기선 위변조 방어가 아니라 설치 경로 구분이 목적이다.
             let environment: AppStore.Environment = switch try await AppTransaction.shared {
             case let .verified(transaction):   transaction.environment
             case let .unverified(transaction, _): transaction.environment
             }
-            if environment == .production {
-                Airbridge.startTracking()
-            }
+            return environment == .production
         } catch {
             // 확인 실패 — 실사용자로 간주해 이번 실행은 수집한다(위 타입 주석 참고).
+            return true
+        }
+    }
+
+    // MARK: - 국외 이전 동의
+
+    /// 회원 상태를 지켜보다 동의가 바뀌면 추적을 켜고 끈다. `didFinishLaunching` 에서 한 번 건다.
+    ///
+    /// 회원이 nil(로그인 전·로그아웃·탈퇴)이면 동의 없음이다. 약관 및 동의 화면에서 철회를 저장하면
+    /// 응답의 회원이 여기로 흘러와 바로 멈춘다.
+    static func observeOverseasConsent(of user: CurrentValueSubject<AuthUser?, Never>) {
+        consentSubscription = user
+            .map { $0?.hasAgreed(to: .overseas) == true }
+            .removeDuplicates()
+            // ⚠️ `receive(on:)` 이 아니라 메인 큐에 **곧바로 줄을 세운다.** 가입 이벤트(`Tracker.signUp`)도
+            //    같은 큐로 들어오므로, 동의 저장 응답 → 추적 시작 → 가입 순서가 지켜진다.
+            .sink { granted in
+                DispatchQueue.main.async {
+                    hasOverseasConsent = granted
+                    applyTrackingState()
+                }
+            }
+    }
+
+    /// 설치 경로 · 동의가 모두 참일 때만 추적한다. 메인 큐에서만 부른다.
+    private static func applyTrackingState() {
+        guard isEnabled else { return }
+        let shouldTrack = isEligibleInstall && hasOverseasConsent
+        guard shouldTrack != Airbridge.isTrackingEnabled else { return }
+        if shouldTrack {
             Airbridge.startTracking()
+        } else {
+            Airbridge.stopTracking()
         }
     }
 
@@ -104,9 +159,13 @@ enum AirbridgeService {
      사용자 ID·이메일도 싣지 않는다. 이벤트를 늘리려면 Android 와 이름·시점을 맞출 것.
      */
     struct Tracker: AttributionTracking {
+        /// 국외 이전에 동의하지 않은 가입은 보내지 않는다 — 추적이 꺼져 있으면 여기서 멈춘다.
+        /// 메인 큐로 한 번 넘기는 이유는 `observeOverseasConsent` 참고(추적 시작보다 먼저 나가지 않게).
         func signUp() {
-            guard AirbridgeService.isEnabled else { return }
-            Airbridge.trackEvent(category: AirbridgeCategory.SIGN_UP)
+            DispatchQueue.main.async {
+                guard AirbridgeService.isEnabled, Airbridge.isTrackingEnabled else { return }
+                Airbridge.trackEvent(category: AirbridgeCategory.SIGN_UP)
+            }
         }
     }
 
@@ -148,7 +207,8 @@ enum AirbridgeService {
     ///
     /// 설치 후 첫 호출에서만 동작하고 그 뒤로는 바로 false 를 돌려준다. 저장된 링크가 없거나
     /// 이번 실행이 딥링크로 열렸으면 nil 이 온다(딥링크 쪽이 이미 처리하므로).
-    /// 수집이 시작돼야(`startTracking`) 링크를 받아 오므로 TestFlight·심사 빌드에서는 오지 않는다.
+    /// 수집이 시작돼야(`startTracking`) 링크를 받아 오므로 TestFlight·심사 빌드에서는 오지 않고,
+    /// 국외 이전 동의 전(로그인 전)에도 오지 않는다 (NM-548).
     static func handleDeferredDeeplink(onOpen: @escaping (URL) -> Void) {
         guard isEnabled else { return }
         _ = Airbridge.handleDeferredDeeplink { url in

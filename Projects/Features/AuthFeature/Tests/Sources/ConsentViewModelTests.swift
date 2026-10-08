@@ -81,6 +81,68 @@ final class ConsentViewModelTests: XCTestCase {
         XCTAssertTrue(sut.checked.value.isEmpty)
     }
 
+    // MARK: - 선택 항목 (NM-548)
+
+    func test_선택항목은_체크하지_않아도_진행할_수_있다() {
+        loadDefinitions([.stub(.terms), .stub(.privacy), .stub(.overseas)])
+        sut.toggle(.terms)
+        sut.toggle(.privacy)
+
+        XCTAssertTrue(latestCanProceed())
+    }
+
+    func test_모든항목은_체크되지_않은_채_시작한다() {
+        loadDefinitions([.stub(.terms), .stub(.privacy), .stub(.overseas)])
+
+        XCTAssertTrue(sut.checked.value.isEmpty)
+    }
+
+    func test_전체동의는_선택항목까지_켠다() {
+        loadDefinitions([.stub(.terms), .stub(.privacy), .stub(.overseas)])
+
+        sut.toggleAll()
+
+        XCTAssertEqual(sut.checked.value, [.terms, .privacy, .overseas])
+    }
+
+    func test_필수가_먼저_선택이_뒤에_온다() {
+        loadDefinitions([.stub(.overseas), .stub(.terms), .stub(.privacy)])
+
+        XCTAssertEqual(sut.definitions.value.map(\.type), [.terms, .privacy, .overseas])
+    }
+
+    /// 동의했든 거부했든 현재 버전에 이미 답했으면 다시 묻지 않는다.
+    func test_현재버전에_응답한_선택항목은_보이지_않는다() {
+        useCase.user.send(.stub(consents: [.init(type: .overseas, agreed: false, version: "1.0", satisfied: false)]))
+
+        loadDefinitions([.stub(.terms), .stub(.privacy), .stub(.overseas, version: "1.0")])
+
+        XCTAssertEqual(sut.definitions.value.map(\.type), [.terms, .privacy])
+    }
+
+    /// 고지사항이 바뀌어 버전이 오르면 다시 묻는다.
+    func test_옛버전에_응답한_선택항목은_다시_보인다() {
+        useCase.user.send(.stub(consents: [.init(type: .overseas, agreed: true, version: "1.0", satisfied: false)]))
+
+        loadDefinitions([.stub(.terms), .stub(.privacy), .stub(.overseas, version: "2.0")])
+
+        XCTAssertEqual(sut.definitions.value.map(\.type), [.terms, .privacy, .overseas])
+    }
+
+    func test_저장할때_체크상태를_그대로_넘긴다() {
+        loadDefinitions([.stub(.terms), .stub(.privacy), .stub(.overseas)])
+        sut.toggle(.terms)
+        sut.toggle(.privacy)
+        useCase.agreeResult = .success(.home)
+
+        let completed = expectation(description: "완료")
+        sut.onCompleted = { completed.fulfill() }
+        sut.agree()
+        wait(for: [completed], timeout: 2)
+
+        XCTAssertEqual(useCase.agreedChecked, [.terms, .privacy])
+    }
+
     // MARK: - 재조회
 
     /// 예전 체크가 남으면 사용자가 보지도 않은 새 버전에 동의한 것처럼 보인다.
@@ -204,7 +266,7 @@ final class ConsentViewModelTests: XCTestCase {
 
 // MARK: - Stub
 
-private final class StubAuthUseCase: AuthUseCase {
+final class StubAuthUseCase: AuthUseCase {
 
     let user = CurrentValueSubject<AuthUser?, Never>(nil)
 
@@ -223,8 +285,18 @@ private final class StubAuthUseCase: AuthUseCase {
         return definitions
     }
 
-    func agreeToConsents(_ definitions: [ConsentDefinition]) async throws -> AuthRoute {
-        try agreeResult.get()
+    private(set) var agreedChecked: Set<ConsentType>?
+    var updateResult: Result<Void, Error> = .success(())
+    private(set) var updatedChanges: [ConsentAgreement] = []
+
+    func agreeToConsents(_ definitions: [ConsentDefinition], checked: Set<ConsentType>) async throws -> AuthRoute {
+        agreedChecked = checked
+        return try agreeResult.get()
+    }
+
+    func updateOptionalConsents(_ changes: [ConsentAgreement]) async throws {
+        updatedChanges = changes
+        try updateResult.get()
     }
 
     func signOut() {
@@ -234,26 +306,26 @@ private final class StubAuthUseCase: AuthUseCase {
     func deleteAccount() async throws {}
 }
 
-private final class SpyAttribution: AttributionTracking {
+final class SpyAttribution: AttributionTracking {
     private(set) var signUpCount = 0
     func signUp() { signUpCount += 1 }
 }
 
 // MARK: - Fixtures
 
-private extension ConsentDefinition {
+extension ConsentDefinition {
     static func stub(_ type: ConsentType, version: String = "1.0") -> ConsentDefinition {
         ConsentDefinition(
             type: type,
             version: version,
-            isRequired: true,
+            isRequired: type != .overseas,
             policyUrl: URL(string: "https://nursemate.app/policy"),
-            title: type == .terms ? "이용약관" : "개인정보처리방침"
+            title: type.rawValue
         )
     }
 }
 
-private extension AuthUser {
+extension AuthUser {
     static func stub(consents: [ConsentStatus]) -> AuthUser {
         AuthUser(userId: "uid", provider: .google, providerUserId: "p",
                  consents: consents, onboardingRequired: true)

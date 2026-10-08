@@ -18,8 +18,8 @@ public struct KakaoTokenRequest: Encodable {
 
 /// POST /api/v0/users/me/consents 요청 바디.
 ///
-/// **필수 항목 전체(TERMS·PRIVACY)를 현재 버전·`agreed=true`로 한 번에** 보내야 한다 —
-/// 부분 저장은 없고, 누락·미동의·버전 불일치는 전부 400 이다(spec: openapi.yaml).
+/// **보낸 항목만** 갱신된다(openapi 0.28.0). 필수 항목은 `agreed=true` 만, 선택 항목(`OVERSEAS`)은
+/// `true`·`false` 모두 받는다. 필수의 `agreed=false`·버전 불일치·모르는 `type` 은 400 이다.
 public struct ConsentAgreementsRequest: Encodable {
     public let agreements: [ConsentAgreementRequest]
 
