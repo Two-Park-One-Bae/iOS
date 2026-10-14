@@ -192,6 +192,40 @@ platform :ios do
     UI.header("배포 결과: #{line}")
   end
 
+  # ── 빌드 번호 ──────────────────────────────────────────────────────────────
+  #
+  # 다음 빌드 번호 = max(TestFlight 최신, 이 머신에서 이미 예약된 번호) + 1.
+  #
+  # TestFlight 만 보면 **진행 중인 빌드**가 안 보인다 — 빌드는 아카이브·업로드가 끝나야(5~7분)
+  # App Store Connect 에 나타난다. 2026-10-01 07:59 에 외부(prod)·내부(dev) 레인이 12초 차이로 시작해
+  # 둘 다 최신 133 을 보고 134 를 만들었고, 내부 업로드는 409 로 실패했다(스토어 "2.0.0" = 바이너리 1.2.0 (134)).
+  #
+  # 배포는 모두 이 맥 한 대에서 돌므로, 정한 번호를 로컬 장부에 적어 두고 다음 레인이 그것까지 본다.
+  # 장부는 파일 잠금(flock) 아래에서 읽고 써서 동시에 시작해도 서로 다른 번호를 받는다.
+  # 장부는 젠킨스가 매번 지우는 작업 폴더 밖(~/.nursemate)에 둔다. 빌드가 실패하면 번호 하나가 비는데,
+  # 빌드 번호는 연속일 필요가 없다.
+  BUILD_NUMBER_LEDGER = File.expand_path("~/.nursemate/build-number-reserved")
+
+  def reserve_build_number!(api_key:)
+    latest = latest_testflight_build_number(
+      api_key: api_key,
+      app_identifier: "app.nursemate.app",
+      initial_build_number: 1
+    ).to_i
+    FileUtils.mkdir_p(File.dirname(BUILD_NUMBER_LEDGER))
+    File.open(BUILD_NUMBER_LEDGER, File::RDWR | File::CREAT, 0o644) do |f|
+      f.flock(File::LOCK_EX)
+      reserved = f.read.to_i
+      number = [latest, reserved].max + 1
+      f.rewind
+      f.write(number.to_s)
+      f.flush
+      f.truncate(f.pos)
+      UI.message("빌드 번호 #{number} 예약 (TestFlight 최신 #{latest} · 로컬 예약 #{reserved})")
+      number
+    end
+  end
+
   # ASC API 키 정보(key_id·issuer_id·.p8 파일경로). 로컬은 fastlane/api_key.json, CI는 env.
   # xcodebuild 의 -authenticationKey* 플래그가 .p8 **파일경로**를 요구하므로 항상 파일로 떨군다.
   def asc_key_info
@@ -281,11 +315,7 @@ platform :ios do
     key = api_key
     version = app_version!(required: false)
 
-    build_number = latest_testflight_build_number(
-      api_key: key,
-      app_identifier: "app.nursemate.app",
-      initial_build_number: 1
-    ) + 1
+    build_number = reserve_build_number!(api_key: key)
 
     increment_build_number(
       build_number: build_number,
@@ -331,11 +361,7 @@ platform :ios do
     key = api_key
     version = app_version!(required: true)
 
-    build_number = latest_testflight_build_number(
-      api_key: key,
-      app_identifier: "app.nursemate.app",
-      initial_build_number: 1
-    ) + 1
+    build_number = reserve_build_number!(api_key: key)
 
     increment_build_number(
       build_number: build_number,
@@ -389,11 +415,7 @@ platform :ios do
     # 빌드(15분) 전에 App Store Connect 쪽을 맞출 수 있는지부터 본다.
     check_asc_version_editable!(version)
 
-    build_number = latest_testflight_build_number(
-      api_key: key,
-      app_identifier: "app.nursemate.app",
-      initial_build_number: 1
-    ) + 1
+    build_number = reserve_build_number!(api_key: key)
 
     increment_build_number(
       build_number: build_number,
