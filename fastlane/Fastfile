@@ -9,6 +9,9 @@ API_KEY_RAW_PATH = "/tmp/AuthKey_raw.p8"
 FIREBASE_ENV_DEV = "Debug".freeze
 FIREBASE_ENV_PROD = "Release".freeze
 
+# App Store Connect 에서 심사에 들어가 번호를 바꿀 수 없는 버전 상태.
+LOCKED_VERSION_STATES = %w[WAITING_FOR_REVIEW IN_REVIEW PENDING_DEVELOPER_RELEASE PENDING_APPLE_RELEASE].freeze
+
 platform :ios do
   before_all do
     setup_ci if ENV["CI"]
@@ -111,6 +114,84 @@ platform :ios do
     "버그 수정 및 개선 사항"
   end
 
+  # ── 앱 버전 ────────────────────────────────────────────────────────────────
+  #
+  # 앱 버전(CFBundleShortVersionString)은 젠킨스 파라미터 APP_VERSION 으로 받는다.
+  #
+  # 스토어에 "2.0.0" 으로 나간 빌드가 실제로는 1.2.0 바이너리였다 — 버전이 코드(Project.swift)에
+  # 박혀 있어 App Store Connect 의 버전과 따로 놀았다. 사용자는 스토어에서 "2.0.0" 을 받았는데
+  # 앱이 보고하는 버전(Firebase Analytics · Crashlytics · Remote Config 최소 버전 비교)은 전부 1.2.0 이었다.
+  #
+  # 그래서 배포 레인은 버전 하나를 입력받아 **바이너리와 App Store Connect 양쪽에 같은 값**을 쓴다.
+  #  - 바이너리: xcargs MARKETING_VERSION (앱·워치·익스텐션 Info.plist 가 모두 이 값을 본다)
+  #  - App Store Connect: release 레인이 업로드 뒤 준비 중 버전을 이 값으로 맞춘다(없으면 만든다)
+  #
+  # required: false 면(내부 레인) 비었을 때 코드 기본값으로 빌드한다 — git 훅이 파라미터 없이 부른다.
+  def app_version!(required:)
+    version = ENV["APP_VERSION"].to_s.strip
+    if version.empty?
+      UI.user_error!("APP_VERSION 이 비어 있습니다 — 젠킨스 파라미터로 배포할 앱 버전(예: 2.0.2)을 넣으세요.") if required
+      UI.important("APP_VERSION 미지정 — 코드 기본값(MARKETING_VERSION)으로 빌드합니다.")
+      return nil
+    end
+    UI.user_error!("APP_VERSION '#{version}' 형식이 틀렸습니다 — x.y.z (예: 2.0.2)") unless version.match?(/\A\d+\.\d+\.\d+\z/)
+
+    live = asc_app.get_live_app_store_version(platform: Spaceship::ConnectAPI::Platform::IOS)&.version_string
+    UI.message("APP_VERSION=#{version} · 스토어 라이브=#{live || '없음'}")
+    # 라이브와 같거나 낮으면 업로드가 어차피 ITMS-90062 로 거부된다 — 15분 빌드 전에 멈춘다.
+    if live && Gem::Version.new(version) <= Gem::Version.new(live)
+      UI.user_error!("APP_VERSION #{version} 이 스토어 라이브 버전 #{live} 보다 크지 않습니다.")
+    end
+    version
+  end
+
+  def asc_app
+    @asc_app ||= Spaceship::ConnectAPI::App.find("app.nursemate.app") ||
+                 UI.user_error!("App Store Connect 에서 app.nursemate.app 을 찾지 못했습니다.")
+  end
+
+  # release 레인: App Store Connect 의 다음 버전을 APP_VERSION 으로 맞춘다. **제출·빌드 지정은 하지 않는다.**
+  def check_asc_version_editable!(version)
+    locked = asc_app.get_app_store_versions(
+      filter: { platform: Spaceship::ConnectAPI::Platform::IOS, appVersionState: LOCKED_VERSION_STATES.join(",") }
+    ).reject { |v| v.version_string == version }
+    return if locked.empty?
+
+    desc = locked.map { |v| "#{v.version_string}(#{v.app_version_state})" }.join(", ")
+    UI.user_error!("App Store Connect 에 심사·출시 대기 중인 버전 #{desc} 이 있어 #{version} 으로 맞출 수 없습니다.")
+  end
+
+  def sync_asc_version!(version)
+    changed = asc_app.ensure_version!(version, platform: Spaceship::ConnectAPI::Platform::IOS)
+    UI.success(changed ? "App Store Connect 준비 중 버전을 #{version} 으로 맞췄습니다." :
+                         "App Store Connect 준비 중 버전이 이미 #{version} 입니다.")
+  end
+
+  # MARKETING_VERSION 을 덮어쓰는 xcargs. 미지정이면 빈 문자열(코드 기본값).
+  def version_xcargs(version)
+    version ? "MARKETING_VERSION=#{version}" : ""
+  end
+
+  # 빌드된 .ipa 의 버전·빌드 번호를 읽고, 입력과 다르면 업로드 전에 멈춘다.
+  def verify_ipa!(version)
+    ipa = lane_context[SharedValues::IPA_OUTPUT_PATH]
+    built = get_ipa_info_plist_value(ipa: ipa, key: "CFBundleShortVersionString")
+    build = get_ipa_info_plist_value(ipa: ipa, key: "CFBundleVersion")
+    if version && built != version
+      UI.user_error!("빌드된 앱 버전 #{built} 이 APP_VERSION #{version} 과 다릅니다 — 업로드하지 않습니다.")
+    end
+    UI.success("빌드 확인: #{built} (#{build})")
+    [built, build]
+  end
+
+  # 끝나면 "몇 번 빌드인지" 한 줄로 남긴다. 젠킨스 Job 이 이 파일을 읽어 알림·빌드 설명에 띄운다
+  # (로그에서 Ctrl+F 로 찾지 않도록).
+  def report_build!(lane:, version:, build:)
+    line = "#{lane} #{version} (#{build})"
+    File.write("#{repo_root}/build/deploy_result.txt", line)
+    UI.header("배포 결과: #{line}")
+  end
+
   # ASC API 키 정보(key_id·issuer_id·.p8 파일경로). 로컬은 fastlane/api_key.json, CI는 env.
   # xcodebuild 의 -authenticationKey* 플래그가 .p8 **파일경로**를 요구하므로 항상 파일로 떨군다.
   def asc_key_info
@@ -198,6 +279,7 @@ platform :ios do
   desc "Build and upload to TestFlight (internal testers)"
   lane :beta_internal do
     key = api_key
+    version = app_version!(required: false)
 
     build_number = latest_testflight_build_number(
       api_key: key,
@@ -220,8 +302,9 @@ platform :ios do
     # App Check 토큰의 aud 는 Firebase 프로젝트에 묶여 있어, 한쪽만 바꾸면 서버가 401 을 낸다.
     build_appstore(
       firebase_env: FIREBASE_ENV_DEV,
-      extra_xcargs: "SWIFT_ACTIVE_COMPILATION_CONDITIONS='$(inherited) INTERNAL' FIREBASE_ANALYTICS_ENABLED=YES BASE_URL='$(BASE_URL_DEBUG)'"
+      extra_xcargs: "SWIFT_ACTIVE_COMPILATION_CONDITIONS='$(inherited) INTERNAL' FIREBASE_ANALYTICS_ENABLED=YES BASE_URL='$(BASE_URL_DEBUG)' #{version_xcargs(version)}"
     )
+    built, build = verify_ipa!(version)
 
     upload_dsyms_to_crashlytics(FIREBASE_ENV_DEV)
 
@@ -240,11 +323,13 @@ platform :ios do
       submit_beta_review: false,
       skip_waiting_for_build_processing: false
     )
+    report_build!(lane: "내부 TestFlight", version: built, build: build)
   end
 
   desc "Build and upload to TestFlight (external testers)"
   lane :beta_external do
     key = api_key
+    version = app_version!(required: true)
 
     build_number = latest_testflight_build_number(
       api_key: key,
@@ -258,7 +343,8 @@ platform :ios do
     )
 
     # 외부 테스터·프로덕션은 prod Firebase(Release) 로 수집한다 — 내부(dev)와 분리.
-    build_appstore(firebase_env: FIREBASE_ENV_PROD)
+    build_appstore(firebase_env: FIREBASE_ENV_PROD, extra_xcargs: version_xcargs(version))
+    built, build = verify_ipa!(version)
 
     upload_dsyms_to_crashlytics(FIREBASE_ENV_PROD)
 
@@ -293,11 +379,15 @@ platform :ios do
       UI.important("   앞 빌드가 심사를 통과하면 이 빌드는 재심사 없이 외부 그룹에 노출된다.")
       UI.important("   즉시 내보내야 하면 App Store Connect 에서 직접 그룹에 추가할 것.")
     end
+    report_build!(lane: "외부 TestFlight", version: built, build: build)
   end
 
   desc "Build and submit to App Store"
   lane :release do
     key = api_key
+    version = app_version!(required: true)
+    # 빌드(15분) 전에 App Store Connect 쪽을 맞출 수 있는지부터 본다.
+    check_asc_version_editable!(version)
 
     build_number = latest_testflight_build_number(
       api_key: key,
@@ -311,7 +401,8 @@ platform :ios do
     )
 
     # 프로덕션은 prod Firebase(Release) 로 수집한다.
-    build_appstore(firebase_env: FIREBASE_ENV_PROD)
+    build_appstore(firebase_env: FIREBASE_ENV_PROD, extra_xcargs: version_xcargs(version))
+    built, build = verify_ipa!(version)
 
     upload_dsyms_to_crashlytics(FIREBASE_ENV_PROD)
 
@@ -319,6 +410,11 @@ platform :ios do
       api_key: key,
       skip_waiting_for_build_processing: false
     )
+
+    # 바이너리와 같은 번호로 App Store Connect 버전을 맞춘다. 심사 제출·빌드 지정은 사람이 한다 —
+    # 끝에 찍히는 빌드 번호를 App Store Connect 에서 골라 붙이면 된다.
+    sync_asc_version!(version)
+    report_build!(lane: "App Store 후보", version: built, build: build)
   end
 
   desc "Regenerate App Store signing profiles for all targets (match --force)"
