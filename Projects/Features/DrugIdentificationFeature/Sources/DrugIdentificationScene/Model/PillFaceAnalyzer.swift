@@ -17,8 +17,8 @@ struct PillFaceModelResult: Equatable {
 
 /// 각인(ImprintKit)·마크(MarkKit) 모델을 한 번 열어 두고 크롭마다 돌린다.
 ///
-/// **각인과 마크는 동시에 돈다.** 쓰는 장치가 달라서다 — 각인은 GPU·CPU 두 레인(fp32 라 ANE 불가),
-/// 마크는 Neural Engine(fp16). iPhone 12 · 번들 사진(알약 6개) 실측: 순차 판독 9.2초 → 5.4초.
+/// **각인과 마크는 동시에 돈다.** 각인은 ANE·CPU 두 레인, 마크는 Neural Engine(fp16).
+/// iPhone 12 · 번들 사진(알약 6개) 실측(각인이 GPU·CPU 일 때): 순차 판독 9.2초 → 5.4초.
 ///
 /// **모델은 앱 수명 동안 한 벌만 연다.** 마크는 ANE 로 처음 열 때 컴파일이 수 초 걸리므로
 /// 촬영 화면이 뜰 때 `prewarm()` 으로 미리 연다. 스캔마다 열면 그 시간이 매번 로딩에 붙는다.
@@ -56,7 +56,7 @@ final class PillFaceAnalyzer: @unchecked Sendable {
         let grays = present.map { faces[$0]! }
         guard !grays.isEmpty else { return crops.map { _ in nil } }
 
-        // 마크(ANE)는 다른 큐에서, 각인(GPU·CPU 레인)은 이 스레드에서 — 끝나면 합류한다.
+        // 마크(ANE)는 다른 큐에서, 각인(ANE·CPU 레인)은 이 스레드에서 — 끝나면 합류한다.
         let group = DispatchGroup()
         let marks = ResultBox<[MarkReading]>()
         DispatchQueue.global(qos: .userInitiated).async(group: group) {
