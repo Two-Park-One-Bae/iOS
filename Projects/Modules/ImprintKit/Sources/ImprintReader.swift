@@ -17,7 +17,7 @@ public struct ImprintReading: Sendable, Equatable {
 ///
 /// ```
 /// 크롭 → 흑백 → 128 정사각 → 확대 6배율 × 회전 24방향 = 144뷰 → CLAHE → CRNN(배치 24) → CTC 그리디
-///      → best_pair 최대 후보 → 확신도 0.949 이상이면 확률 0.95 이상 글자 = 확신 글자
+///      → best_pair 최대 후보 → 확신도 0.90 이상이면 확률 0.95 이상 글자 = 확신 글자
 /// ```
 ///
 /// **연산 장치 두 레인에 나눠 돈다(ANE + CPU).** GPU 는 쓰지 않는다(`ImprintReaderModel` 참고).
@@ -30,8 +30,10 @@ public final class ImprintReader: @unchecked Sendable {
     public static let rotations = 24
     /// 확신 글자 임계 — 글자 확률(소수 셋째 자리 반올림) 이 이상.
     public static let sureThreshold = 0.95
-    /// 채택 조건 — 고른 후보의 best_pair 확신도가 이 미만이면 확신 글자를 내지 않는다(감사셋 정밀도 90% 지점).
-    public static let acceptThreshold = 0.949
+    /// 채택 조건 — 고른 후보의 best_pair 확신도가 이 미만이면 확신 글자를 내지 않는다.
+    /// 정본은 0.949(감사셋 정밀도 90% 지점)인데, 감사셋 347면에서 0.90 까지 내려도 늘어난 16면 중 15면이 맞아
+    /// 정밀도가 그대로(92.1% → 92.2%)라 낮췄다.
+    public static let acceptThreshold = 0.90
 
     static let charset = Array("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ")
 

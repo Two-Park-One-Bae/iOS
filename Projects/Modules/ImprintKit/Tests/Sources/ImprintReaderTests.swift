@@ -7,7 +7,7 @@ final class ImprintReaderTests: XCTestCase {
     // MARK: - 답 규칙
 
     func test_확신도가_채택_임계_미만이면_확신_글자를_내지_않는다() {
-        let candidate = ImprintReader.Candidate(chars: [("A", 0.99), ("X", 0.948)], pair: "AX", score: 0.948)
+        let candidate = ImprintReader.Candidate(chars: [("A", 0.99), ("X", 0.899)], pair: "AX", score: 0.899)
         XCTAssertNil(ImprintReader.answer(from: [candidate]).sure)
     }
 
