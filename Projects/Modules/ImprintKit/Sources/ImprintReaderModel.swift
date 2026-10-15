@@ -32,7 +32,7 @@ public final class ImprintReaderModel {
     /// GPU(MPSGraph) 첫 그래프 특수화에서 앱이 죽는 크래시를 피한다(2.0.1, iOS 27 · A19).
     /// `ImprintReader` 가 레인마다 하나씩 연다.
     /// - Parameter url: 컴파일된 `.mlmodelc`. nil 이면 이 프레임워크 번들에서 찾는다(대조 도구가 경로를 준다).
-    public init(url: URL? = nil, computeUnits: MLComputeUnits = .all) throws {
+    public init(url: URL? = nil, computeUnits: MLComputeUnits = .cpuAndNeuralEngine) throws {
         guard let url = url ?? Bundle(for: ImprintReaderModel.self).url(forResource: Self.resourceName, withExtension: "mlmodelc") else {
             throw ImprintReaderModelError.missingModel
         }
