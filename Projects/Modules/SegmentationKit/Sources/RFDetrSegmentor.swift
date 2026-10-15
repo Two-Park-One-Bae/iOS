@@ -138,7 +138,7 @@ public final class RFDetrSegmentor: @unchecked Sendable {
             throw RFDETRError.missingModel
         }
         let config = MLModelConfiguration()
-        config.computeUnits = .all
+        config.computeUnits = .cpuOnly
         model = try MLModel(contentsOf: url, configuration: config)
     }
 
