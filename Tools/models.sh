@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # models.lock 에 적힌 CoreML 모델을 ML 레포 DVC(S3)에서 받는다 (NM-482).
 #
-#   Tools/models.sh fetch   받는다. 이미 같은 REV 로 받은 것은 건너뛴다
+#   Tools/models.sh fetch   받는다. 이미 같은 REV 로 받은 것은 건너뛴다. models.lock 에서 빠진 옛 모델은 지운다
 #   Tools/models.sh check   받은 것이 models.lock 과 맞는지만 본다(네트워크 안 씀). 빌드 단계가 부른다
 #
 # 필요한 것: dvc(S3 지원) · AWS 프로필 nursemate-dvc · ML 레포(private) 를 클론할 수 있는 git 자격증명.
@@ -33,6 +33,19 @@ entries() { grep -v -E '^[[:space:]]*(#|$|REV=)' "$LOCK"; }
 
 stamp_of() { echo "$STAMPS/$(basename "$1").stamp"; }
 
+# models.lock 목적지 폴더에 있으면서 lock 에 없는 mlpackage — 모델을 바꾸면 옛 것이 남는다.
+# 빌드는 Sources/*.mlpackage 를 전부 번들하므로 남겨 두면 안 쓰는 모델이 앱에 같이 들어간다.
+strays() {
+  local dirs dir pkg
+  dirs="$(entries | awk '{print $2}' | xargs -n1 dirname | sort -u)"
+  for dir in $dirs; do
+    for pkg in "$ROOT/$dir"/*.mlpackage; do
+      [ -e "$pkg" ] || continue
+      entries | awk '{print $2}' | grep -qxF "$dir/$(basename "$pkg")" || echo "$dir/$(basename "$pkg")"
+    done
+  done
+}
+
 is_current() {  # $1=ML 경로 $2=목적지
   local dst="$ROOT/$2" stamp
   stamp="$(stamp_of "$2")"
@@ -47,6 +60,10 @@ cmd_check() {
       bad=1
     fi
   done < <(entries)
+  for dst in $(strays); do
+    echo "error: models.lock 에 없는 모델이 남아 있다(앱에 같이 번들된다) — $dst"
+    bad=1
+  done
   if [ "$bad" -ne 0 ]; then
     echo "error: 저장소 루트에서 'make models' 를 먼저 실행하세요 (필요한 것: dvc · AWS 프로필 $AWS_PROFILE)."
     exit 1
@@ -92,6 +109,10 @@ cmd_fetch() {
     rm -rf "$tmp"
     echo "$REV $src" > "$(stamp_of "$dst")"
   done < <(entries)
+  for dst in $(strays); do
+    echo "🗑  $(basename "$dst") (models.lock 에서 빠짐)"
+    rm -rf "${ROOT:?}/$dst" "$(stamp_of "$dst")"
+  done
   cmd_check
 }
 
