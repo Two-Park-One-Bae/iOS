@@ -17,10 +17,10 @@ public struct ImprintReading: Sendable, Equatable {
 ///
 /// ```
 /// 크롭 → 흑백 → 128 정사각 → 확대 6배율 × 회전 24방향 = 144뷰 → CLAHE → CRNN(배치 24) → CTC 그리디
-///      → best_pair 최대 후보 → 확신도 0.949 이상이면 확률 0.95 이상 글자 = 확신 글자
+///      → best_pair 최대 후보 → 확신도 0.90 이상이면 확률 0.95 이상 글자 = 확신 글자
 /// ```
 ///
-/// **연산 장치 두 레인에 나눠 돈다(GPU + CPU).** fp32 모델이라 ANE 는 못 쓰고, CPU·GPU 속도가 비슷하다.
+/// **연산 장치 두 레인에 나눠 돈다(ANE + CPU).** GPU 는 쓰지 않는다(`ImprintReaderModel` 참고).
 /// 알약 하나 = 배치 6개(배율 하나가 24방향 = 배치 하나)이고, 여러 알약의 배치를 두 레인이 먼저 빈 쪽부터
 /// 가져간다. 알약 단위로 나누면 알약이 1개일 때 레인 하나가 논다(iPhone 12 실측: 알약 1개 각인 −41%).
 /// 레인마다 모델을 따로 연다 — `MLModel` 하나를 여러 스레드가 동시에 부르지 않는다.
@@ -30,17 +30,19 @@ public final class ImprintReader: @unchecked Sendable {
     public static let rotations = 24
     /// 확신 글자 임계 — 글자 확률(소수 셋째 자리 반올림) 이 이상.
     public static let sureThreshold = 0.95
-    /// 채택 조건 — 고른 후보의 best_pair 확신도가 이 미만이면 확신 글자를 내지 않는다(감사셋 정밀도 90% 지점).
-    public static let acceptThreshold = 0.949
+    /// 채택 조건 — 고른 후보의 best_pair 확신도가 이 미만이면 확신 글자를 내지 않는다.
+    /// 정본은 0.949(감사셋 정밀도 90% 지점)인데, 감사셋 347면에서 0.90 까지 내려도 늘어난 16면 중 15면이 맞아
+    /// 정밀도가 그대로(92.1% → 92.2%)라 낮췄다.
+    public static let acceptThreshold = 0.90
 
     static let charset = Array("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
     private let lanes: [ImprintReaderModel]
 
     /// - Parameters:
-    ///   - computeUnits: 레인마다 하나. 기본은 GPU(`.all`) + CPU.
+    ///   - computeUnits: 레인마다 하나. 기본은 ANE(`.cpuAndNeuralEngine`) + CPU.
     ///   - modelURL: 컴파일된 `.mlmodelc`. nil 이면 번들에서 찾는다.
-    public init(computeUnits: [MLComputeUnits] = [.all, .cpuOnly], modelURL: URL? = nil) throws {
+    public init(computeUnits: [MLComputeUnits] = [.cpuAndNeuralEngine, .cpuOnly], modelURL: URL? = nil) throws {
         precondition(!computeUnits.isEmpty)
         lanes = try computeUnits.map { try ImprintReaderModel(url: modelURL, computeUnits: $0) }
     }

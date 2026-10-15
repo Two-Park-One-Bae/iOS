@@ -17,18 +17,22 @@ public enum ImprintReaderModelError: LocalizedError {
 ///
 /// 입력 `image` [24,1,128,128] — CLAHE 를 끝낸 흑백. 출력 `logits` [32,24,37] (시간축 · 배치 · 클래스).
 /// 배치 24 고정: 가변 shape 은 ANE 를 잘 못 탄다. (배율·방향) 조합을 묶어 한 번에 넘긴다.
+///
+/// **혼합 정밀도(keep-matmul)** — matmul 6개(TPS 2 · attention 4)만 fp32, 나머지는 fp16 이라 ANE 를 탄다.
+/// 전부 fp16 이면 확신 글자가 절반 가까이 바뀐다(감사셋 채택 238 → 137면). matmul 을 남기면 fp32 와 같은 수준.
 /// 규격·전처리는 ML 레포 `models/imprint/20260907-crnn-ep60-s1/INFO.md`.
 public final class ImprintReaderModel {
-    static let resourceName = "Reader_s1_b24_fp32"
+    static let resourceName = "Reader_s1_b24_keepmatmul"
     public static let batchSize = 24
     public static let inputSize = 128
 
     public let model: MLModel
 
-    /// fp32 모델이라 ANE 는 후보가 아니다 — `.all` 이면 GPU, `.cpuOnly` 면 CPU 로 돈다.
-    /// `ImprintReader` 가 두 장치를 동시에 쓰려고 레인마다 하나씩 연다.
+    /// `.cpuAndNeuralEngine` 이면 fp16 연산은 ANE, fp32 matmul · LSTM 은 CPU 로 돈다. **GPU 는 쓰지 않는다** —
+    /// GPU(MPSGraph) 첫 그래프 특수화에서 앱이 죽는 크래시를 피한다(2.0.1, iOS 27 · A19).
+    /// `ImprintReader` 가 레인마다 하나씩 연다.
     /// - Parameter url: 컴파일된 `.mlmodelc`. nil 이면 이 프레임워크 번들에서 찾는다(대조 도구가 경로를 준다).
-    public init(url: URL? = nil, computeUnits: MLComputeUnits = .all) throws {
+    public init(url: URL? = nil, computeUnits: MLComputeUnits = .cpuAndNeuralEngine) throws {
         guard let url = url ?? Bundle(for: ImprintReaderModel.self).url(forResource: Self.resourceName, withExtension: "mlmodelc") else {
             throw ImprintReaderModelError.missingModel
         }
