@@ -36,7 +36,7 @@ public final class RingModeSheetViewController: UIViewController {
         iconWrap.backgroundColor = DSColor.Primary._50
         iconWrap.layer.cornerRadius = 32
         iconWrap.snp.makeConstraints { $0.width.height.equalTo(64) }
-        let bell = UIImageView(image: UIImage(systemName: "bell.badge.fill"))
+        let bell = UIImageView(image: DSIcon.bellRing.uiImage)
         bell.tintColor = DSColor.Primary._600
         bell.contentMode = .scaleAspectFit
         iconWrap.addSubview(bell)

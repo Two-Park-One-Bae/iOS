@@ -22,6 +22,7 @@ final class PresetFormVC: UIViewController, UIPickerViewDataSource, UIPickerView
     private let keywordField = DSTextField(label: "처치 키워드", placeholder: "예: 수혈 교체")
     private var categoryButtons: [TimerCategory: UIControl] = [:]
     private var categoryLabels: [TimerCategory: UILabel] = [:]
+    private var categorySurfaces: [TimerCategory: DSSurfaceView] = [:]
     private let picker = UIPickerView()
     private let saveButton = PrimaryButton(title: "저장")
 
@@ -46,7 +47,7 @@ final class PresetFormVC: UIViewController, UIPickerViewDataSource, UIPickerView
     // MARK: - Layout
 
     private func setLayout() {
-        view.backgroundColor = DSColor.Neutral._0
+        view.backgroundColor = DSColor.surface
 
         // Header: 제목 + ✕
         let title = UILabel().then {
@@ -67,23 +68,24 @@ final class PresetFormVC: UIViewController, UIPickerViewDataSource, UIPickerView
         // 분류
         let categoryLabel = UILabel().then {
             $0.text = "분류"
-            $0.font = DSKitFontFamily.Pretendard.medium.font(size: 13)
+            $0.font = DSKitFontFamily.Pretendard.semiBold.font(size: 13)
             $0.textColor = DSColor.textSecondary
         }
         let categoryRow = UIStackView().then {
             $0.axis = .horizontal; $0.spacing = 8; $0.distribution = .fillEqually
         }
         for category in TimerCategory.allCases {
-            let button = UIControl().then {
-                $0.backgroundColor = DSColor.Neutral._50
-                $0.layer.cornerRadius = 10
-                $0.layer.borderWidth = 1
-                $0.layer.borderColor = DSColor.Neutral._200.cgColor
-            }
+            // 흰 볼록 세그먼트(r12) — 고르면 파란 테두리 1.5
+            let button = UIControl()
+            let surface = DSSurfaceView(spec: .raisedNeutral(), cornerRadius: DSRadius.md)
+            surface.isUserInteractionEnabled = false
+            button.addSubview(surface)
+            surface.snp.makeConstraints { $0.edges.equalToSuperview() }
+            categorySurfaces[category] = surface
             let label = UILabel().then {
                 $0.text = category.displayName
                 $0.font = DSKitFontFamily.Pretendard.medium.font(size: 14)
-                $0.textColor = DSColor.textSecondary
+                $0.textColor = DSColor.textPrimary
                 $0.textAlignment = .center
                 $0.isUserInteractionEnabled = false
             }
@@ -98,13 +100,13 @@ final class PresetFormVC: UIViewController, UIPickerViewDataSource, UIPickerView
             categoryRow.addArrangedSubview(button)
         }
         let categorySection = UIStackView(arrangedSubviews: [categoryLabel, categoryRow]).then {
-            $0.axis = .vertical; $0.spacing = 6
+            $0.axis = .vertical; $0.spacing = 8
         }
 
         // 시간 (시·분·초 휠)
         let timeLabel = UILabel().then {
             $0.text = "시간"
-            $0.font = DSKitFontFamily.Pretendard.medium.font(size: 13)
+            $0.font = DSKitFontFamily.Pretendard.semiBold.font(size: 13)
             $0.textColor = DSColor.textSecondary
         }
         picker.dataSource = self
@@ -119,7 +121,7 @@ final class PresetFormVC: UIViewController, UIPickerViewDataSource, UIPickerView
 
         let stack = UIStackView(arrangedSubviews: [header, keywordField, categorySection, timeSection, saveButton]).then {
             $0.axis = .vertical
-            $0.spacing = 16
+            $0.spacing = 18
         }
         view.addSubview(stack)
         stack.snp.makeConstraints {
@@ -146,12 +148,13 @@ final class PresetFormVC: UIViewController, UIPickerViewDataSource, UIPickerView
         selectedCategory = category
         for (key, button) in categoryButtons {
             let on = key == category
-            button.backgroundColor = on ? DSColor.Primary._50 : DSColor.Neutral._50
-            button.layer.borderColor = (on ? DSColor.Primary._500 : DSColor.Neutral._200).cgColor
-            button.layer.borderWidth = on ? 1.5 : 1
-            categoryLabels[key]?.textColor = on ? DSColor.Primary._600 : DSColor.textSecondary
+            button.accessibilityTraits = on ? [.button, .selected] : .button
+            categorySurfaces[key]?.spec = on
+                ? .raisedNeutral(stroke: DSColor.Primary._500, strokeWidth: 1.5)
+                : .raisedNeutral()
+            categoryLabels[key]?.textColor = on ? DSColor.Primary._700 : DSColor.textPrimary
             categoryLabels[key]?.font = on
-                ? DSKitFontFamily.Pretendard.semiBold.font(size: 14)
+                ? DSKitFontFamily.Pretendard.bold.font(size: 14)
                 : DSKitFontFamily.Pretendard.medium.font(size: 14)
         }
         validate()

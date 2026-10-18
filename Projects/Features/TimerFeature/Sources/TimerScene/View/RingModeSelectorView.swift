@@ -61,8 +61,7 @@ public final class RingModeSelectorView: UIView {
             super.init(frame: .zero)
             layer.cornerRadius = 12
             icon.contentMode = .scaleAspectFit
-            icon.image = UIImage(systemName: mode.iconName)
-            icon.preferredSymbolConfiguration = .init(pointSize: 20, weight: .regular)
+            icon.image = mode.icon.uiImage
             label.text = mode.title
             label.font = DSKitFontFamily.Pretendard.semiBold.font(size: 13)
 
@@ -72,7 +71,7 @@ public final class RingModeSelectorView: UIView {
             stack.alignment = .center
             stack.isUserInteractionEnabled = false
             addSubview(stack)
-            icon.snp.makeConstraints { $0.height.equalTo(22) }
+            icon.snp.makeConstraints { $0.width.height.equalTo(22) }
             stack.snp.makeConstraints {
                 $0.top.bottom.equalToSuperview().inset(14)
                 $0.leading.trailing.equalToSuperview().inset(8)
@@ -104,10 +103,10 @@ extension RingMode {
         case .silent: return "무음"
         }
     }
-    var iconName: String {
+    var icon: DSIcon {
         switch self {
-        case .sound:  return "speaker.wave.2.fill"
-        case .silent: return "speaker.slash.fill"
+        case .sound:  return .volume
+        case .silent: return .volumeX
         }
     }
 }

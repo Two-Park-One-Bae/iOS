@@ -5,6 +5,7 @@ import DSKit
 import Domain
 
 // C3 프리셋 시트 (W2Xi4t / 편집 모드 lbWur) — 프리셋 원탭 = 즉시 시작
+// V2.1.0(NM-591): 행 · 프리셋 추가는 흰 볼록(r12). 편집 모드의 드래그 정렬(sortOrder)은 아직 없다 — 별도 작업.
 final class PresetSheetVC: UIViewController {
 
     // MARK: - Callbacks
@@ -21,6 +22,11 @@ final class PresetSheetVC: UIViewController {
 
     // MARK: - UI
 
+    private let subLabel = UILabel().then {
+        $0.text = "누르면 타이머가 바로 시작됩니다"
+        $0.font = DSKitFontFamily.Pretendard.regular.font(size: 12)
+        $0.textColor = DSColor.textSecondary
+    }
     private let editButton = UIButton(type: .system).then {
         $0.setTitle("편집", for: .normal)
         $0.setTitleColor(DSColor.Primary._600, for: .normal)
@@ -53,7 +59,7 @@ final class PresetSheetVC: UIViewController {
     // MARK: - Layout
 
     private func setLayout() {
-        view.backgroundColor = DSColor.Neutral._0
+        view.backgroundColor = DSColor.surface
 
         let title = UILabel().then {
             $0.text = "프리셋"
@@ -63,12 +69,7 @@ final class PresetSheetVC: UIViewController {
         let titleRow = UIStackView(arrangedSubviews: [title, UIView(), editButton]).then {
             $0.axis = .horizontal; $0.alignment = .center
         }
-        let sub = UILabel().then {
-            $0.text = "누르면 타이머가 바로 시작됩니다"
-            $0.font = DSKitFontFamily.Pretendard.regular.font(size: 12)
-            $0.textColor = DSColor.textSecondary
-        }
-        let header = UIStackView(arrangedSubviews: [titleRow, sub]).then {
+        let header = UIStackView(arrangedSubviews: [titleRow, subLabel]).then {
             $0.axis = .vertical; $0.spacing = 4; $0.alignment = .fill
         }
 
@@ -96,6 +97,10 @@ final class PresetSheetVC: UIViewController {
     private func toggleEditMode() {
         isEditMode.toggle()
         editButton.setTitle(isEditMode ? "완료" : "편집", for: .normal)
+        editButton.titleLabel?.font = isEditMode
+            ? DSKitFontFamily.Pretendard.semiBold.font(size: 14)
+            : DSKitFontFamily.Pretendard.medium.font(size: 14)
+        subLabel.text = isEditMode ? "프리셋을 눌러 수정" : "누르면 타이머가 바로 시작됩니다"
         renderList()
     }
 
@@ -110,12 +115,7 @@ final class PresetSheetVC: UIViewController {
     }
 
     private func makeRow(_ preset: TimerPresetModel) -> UIView {
-        let row = UIControl().then {
-            $0.backgroundColor = DSColor.Neutral._50
-            $0.layer.cornerRadius = 12
-            $0.layer.borderWidth = 1
-            $0.layer.borderColor = DSColor.Neutral._200.cgColor
-        }
+        let row = PresetRaisedRow()
 
         let label = UILabel().then {
             $0.text = preset.label
@@ -146,15 +146,13 @@ final class PresetSheetVC: UIViewController {
         var trailing: UIView
 
         if isEditMode {
-            // 삭제(빨간 마이너스) + … + chevron (행 탭 = 편집)
+            // 삭제(빨간 휴지통) + … + chevron (행 탭 = 편집)
             let minus = UIButton(type: .system).then {
-                $0.setImage(
-                    UIImage(systemName: "minus.circle.fill", withConfiguration: UIImage.SymbolConfiguration(pointSize: 20)),
-                    for: .normal
-                )
+                $0.setImage(DSIcon.trash.uiImage(size: 20), for: .normal)
                 $0.tintColor = DSColor.Error._500
+                $0.accessibilityLabel = "\(preset.label) 삭제"
             }
-            minus.snp.makeConstraints { $0.width.height.equalTo(22) }
+            minus.snp.makeConstraints { $0.width.height.equalTo(24) }
             minus.addAction(UIAction { [weak self] _ in self?.onDeletePreset?(preset) }, for: .touchUpInside)
             leading = [minus]
 
@@ -168,7 +166,7 @@ final class PresetSheetVC: UIViewController {
             row.addAction(UIAction { [weak self] _ in self?.onEditPreset?(preset) }, for: .touchUpInside)
         } else {
             let play = UIImageView().then {
-                $0.image = UIImage(systemName: "play.circle", withConfiguration: UIImage.SymbolConfiguration(pointSize: 24, weight: .regular))
+                $0.image = DSIcon.circlePlay.uiImage
                 $0.tintColor = DSColor.Primary._500
                 $0.contentMode = .scaleAspectFit
             }
@@ -201,20 +199,16 @@ final class PresetSheetVC: UIViewController {
     }
 
     private func makeAddRow() -> UIView {
-        let row = UIControl().then {
-            $0.layer.cornerRadius = 12
-            $0.layer.borderWidth = 1
-            $0.layer.borderColor = DSColor.Neutral._300.cgColor
-        }
+        let row = PresetRaisedRow()
         let plus = UIImageView(image: DSIcon.plus.uiImage).then {
-            $0.tintColor = DSColor.textSecondary
+            $0.tintColor = DSColor.Primary._700
             $0.contentMode = .scaleAspectFit
         }
-        plus.snp.makeConstraints { $0.width.height.equalTo(16) }
+        plus.snp.makeConstraints { $0.width.height.equalTo(18) }
         let label = UILabel().then {
             $0.text = "프리셋 추가"
             $0.font = DSKitFontFamily.Pretendard.semiBold.font(size: 14)
-            $0.textColor = DSColor.textSecondary
+            $0.textColor = DSColor.Primary._700
         }
         let stack = UIStackView(arrangedSubviews: [plus, label]).then {
             $0.axis = .horizontal; $0.spacing = 6; $0.alignment = .center
@@ -227,5 +221,26 @@ final class PresetSheetVC: UIViewController {
         }
         row.addAction(UIAction { [weak self] _ in self?.onAddPreset?() }, for: .touchUpInside)
         return row
+    }
+}
+
+// MARK: - 흰 볼록 행
+
+/// 프리셋 행 · 프리셋 추가 — 흰 볼록 면(raisedNeutral, r12).
+private final class PresetRaisedRow: UIControl {
+
+    private let surface = DSSurfaceView(spec: .raisedNeutral(), cornerRadius: DSRadius.md)
+
+    init() {
+        super.init(frame: .zero)
+        surface.isUserInteractionEnabled = false
+        addSubview(surface)
+        surface.snp.makeConstraints { $0.edges.equalToSuperview() }
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override var isHighlighted: Bool {
+        didSet { surface.alpha = isHighlighted ? 0.85 : 1 }
     }
 }
