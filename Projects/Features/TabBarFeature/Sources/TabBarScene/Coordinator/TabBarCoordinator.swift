@@ -51,7 +51,12 @@ public final class TabBarCoordinator: CoordinatorProtocol {
         self.tabBarVC = tabBar
 
         tabBar.viewControllers = makeTabViewControllers()
-        configureAppearance(tabBar)
+        tabBar.installTabBar(items: [
+            .init(title: "홈", icon: .house),
+            .init(title: "알약", icon: .pill),
+            .init(title: "타이머", icon: .timer),
+            .init(title: "설정", icon: .settings)
+        ])
 
         navigationController.setViewControllers([tabBar], animated: false)
         navigationController.setNavigationBarHidden(true, animated: false)
@@ -111,20 +116,5 @@ public final class TabBarCoordinator: CoordinatorProtocol {
         settingsNav.tabBarItem = UITabBarItem(title: "설정", image: DSIcon.settings.uiImage, tag: 3)
 
         return [homeNav, pillNav, timerNav, settingsNav]
-    }
-
-    private func configureAppearance(_ tabBar: UITabBarController) {
-        // V2.1.0: 탭 바는 iOS 기본 모양을 쓴다 — 배경을 칠하지 않아 iOS 26 에서는 떠 있는 유리 탭 바가 된다
-        // (spec: design/README.md "탭 바의 선택 표시는 iOS 기본 모양"). 색만 디자인에 맞춘다.
-        let appearance = UITabBarAppearance()
-        appearance.configureWithDefaultBackground()
-
-        appearance.stackedLayoutAppearance.normal.iconColor = DSColor.textTertiary
-        appearance.stackedLayoutAppearance.normal.titleTextAttributes = [.foregroundColor: DSColor.textTertiary]
-        appearance.stackedLayoutAppearance.selected.iconColor = DSColor.Primary._500
-        appearance.stackedLayoutAppearance.selected.titleTextAttributes = [.foregroundColor: DSColor.Primary._500]
-
-        tabBar.tabBar.standardAppearance = appearance
-        tabBar.tabBar.scrollEdgeAppearance = appearance
     }
 }
