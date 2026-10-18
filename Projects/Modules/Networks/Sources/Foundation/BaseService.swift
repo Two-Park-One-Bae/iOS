@@ -191,6 +191,39 @@ extension BaseService {
         }
     }
 
+    /// 응답 바디가 없는 요청(204)의 Combine 판. 4xx/5xx 는 `requestObjectWithNetworkErrorInCombine` 처럼
+    /// ProblemDetail 을 `APIError.network` 로 올린다 — 상위가 `code`·상태코드로 분기할 수 있게.
+    /// (`requestObjectInCombineNoResult` 는 상태코드를 성공으로 흘려 400 과 204 를 구분하지 못한다.)
+    func requestNoContentWithNetworkErrorInCombine(_ target: API) -> AnyPublisher<Void, Error> {
+        Future { promise in
+            self.provider.request(target) { response in
+                switch response {
+                case .success(let value):
+                    guard let httpResponse = value.response else {
+                        promise(.failure(APIError.unknown))
+                        return
+                    }
+
+                    switch httpResponse.statusCode {
+                    case 200...399:
+                        promise(.success(()))
+                    case 400...599:
+                        if var problem = try? JSONDecoder().decode(NetworkError.self, from: value.data) {
+                            problem.rawBody = value.data
+                            promise(.failure(APIError.network(statusCode: httpResponse.statusCode, error: problem)))
+                        } else {
+                            promise(.failure(APIError.unknown))
+                        }
+                    default:
+                        promise(.failure(APIError.unknown))
+                    }
+                case .failure(let error):
+                    promise(.failure(Self.interpret(error)))
+                }
+            }
+        }.eraseToAnyPublisher()
+    }
+
     /// 응답 바디가 없는 요청 (DELETE 등). statusCode만 반환
     func requestObjectInCombineNoResult(_ target: API) -> AnyPublisher<Int, Error> {
         Future { promise in
