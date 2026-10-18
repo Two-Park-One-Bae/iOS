@@ -63,7 +63,12 @@ enum RegisterDependencies {
             PillRepository(service: pillService)
         }
         container.register(PillHistoryRepositoryProtocol.self) {
-            PillHistoryRepository(service: pillService)
+            let repository = PillHistoryRepository(service: pillService)
+            #if DEBUG
+            // 환경 변수 MOCK_PILL_HISTORY 가 있으면 기록 API 를 목으로 — 빈 상태 · 실패 화면 확인용.
+            if let mock = MockPillHistoryRepository.fromEnvironment(fallback: repository) { return mock }
+            #endif
+            return repository
         }
         container.register(TimerRepositoryProtocol.self) {
             TimerRepository()
