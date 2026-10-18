@@ -14,7 +14,7 @@ import Kingfisher
 /// 후보 카드 1개 — V2.1.0 2열 격자(NM-588 ②). 서브뷰는 init 에서 1회만 만들고 configure 로 내용만 갈아끼운다.
 ///
 /// 유리 목록 카드(r20, padding 7 · 10 · 8 · 10, gap 5)
-/// - 낱알 사진: 카드 폭 · 높이 78 · r12, 원래 비율(자르지 않는다). 오른쪽 위 `크게 보기`(유리 아이콘 버튼),
+/// - 낱알 사진: 카드 폭 · r12, 식약처 썸네일 비율(256 × 140) 그대로 — 자르지도 비우지도 않는다. 오른쪽 위 `크게 보기`(유리 아이콘 버튼),
 ///   허가 종료 배지는 사진 왼쪽 위에 얹는다 — 카드 높이를 같게 두기 위해서다.
 /// - 품목명 SemiBold 13 한 줄 말줄임 · 세부정보(ⓘ, 흰 볼록 원 24)
 /// - 면 요약 한 줄(넘치면 앞 / 뒤 두 줄). 업체명은 두지 않는다.
@@ -51,7 +51,7 @@ final class CandidateCell: UICollectionViewCell {
     /// 면 요약 자리 — 같은 줄 짝 카드가 두 줄이면 한 줄짜리도 같은 높이를 잡아 카드 높이를 맞춘다.
     private let faceSummaryBox = UIView()
     private var faceSummaryHeight: Constraint?
-    private let info = UIButton(type: .system)
+    private let info = UIControl()
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -65,8 +65,9 @@ final class CandidateCell: UICollectionViewCell {
         contentView.addSubview(surface)
 
         thumbBox.addSubview(thumb)
-        thumb.snp.makeConstraints { $0.edges.equalToSuperview().inset(4) }
-        thumbBox.snp.makeConstraints { $0.height.equalTo(78) }
+        thumb.snp.makeConstraints { $0.edges.equalToSuperview() }
+        // 식약처 낱알 썸네일은 모두 256 × 140 — 카드 폭에 맞춰 같은 비율로 둔다.
+        thumbBox.snp.makeConstraints { $0.height.equalTo(thumbBox.snp.width).multipliedBy(Self.thumbnailAspect) }
         thumbBox.isUserInteractionEnabled = true
         thumbBox.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(thumbTapped)))
         thumbBox.addSubview(licenseBadge)
@@ -76,14 +77,22 @@ final class CandidateCell: UICollectionViewCell {
         zoomButton.accessibilityLabel = "크게 보기"
         zoomButton.addAction(UIAction { [weak self] _ in self?.onThumbnailTap?() }, for: .touchUpInside)
 
-        info.setImage(DSIcon.info.uiImage(size: 16), for: .normal)
-        info.tintColor = DSColor.Primary._500
-        info.accessibilityLabel = "세부정보"
-        info.addAction(UIAction { [weak self] _ in self?.onInfoTap?() }, for: .touchUpInside)
+        // 세부정보 — 흰 볼록 원(24) 위에 ⓘ(16). 면이 아이콘을 덮지 않게 아이콘을 따로 얹는다.
         let infoSurface = DSSurfaceView(spec: .raisedNeutral(), cornerRadius: nil)
         infoSurface.isUserInteractionEnabled = false
-        info.insertSubview(infoSurface, at: 0)
+        let infoIcon = UIImageView(image: DSIcon.info.uiImage).then {
+            $0.tintColor = DSColor.Primary._500
+            $0.contentMode = .scaleAspectFit
+            $0.isUserInteractionEnabled = false
+        }
+        info.addSubview(infoSurface)
+        info.addSubview(infoIcon)
         infoSurface.snp.makeConstraints { $0.edges.equalToSuperview() }
+        infoIcon.snp.makeConstraints { $0.center.equalToSuperview(); $0.width.height.equalTo(16) }
+        info.isAccessibilityElement = true
+        info.accessibilityTraits = .button
+        info.accessibilityLabel = "세부정보"
+        info.addAction(UIAction { [weak self] _ in self?.onInfoTap?() }, for: .touchUpInside)
         info.snp.makeConstraints { $0.width.height.equalTo(24) }
 
         nameLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
@@ -115,6 +124,9 @@ final class CandidateCell: UICollectionViewCell {
 
     @objc private func thumbTapped() { onThumbnailTap?() }
 
+    /// 식약처 낱알 썸네일 비율(세로 / 가로) — CDN 썸네일이 모두 256 × 140 이다(spec pillThumbnailUrl: 장변 256 · 종횡비 유지).
+    static let thumbnailAspect: CGFloat = 140.0 / 256.0
+
     /// - Parameters:
     ///   - stacked: 이 카드의 면 요약이 카드 폭을 넘는다 — `앞` / `뒤` 두 줄로 내린다(각인은 자르지 않는다).
     ///   - rowStacked: 같은 줄 짝 카드 중 하나라도 두 줄 — 높이를 맞춘다.
@@ -132,7 +144,7 @@ final class CandidateCell: UICollectionViewCell {
             thumb.kf.setImage(
                 with: url,
                 options: [
-                    .processor(DownsamplingImageProcessor(size: CGSize(width: 180, height: 78))),
+                    .processor(DownsamplingImageProcessor(size: CGSize(width: 180, height: 180 * Self.thumbnailAspect))),
                     .scaleFactor(UIScreen.main.scale),
                     .cacheOriginalImage,
                     .transition(.fade(0.2)),

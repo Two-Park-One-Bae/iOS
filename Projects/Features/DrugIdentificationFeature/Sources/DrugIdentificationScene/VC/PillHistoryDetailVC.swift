@@ -206,16 +206,17 @@ final class PillHistoryDetailVC: UIViewController {
             $0.clipsToBounds = true
             $0.contentMode = .scaleAspectFit
         }
+        // 식약처 썸네일 비율(256 × 140) 그대로 — 높이 28.
         thumb.snp.makeConstraints {
-            $0.width.equalTo(48)
             $0.height.equalTo(28)
+            $0.width.equalTo(thumb.snp.height).dividedBy(CandidateCell.thumbnailAspect)
         }
         // 이미지가 없는 품목은 회색 자리 표시로 둔다(후보 카드와 같다).
         if let urlString = pill.pillThumbnailUrl, let url = URL(string: urlString) {
             thumb.kf.setImage(
                 with: url,
                 options: [
-                    .processor(DownsamplingImageProcessor(size: CGSize(width: 48, height: 28))),
+                    .processor(DownsamplingImageProcessor(size: CGSize(width: 51, height: 28))),
                     .scaleFactor(UIScreen.main.scale),
                     .cacheOriginalImage,
                     .transition(.fade(0.2)),
