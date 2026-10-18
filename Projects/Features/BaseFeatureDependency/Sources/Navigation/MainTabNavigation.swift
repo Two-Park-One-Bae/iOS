@@ -8,8 +8,10 @@ public extension Notification.Name {
     static let selectTimerTab = Notification.Name("app.selectTimerTab")
     /// 홈 탭으로 이동 (예: 촬영 취소 후 복귀)
     static let selectHomeTab = Notification.Name("app.selectHomeTab")
-    /// 알약 탭이 실제로 선택됨 → 약물 식별 카메라 present 트리거
+    /// 알약 탭이 실제로 선택됨 → 잔여 횟수 갱신 · 모델 예열 (알약 탭 루트는 기록 목록이다 — NM-552)
     static let pillTabSelected = Notification.Name("app.pillTabSelected")
+    /// 홈 '알약 식별' 카드 → 알약 탭에서 곧장 촬영을 연다. 식별을 끝내거나 그만두면 홈으로 돌아간다
+    static let startPillCapture = Notification.Name("app.startPillCapture")
     /// 위젯 딥링크 랜딩 → 타이머 탭으로 이동.
     /// (커스텀 알람 스택을 걷어내면서 TimerNotificationHandler 에 있던 정의를 여기로 옮김)
     static let openTimerTab = Notification.Name("openTimerTab")
