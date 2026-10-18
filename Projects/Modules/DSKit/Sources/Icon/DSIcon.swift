@@ -1,5 +1,8 @@
 import UIKit
 
+/// 아이콘 (V2.1.0 — Material Symbols Rounded 굵기 600, 24pt 벡터).
+/// 케이스 이름은 lucide 이름 그대로 두고 그림만 대응하는 Material Symbols 로 바꿨다(디자인 `Icons · V2.1.0`의 대응표).
+/// 대응이 없는 lucide 아이콘은 그대로 lucide 다.
 public enum DSIcon: String {
 
     // MARK: - Navigation
@@ -162,6 +165,16 @@ public enum DSIcon: String {
     case vibrate = "Icons/ic_vibrate"
     case fileSearch = "Icons/ic_file_search"
     case circlePlay = "Icons/ic_circle_play"
+
+    // MARK: - V2.1.0 (Material Symbols Rounded 600 — lucide 대응이 없는 것)
+
+    case addCircle = "Icons/ic_add_circle"
+    case openInFull = "Icons/ic_open_in_full"
+    case subdirectoryArrowRight = "Icons/ic_subdirectory_arrow_right"
+    case restart = "Icons/ic_restart"
+    case eventUpcoming = "Icons/ic_event_upcoming"
+    case bolt = "Icons/ic_bolt"
+    case cloudOff = "Icons/ic_cloud_off"
 
     // MARK: - UIImage
 
