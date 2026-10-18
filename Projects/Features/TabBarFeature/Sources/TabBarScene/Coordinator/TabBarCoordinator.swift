@@ -114,12 +114,13 @@ public final class TabBarCoordinator: CoordinatorProtocol {
     }
 
     private func configureAppearance(_ tabBar: UITabBarController) {
+        // V2.1.0: 탭 바는 iOS 기본 모양을 쓴다 — 배경을 칠하지 않아 iOS 26 에서는 떠 있는 유리 탭 바가 된다
+        // (spec: design/README.md "탭 바의 선택 표시는 iOS 기본 모양"). 색만 디자인에 맞춘다.
         let appearance = UITabBarAppearance()
-        appearance.configureWithOpaqueBackground()
-        appearance.backgroundColor = .white
+        appearance.configureWithDefaultBackground()
 
-        appearance.stackedLayoutAppearance.normal.iconColor = DSColor.Neutral._400
-        appearance.stackedLayoutAppearance.normal.titleTextAttributes = [.foregroundColor: DSColor.Neutral._400]
+        appearance.stackedLayoutAppearance.normal.iconColor = DSColor.textTertiary
+        appearance.stackedLayoutAppearance.normal.titleTextAttributes = [.foregroundColor: DSColor.textTertiary]
         appearance.stackedLayoutAppearance.selected.iconColor = DSColor.Primary._500
         appearance.stackedLayoutAppearance.selected.titleTextAttributes = [.foregroundColor: DSColor.Primary._500]
 
