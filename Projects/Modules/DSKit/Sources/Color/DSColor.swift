@@ -72,6 +72,15 @@ public enum DSColor {
         public static let _900 = color("Warning900")
     }
 
+    /// V2.1.0 경고색(살구). `Warning`은 V2.1.0 이전 화면용으로 남긴다.
+    public enum Caution {
+        public static let _50  = color("Caution50")
+        public static let _300 = color("Caution300")
+        public static let _500 = color("Caution500")
+        public static let _600 = color("Caution600")
+        public static let _700 = color("Caution700")
+    }
+
     public enum Error {
         public static let _50  = color("Error50")
         public static let _100 = color("Error100")
