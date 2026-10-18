@@ -275,6 +275,9 @@ public final class DSSurfaceView: UIView {
     private var outerShadowLayers: [CALayer] = []
     private var blurView: UIVisualEffectView?
     private let clipView = UIView()
+    /// 면 모양 마스크 — 안쪽 그림자 고리와 같은 경로를 써야 둘 사이에 틈이 안 생긴다.
+    /// (`cornerRadius` + `.continuous`는 낮은 면에서 모서리를 다르게 그려 고리의 검은 칠이 비친다.)
+    private let clipMask = CAShapeLayer()
     private var fillLayers: [CALayer] = []
     private var innerShadowLayers: [CAShapeLayer] = []
     private let strokeLayer = CAGradientLayer()
@@ -288,7 +291,7 @@ public final class DSSurfaceView: UIView {
         backgroundColor = .clear
 
         layer.addSublayer(outerShadowContainer)
-        clipView.clipsToBounds = true
+        clipView.layer.mask = clipMask
         clipView.isUserInteractionEnabled = false
         addSubview(clipView)
         strokeMask.fillColor = nil
@@ -394,8 +397,8 @@ public final class DSSurfaceView: UIView {
         }
 
         clipView.frame = bounds
-        clipView.layer.cornerRadius = radius
-        clipView.layer.cornerCurve = .continuous
+        clipMask.frame = bounds
+        clipMask.path = shape.cgPath
         blurView?.frame = bounds
         fillLayers.forEach { $0.frame = bounds }
 
