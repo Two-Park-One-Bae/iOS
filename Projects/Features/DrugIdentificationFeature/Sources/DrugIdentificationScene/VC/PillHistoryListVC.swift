@@ -5,7 +5,7 @@ import Then
 import DSKit
 import Domain
 
-// 알약 탭 — 촬영 버튼 + 식별 기록 목록 (NM-552, 디자인 `Oqopb` · 기록 없음 `f7D3Y`).
+// 알약 탭 — 촬영 버튼 + 식별 기록 목록 (NM-552 · V2.1.0 NM-590 `qrHGM` · 기록 없음 `kNLoZ` · 실패 `LoTih`).
 final class PillHistoryListVC: UIViewController {
 
     // MARK: - Callbacks
@@ -48,17 +48,8 @@ final class PillHistoryListVC: UIViewController {
     /// 기록 없음 · 불러오기 실패 · 첫 조회 중 — 목록 대신 가운데에 둔다
     private let stateContainer = UIView()
 
-    private let captureButton = UIButton(type: .system).then {
-        var config = UIButton.Configuration.filled()
-        config.baseBackgroundColor = DSColor.Primary._500
-        config.baseForegroundColor = .white
-        config.cornerStyle = .capsule
-        config.image = DSIcon.camera.uiImage
-        $0.configuration = config
-        $0.layer.shadowColor = DSColor.Primary._600.cgColor
-        $0.layer.shadowOpacity = 0.3
-        $0.layer.shadowOffset = CGSize(width: 0, height: 6)
-        $0.layer.shadowRadius = 10
+    // 띄운 버튼 — 파랗게 물든 유리 원(56). 타이머 탭의 추가 버튼과 같은 자리.
+    private let captureButton = FloatingButton(icon: .camera).then {
         $0.accessibilityLabel = "촬영"
     }
 
@@ -76,7 +67,7 @@ final class PillHistoryListVC: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         navigationController?.setNavigationBarHidden(true, animated: false)
-        view.backgroundColor = DSColor.bgApp
+        view.backgroundColor = DSColor.surface
         setLayout()
         bind()
     }
@@ -124,7 +115,6 @@ final class PillHistoryListVC: UIViewController {
         }
         stateContainer.snp.makeConstraints { $0.edges.equalTo(scrollView) }
         captureButton.snp.makeConstraints {
-            $0.width.height.equalTo(56)
             $0.trailing.equalToSuperview().inset(20)
             $0.bottom.equalTo(view.safeAreaLayoutGuide).inset(20)
         }
@@ -170,7 +160,7 @@ final class PillHistoryListVC: UIViewController {
             showInState(makeEmptyView())
         case .failed:
             canLoadMore = false
-            showInState(makeFailedView(message: "기록을 불러오지 못했어요") { [weak self] in
+            showInState(makeFailedView(message: "기록을 불러오지 못했어요", withIcon: true) { [weak self] in
                 self?.retrySubject.send(())
             })
         case let .loaded(sections, footer):
@@ -209,14 +199,11 @@ final class PillHistoryListVC: UIViewController {
 
     /// 같은 날 기록을 한 카드에 묶는다 — 행 사이 Neutral100 1px 구분선.
     private func makeGroupCard(_ items: [PillHistorySummaryModel]) -> UIView {
-        let card = UIView().then {
-            $0.backgroundColor = DSColor.surface
-            $0.layer.cornerRadius = 14
-            $0.layer.shadowColor = DSColor.textPrimary.cgColor
-            $0.layer.shadowOpacity = 0.04
-            $0.layer.shadowOffset = CGSize(width: 0, height: 1)
-            $0.layer.shadowRadius = 6
-        }
+        let card = UIView()
+        let surface = DSSurfaceView(spec: .glassListCard)
+        surface.frame = card.bounds
+        surface.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        card.addSubview(surface)
         let rows = UIStackView().then { $0.axis = .vertical }
         for (index, item) in items.enumerated() {
             rows.addArrangedSubview(makeRow(item))
@@ -307,20 +294,7 @@ final class PillHistoryListVC: UIViewController {
     }
 
     private func makeEmptyView() -> UIView {
-        let iconBackground = UIView().then {
-            $0.backgroundColor = DSColor.Neutral._100
-            $0.layer.cornerRadius = 32
-        }
-        let icon = UIImageView(image: DSIcon.history.uiImage).then {
-            $0.tintColor = DSColor.textTertiary
-            $0.contentMode = .scaleAspectFit
-        }
-        iconBackground.addSubview(icon)
-        iconBackground.snp.makeConstraints { $0.width.height.equalTo(64) }
-        icon.snp.makeConstraints {
-            $0.center.equalToSuperview()
-            $0.width.height.equalTo(30)
-        }
+        let iconBackground = makeIconCircle(.history)
         let label = UILabel().then {
             $0.text = "아직 식별 기록이 없어요"
             $0.font = DSKitFontFamily.Pretendard.bold.font(size: 15)
@@ -334,21 +308,42 @@ final class PillHistoryListVC: UIViewController {
         }
     }
 
-    /// 불러오기 실패 — 문구 + `다시 시도`. 촬영 버튼은 그대로 쓸 수 있다.
-    private func makeFailedView(message: String, retry: @escaping () -> Void) -> UIView {
+    /// 불러오기 실패 — (아이콘) 문구 + 작은 `다시 시도`. 촬영 버튼은 그대로 쓸 수 있다.
+    private func makeFailedView(message: String, withIcon: Bool = false, retry: @escaping () -> Void) -> UIView {
+        var views: [UIView] = []
+        if withIcon { views.append(makeIconCircle(.cloudOff)) }
         let label = UILabel().then {
             $0.text = message
-            $0.font = DSKitFontFamily.Pretendard.medium.font(size: 14)
-            $0.textColor = DSColor.textSecondary
+            $0.font = DSKitFontFamily.Pretendard.bold.font(size: 15)
+            $0.textColor = DSColor.textPrimary
             $0.textAlignment = .center
         }
-        let button = TextButton(title: "다시 시도")
+        views.append(label)
+        let button = SecondaryButton(title: "다시 시도")
+            .setCapsule()
+            .changeInset(top: 8, leading: 16, bottom: 8, trailing: 16)
         button.addAction(UIAction { _ in retry() }, for: .touchUpInside)
-        return UIStackView(arrangedSubviews: [label, button]).then {
+        views.append(button)
+        return UIStackView(arrangedSubviews: views).then {
             $0.axis = .vertical
-            $0.spacing = 4
+            $0.spacing = 14
             $0.alignment = .center
         }
+    }
+
+    private func makeIconCircle(_ icon: DSIcon) -> UIView {
+        let background = UIView().then {
+            $0.backgroundColor = DSColor.Neutral._100
+            $0.layer.cornerRadius = 32
+        }
+        let iconView = UIImageView(image: icon.uiImage).then {
+            $0.tintColor = DSColor.textTertiary
+            $0.contentMode = .scaleAspectFit
+        }
+        background.addSubview(iconView)
+        background.snp.makeConstraints { $0.width.height.equalTo(64) }
+        iconView.snp.makeConstraints { $0.center.equalToSuperview(); $0.width.height.equalTo(30) }
+        return background
     }
 }
 

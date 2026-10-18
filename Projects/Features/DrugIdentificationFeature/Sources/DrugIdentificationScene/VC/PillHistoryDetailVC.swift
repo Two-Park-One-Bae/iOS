@@ -62,11 +62,11 @@ final class PillHistoryDetailVC: UIViewController {
         $0.spacing = 10
     }
 
-    private let footer = UIView().then {
-        $0.backgroundColor = DSColor.bgApp
-    }
-
     private let shareButton = PrimaryButton(title: "공유")
+    // 하단 바 — 판 없이 `공유` 캡슐 + 고지(V2.1.0 `IkyB0`).
+    private lazy var footer = DSBottomBar(buttons: [shareButton], disclaimer: PillDisclaimer.notice).then {
+        $0.backgroundColor = DSColor.surface
+    }
 
     // MARK: - Init
 
@@ -82,7 +82,7 @@ final class PillHistoryDetailVC: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         navigationController?.setNavigationBarHidden(true, animated: false)
-        view.backgroundColor = DSColor.bgApp
+        view.backgroundColor = DSColor.surface
         setLayout()
         bind()
         viewDidLoadSubject.send(())
@@ -135,19 +135,10 @@ final class PillHistoryDetailVC: UIViewController {
         contentStack.addArrangedSubview(listStack)
 
         // 고지 문구는 식별 결과 화면과 같다 (Guideline 1.4.1) — 버튼 아래.
-        let disclaimer = PillDisclaimer.makeLabel()
-        shareButton.snp.makeConstraints { $0.height.equalTo(52) }
         shareButton.addAction(UIAction { [weak self] _ in self?.shareTapped() }, for: .touchUpInside)
-        let footerStack = UIStackView(arrangedSubviews: [shareButton, disclaimer]).then {
-            $0.axis = .vertical
-            $0.spacing = 10
-        }
-        footer.addSubview(footerStack)
-        footer.snp.makeConstraints { $0.leading.trailing.bottom.equalToSuperview() }
-        footerStack.snp.makeConstraints {
-            $0.top.equalToSuperview().offset(12)
-            $0.leading.trailing.equalToSuperview().inset(20)
-            $0.bottom.equalTo(view.safeAreaLayoutGuide).offset(-12)
+        footer.snp.makeConstraints {
+            $0.leading.trailing.equalToSuperview()
+            $0.bottom.equalTo(view.safeAreaLayoutGuide)
         }
     }
 
@@ -312,15 +303,14 @@ final class PillHistoryDetailVC: UIViewController {
         }
     }
 
+    /// 유리 목록 카드(r20).
     private func makeCard() -> UIView {
-        UIView().then {
-            $0.backgroundColor = DSColor.surface
-            $0.layer.cornerRadius = 14
-            $0.layer.shadowColor = DSColor.textPrimary.cgColor
-            $0.layer.shadowOpacity = 0.04
-            $0.layer.shadowOffset = CGSize(width: 0, height: 1)
-            $0.layer.shadowRadius = 6
-        }
+        let card = UIView()
+        let surface = DSSurfaceView(spec: .glassListCard)
+        surface.frame = card.bounds
+        surface.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        card.addSubview(surface)
+        return card
     }
 
     /// 조회 실패 — 알약 탭 불러오기 실패와 같은 모양.
