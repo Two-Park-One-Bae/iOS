@@ -47,7 +47,7 @@ final class PillDetailVC: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         navigationController?.setNavigationBarHidden(true, animated: false)
-        view.backgroundColor = DSColor.bgApp
+        view.backgroundColor = DSColor.surface
         setLayout()
         bind()
         viewDidLoadSubject.send(())
@@ -91,111 +91,90 @@ final class PillDetailVC: UIViewController {
             self.selectedDocIndex = 0
             containerView.addSubview(makeContentScroll(model))
         case .notFound:
-            containerView.addSubview(makeMessageView(
-                icon: .fileSearch,
-                title: "세부정보가 없어요",
-                message: "이 약은 아직 등록된 세부정보가 없습니다.",
+            containerView.addSubview(makeStateView(
+                icon: .fileSearch, iconTint: DSColor.Neutral._400, iconBackground: DSColor.Neutral._100,
+                title: "등록된 세부정보가 없어요",
+                message: "이 약은 허가정보가 아직 준비되지 않았어요\n후보 선택과 식별 결과에는 영향이 없어요",
                 retry: false
             ))
-        case .failure(let message):
-            containerView.addSubview(makeMessageView(
-                icon: .alertTriangle,
+        case .failure:
+            // 부제는 인식 실패 · 후보 조회 실패와 같은 문구(spec 세부정보 조회).
+            containerView.addSubview(makeStateView(
+                icon: .alertCircle, iconTint: DSColor.Error._500, iconBackground: DSColor.Error._50,
                 title: "세부정보를 불러오지 못했어요",
-                message: message,
+                message: "네트워크 연결을 확인하고\n다시 시도해 주세요",
                 retry: true
             ))
         case .revoked:
-            containerView.addSubview(makeRevokedView())
+            // ⑩-g 허가 종료 안내 — REVOKED 품목은 조회 없이 안내만 표시 (NM-342).
+            containerView.addSubview(makeStateView(
+                icon: .fileX, iconTint: DSColor.Caution._600, iconBackground: DSColor.Caution._50,
+                title: "허가가 종료된 약이에요",
+                message: "허가가 취소되거나 취하된 품목이라\n세부정보가 제공되지 않아요\n후보 선택과 식별 결과에는 영향이 없어요",
+                retry: false
+            ))
         }
         containerView.subviews.last?.snp.makeConstraints { $0.edges.equalToSuperview() }
     }
 
     // MARK: - Loading / Message states
 
+    /// ⑩-a 로딩 — 하늘색 원(72) 안 고리 · 제목 17 · 부제 13 (식별 로딩 화면과 같은 모양).
     private func makeLoadingView() -> UIView {
         let container = UIView()
-        let spinner = UIActivityIndicatorView(style: .large)
-        spinner.color = DSColor.Primary._500
-        spinner.startAnimating()
-        let label = UILabel()
-        label.text = "세부정보를 불러오는 중…"
-        label.font = DSKitFontFamily.Pretendard.regular.font(size: 14)
-        label.textColor = DSColor.textSecondary
-        let stack = UIStackView(arrangedSubviews: [spinner, label])
+        let wrap = UIView()
+        wrap.backgroundColor = DSColor.Primary._50
+        wrap.layer.cornerRadius = 36
+        wrap.snp.makeConstraints { $0.width.height.equalTo(72) }
+        let spinner = DSLoading(text: "")
+        spinner.setLabelHidden(true)
+        spinner.setSpinnerColor(DSColor.Primary._500)
+        wrap.addSubview(spinner)
+        spinner.snp.makeConstraints { $0.center.equalToSuperview() }
+
+        let title = UILabel()
+        title.text = "세부정보를 불러오고 있어요"
+        title.font = DSKitFontFamily.Pretendard.bold.font(size: 17)
+        title.textColor = DSColor.textPrimary
+        let subtitle = UILabel()
+        subtitle.text = "잠시만 기다려 주세요"
+        subtitle.font = DSKitFontFamily.Pretendard.regular.font(size: 13)
+        subtitle.textColor = DSColor.textTertiary
+
+        let stack = UIStackView(arrangedSubviews: [wrap, title, subtitle])
         stack.axis = .vertical
-        stack.spacing = 14
+        stack.spacing = 6
         stack.alignment = .center
+        stack.setCustomSpacing(18, after: wrap)
         container.addSubview(stack)
         stack.snp.makeConstraints { $0.center.equalToSuperview() }
         return container
     }
 
-    private func makeMessageView(icon: DSIcon, title: String, message: String, retry: Bool) -> UIView {
-        let container = UIView()
-
-        let iconView = UIImageView(image: icon.uiImage)
-        iconView.tintColor = DSColor.Neutral._400
-        iconView.contentMode = .scaleAspectFit
-        iconView.snp.makeConstraints { $0.width.height.equalTo(44) }
-
-        let titleLabel = UILabel()
-        titleLabel.text = title
-        titleLabel.font = DSKitFontFamily.Pretendard.bold.font(size: 18)
-        titleLabel.textColor = DSColor.textPrimary
-        titleLabel.textAlignment = .center
-
-        let messageLabel = UILabel()
-        messageLabel.text = message
-        messageLabel.font = DSKitFontFamily.Pretendard.regular.font(size: 14)
-        messageLabel.textColor = DSColor.textSecondary
-        messageLabel.textAlignment = .center
-        messageLabel.numberOfLines = 0
-
-        let stack = UIStackView(arrangedSubviews: [iconView, titleLabel, messageLabel])
-        stack.axis = .vertical
-        stack.spacing = 12
-        stack.alignment = .center
-        stack.setCustomSpacing(20, after: iconView)
-        container.addSubview(stack)
-        stack.snp.makeConstraints {
-            $0.center.equalToSuperview()
-            $0.leading.trailing.equalToSuperview().inset(40)
-        }
-
-        if retry {
-            let button = PrimaryButton(title: "다시 시도")
-            button.addAction(UIAction { [weak self] _ in self?.retrySubject.send(()) }, for: .touchUpInside)
-            container.addSubview(button)
-            button.snp.makeConstraints {
-                $0.leading.trailing.equalToSuperview().inset(24)
-                $0.bottom.equalTo(container.safeAreaLayoutGuide).inset(24)
-            }
-        }
-        return container
-    }
-
-    // ⑩-g 허가 종료 안내 — REVOKED 품목은 조회 없이 안내만 표시 (NM-342, 디자인 UwBjQ).
-    // 96 원형(warning-50) + file-x(warning-600 42pt) + 타이틀 20 + 설명 15(lineHeight 1.5) + '뒤로'.
-    private func makeRevokedView() -> UIView {
+    /// ⑩-e 데이터 없음 · ⑩-f 오류 · ⑩-g 허가 종료 — 색 원(96) 안 아이콘 42 · 제목 20 · 설명 15(행간 1.5).
+    /// 아래는 `다시 시도`(오류만) + `뒤로`.
+    private func makeStateView(
+        icon: DSIcon,
+        iconTint: UIColor,
+        iconBackground: UIColor,
+        title: String,
+        message: String,
+        retry: Bool
+    ) -> UIView {
         let container = UIView()
 
         let iconBg = UIView()
-        iconBg.backgroundColor = DSColor.Warning._50
+        iconBg.backgroundColor = iconBackground
         iconBg.layer.cornerRadius = 48
         iconBg.snp.makeConstraints { $0.width.height.equalTo(96) }
-
-        // 디자인 아이콘 lucide file-x (ClL1Q).
-        let iconView = UIImageView(image: DSIcon.fileX.uiImage)
-        iconView.tintColor = DSColor.Warning._600
+        let iconView = UIImageView(image: icon.uiImage)
+        iconView.tintColor = iconTint
         iconView.contentMode = .scaleAspectFit
         iconBg.addSubview(iconView)
-        iconView.snp.makeConstraints {
-            $0.center.equalToSuperview()
-            $0.width.height.equalTo(42)
-        }
+        iconView.snp.makeConstraints { $0.center.equalToSuperview(); $0.width.height.equalTo(42) }
 
         let titleLabel = UILabel()
-        titleLabel.text = "허가가 종료된 약이에요"
+        titleLabel.text = title
         titleLabel.font = DSKitFontFamily.Pretendard.bold.font(size: 20)
         titleLabel.textColor = DSColor.textPrimary
         titleLabel.textAlignment = .center
@@ -205,7 +184,7 @@ final class PillDetailVC: UIViewController {
         style.lineHeightMultiple = 1.5
         style.alignment = .center
         messageLabel.attributedText = NSAttributedString(
-            string: "허가가 취소되거나 취하된 품목이라\n세부정보가 제공되지 않아요\n후보 선택과 식별 결과에는 영향이 없어요",
+            string: message,
             attributes: [
                 .paragraphStyle: style,
                 .font: DSKitFontFamily.Pretendard.regular.font(size: 15),
@@ -213,7 +192,6 @@ final class PillDetailVC: UIViewController {
             ]
         )
         messageLabel.numberOfLines = 0
-        messageLabel.textAlignment = .center
 
         let texts = UIStackView(arrangedSubviews: [titleLabel, messageLabel])
         texts.axis = .vertical
@@ -230,12 +208,22 @@ final class PillDetailVC: UIViewController {
             $0.leading.trailing.equalToSuperview().inset(40)
         }
 
+        var buttons: [UIView] = []
+        if retry {
+            let retryButton = PrimaryButton(title: "다시 시도")
+            retryButton.addAction(UIAction { [weak self] _ in self?.retrySubject.send(()) }, for: .touchUpInside)
+            buttons.append(retryButton)
+        }
         let backButton = SecondaryButton(title: "뒤로")
         backButton.addAction(UIAction { [weak self] _ in self?.onBackTapped?() }, for: .touchUpInside)
-        container.addSubview(backButton)
-        backButton.snp.makeConstraints {
+        buttons.append(backButton)
+        let footer = UIStackView(arrangedSubviews: buttons)
+        footer.axis = .vertical
+        footer.spacing = 10
+        container.addSubview(footer)
+        footer.snp.makeConstraints {
             $0.leading.trailing.equalToSuperview().inset(20)
-            $0.bottom.equalTo(container.safeAreaLayoutGuide).inset(28)
+            $0.bottom.equalTo(container.safeAreaLayoutGuide).inset(12)
         }
         return container
     }
