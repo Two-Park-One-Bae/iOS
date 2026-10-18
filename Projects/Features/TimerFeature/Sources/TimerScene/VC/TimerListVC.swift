@@ -170,7 +170,6 @@ public final class TimerListVC: UIViewController {
                     guard let current = self?.viewModel.currentTimers.first(where: { $0.id == timer.id }) else { return }
                     self?.viewModel.pauseOrResume(current)
                 }
-                card.onExtend = { [weak self] in self?.viewModel.extendOneMinute(id: timer.id) }
                 card.onStop = { [weak self] in self?.viewModel.remove(id: timer.id) }
                 card.onMemoSave = { [weak self] memo in self?.viewModel.updateMemo(id: timer.id, memo: memo) }
                 card.render(timer)

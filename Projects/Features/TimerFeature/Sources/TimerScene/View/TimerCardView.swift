@@ -5,14 +5,13 @@ import DSKit
 import Domain
 
 // C1 타이머 카드 (RUNNING/PAUSED) — 링 + 라벨/태그/전체시간 + ✕,
-// 메모 행, [일시정지|재개] [+1분] [메모]. 메모 인라인 입력(JNVXy) 포함.
-// V2.1.0(NM-591): 유리 카드, ✕ · 액션 버튼은 흰 볼록. (+1분은 spec 대로 둔다 — 디자인 시안에는 빠져 있다.)
+// 메모 행, [일시정지|재개] [메모]. 메모 인라인 입력(JNVXy) 포함.
+// V2.1.0(NM-591): 유리 카드, ✕ · 액션 버튼은 흰 볼록. +1분은 디자인대로 뺀다(NM-613).
 final class TimerCardView: UIView, UITextFieldDelegate {
 
     // MARK: - Callbacks
 
     var onPauseOrResume: (() -> Void)?
-    var onExtend: (() -> Void)?
     var onStop: (() -> Void)?
     var onMemoSave: ((String) -> Void)?
 
@@ -68,7 +67,6 @@ final class TimerCardView: UIView, UITextFieldDelegate {
     }
 
     private let pauseResumeButton = TimerActionButton()
-    private let extendButton = TimerActionButton()
     private let memoButton = TimerActionButton()
 
     // MARK: - Init
@@ -119,10 +117,9 @@ final class TimerCardView: UIView, UITextFieldDelegate {
         memoInputRow.addArrangedSubview(memoSaveButton)
 
         // Actions
-        let actions = UIStackView(arrangedSubviews: [pauseResumeButton, extendButton, memoButton]).then {
+        let actions = UIStackView(arrangedSubviews: [pauseResumeButton, memoButton]).then {
             $0.axis = .horizontal; $0.spacing = 8; $0.distribution = .fillEqually
         }
-        extendButton.configure(icon: nil, title: "+1분", style: .normal)
         memoButton.configure(icon: DSIcon.stickyNote.uiImage, title: "메모", style: .normal)
 
         let stack = UIStackView(arrangedSubviews: [topRow, memoLabel, memoInputRow, actions]).then {
@@ -133,7 +130,6 @@ final class TimerCardView: UIView, UITextFieldDelegate {
 
         stopButton.addAction(UIAction { [weak self] _ in self?.onStop?() }, for: .touchUpInside)
         pauseResumeButton.addAction(UIAction { [weak self] _ in self?.onPauseOrResume?() }, for: .touchUpInside)
-        extendButton.addAction(UIAction { [weak self] _ in self?.onExtend?() }, for: .touchUpInside)
         memoButton.addAction(UIAction { [weak self] _ in self?.toggleMemoInput() }, for: .touchUpInside)
         memoSaveButton.addAction(UIAction { [weak self] _ in self?.saveMemo() }, for: .touchUpInside)
         memoField.delegate = self
