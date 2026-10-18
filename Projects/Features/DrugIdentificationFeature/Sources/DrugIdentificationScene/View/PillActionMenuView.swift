@@ -3,14 +3,17 @@ import SnapKit
 import Then
 import DSKit
 
-// 알약 액션 팝업 메뉴 카드 (⋮ 메뉴: 수정 / 삭제)
+// 알약 액션 팝업 메뉴 카드 (⋮ 메뉴: 수정 / 삭제). 기록 상세는 고쳐 쓰지 않아 삭제만 둔다.
 final class PillActionMenuView: UIView {
 
     var onEdit: (() -> Void)?
     var onDelete: (() -> Void)?
 
-    override init(frame: CGRect) {
-        super.init(frame: frame)
+    private let showsEdit: Bool
+
+    init(showsEdit: Bool = true) {
+        self.showsEdit = showsEdit
+        super.init(frame: .zero)
         setup()
     }
 
@@ -50,6 +53,9 @@ final class PillActionMenuView: UIView {
             titleColor: DSColor.Error._500,
             action: #selector(deleteTapped)
         )
+
+        editRow.isHidden = !showsEdit
+        divider.isHidden = !showsEdit
 
         let stack = UIStackView(arrangedSubviews: [editRow, divider, deleteRow]).then {
             $0.axis = .vertical

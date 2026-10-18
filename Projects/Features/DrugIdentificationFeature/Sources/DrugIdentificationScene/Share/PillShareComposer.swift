@@ -16,28 +16,48 @@ enum PillShareComposer {
         pills: [IdentifiedPill],
         candidates: [Int: PillCandidateModel]
     ) -> String {
+        let entries: [Entry] = pills.sorted { $0.index < $1.index }.map { pill in
+            guard let candidate = candidates[pill.index] else { return .unselected(number: pill.index) }
+            return .pill(number: pill.index, name: candidate.pillName, company: candidate.companyName, code: candidate.pillCode)
+        }
+        return plainText(date: Date(), entries: entries)
+    }
+
+    /// 기록 상세 공유 — 식별 결과와 같은 모양, 날짜는 식별 시각 (NM-552).
+    static func plainText(history: PillHistoryModel) -> String {
+        let entries: [Entry] = history.pills.enumerated().map { offset, pill in
+            .pill(number: offset + 1, name: pill.pillName, company: pill.companyName, code: pill.pillCode)
+        }
+        return plainText(date: history.identifiedAt ?? Date(), entries: entries)
+    }
+
+    private enum Entry {
+        case pill(number: Int, name: String?, company: String?, code: String)
+        case unselected(number: Int)
+    }
+
+    private static func plainText(date: Date, entries: [Entry]) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "ko_KR")
         formatter.dateFormat = "yyyy년 M월 d일"
-        let date = formatter.string(from: Date())
 
-        let sorted = pills.sorted { $0.index < $1.index }
         var lines: [String] = [
             "널스메이트 · 알약 식별 결과",
-            date,
+            formatter.string(from: date),
             "",
-            "식별된 알약 \(sorted.count)개",
+            "식별된 알약 \(entries.count)개",
             "────────────────",
         ]
-        for pill in sorted {
-            if let candidate = candidates[pill.index] {
-                lines.append("\(pill.index). \(candidate.pillName ?? "이름 미상")")
-                if let company = candidate.companyName, !company.isEmpty {
+        for entry in entries {
+            switch entry {
+            case let .pill(number, name, company, code):
+                lines.append("\(number). \(name ?? "이름 미상")")
+                if let company, !company.isEmpty {
                     lines.append("   제조사: \(company)")
                 }
-                lines.append("   품목코드: \(candidate.pillCode)")
-            } else {
-                lines.append("\(pill.index). (후보 미선택)")
+                lines.append("   품목코드: \(code)")
+            case let .unselected(number):
+                lines.append("\(number). (후보 미선택)")
             }
             lines.append("")
         }
