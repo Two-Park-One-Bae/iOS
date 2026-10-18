@@ -171,7 +171,6 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
 
             self.startIdentification(image: image)
         }
-        vc.onExitToHome = { [weak self] in self?.exitToEntry() }
         // 미리보기에도 남은 횟수를 표시한다 (촬영 화면에는 표시하지 않는다).
         vc.bindUsage(pillUseCase.pillUsage.eraseToAnyPublisher())
         navigationController.pushViewController(vc, animated: true)
@@ -467,10 +466,11 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
                 )
             } receiveValue: { [weak self, weak vc] in
                 guard let self else { return }
-                // 완주(완료 버튼) — 미확정이 남았어도 종료 확인을 거쳐 끝낸 경우를 함께 센다.
+                // 완주(완료 버튼) — 미확정이 남았어도 종료 확인을 거쳐 끝낸 경우를 함께 세고, 남긴 수를 싣는다.
                 if let s = vc?.identificationSummary() {
                     AppAnalytics.track(.pillIdentifyComplete(
                         detectedCount: s.detectedCount, confirmedCount: s.confirmedCount,
+                        unconfirmedCount: s.unconfirmedCount,
                         deletedCount: s.deletedCount, manualAddedCount: s.manualAddedCount))
                 }
                 self.exitToEntry()

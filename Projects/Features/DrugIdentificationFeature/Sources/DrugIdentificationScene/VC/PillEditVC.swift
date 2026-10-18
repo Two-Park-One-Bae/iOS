@@ -37,6 +37,10 @@ final class PillEditVC: UIViewController {
     private let viewDidLoadSubject = PassthroughSubject<Void, Never>()
     private var cancelBag = Set<AnyCancellable>()
 
+    /// 후보별 면 요약 두 줄 여부 — 카드 폭이 바뀌면 다시 잰다.
+    private var stackedCache: [String: Bool] = [:]
+    private var stackedCacheWidth: CGFloat = 0
+
     /// 결과(2열 격자)와 안내(폭 가득)는 섹션 모양이 달라 바뀔 때 레이아웃을 다시 잡는다.
     private var listState: ListState = .loading {
         didSet {
@@ -443,6 +447,19 @@ final class PillEditVC: UIViewController {
 
     // MARK: - Candidates
 
+    /// 면 요약을 한 줄로 그리면 카드 안쪽 폭(카드 − 좌우 10)을 넘는가.
+    private func isFaceSummaryStacked(_ candidate: PillCandidateModel) -> Bool {
+        let cardWidth = (collectionView.bounds.width - 40 - 8) / 2
+        if cardWidth != stackedCacheWidth {
+            stackedCache = [:]
+            stackedCacheWidth = cardWidth
+        }
+        if let cached = stackedCache[candidate.pillCode] { return cached }
+        let stacked = CandidateFaceSummaryView.singleLineWidth(front: candidate.front, back: candidate.back) > cardWidth - 20
+        stackedCache[candidate.pillCode] = stacked
+        return stacked
+    }
+
     /// 목록 끝 한 줄 — 이어서 조회 실패가 먼저, 아니면 서버가 200개에서 자른 결과일 때 안내.
     private var footerMode: CandidateListFooter.Mode {
         guard !currentResults.isEmpty else { return .none }
@@ -546,7 +563,16 @@ extension PillEditVC: UICollectionViewDataSource {
                     withReuseIdentifier: CandidateCell.reuseID, for: indexPath
                 ) as! CandidateCell
                 let candidate = candidates[indexPath.item]
-                cell.configure(candidate: candidate, selected: candidate.pillCode == selectedPillCode)
+                // 같은 줄(2열)의 짝 카드 — 둘 중 하나라도 면 요약이 두 줄이면 높이를 맞춘다.
+                let partner = indexPath.item ^ 1
+                let stacked = isFaceSummaryStacked(candidate)
+                let partnerStacked = candidates.indices.contains(partner) && isFaceSummaryStacked(candidates[partner])
+                cell.configure(
+                    candidate: candidate,
+                    selected: candidate.pillCode == selectedPillCode,
+                    stacked: stacked,
+                    rowStacked: stacked || partnerStacked
+                )
                 cell.onInfoTap = { [weak self] in
                     self?.onSelectDetail?(candidate.pillCode, candidate.licenseStatus)
                 }

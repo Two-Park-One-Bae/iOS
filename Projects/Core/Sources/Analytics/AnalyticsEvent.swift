@@ -46,8 +46,9 @@ public enum AnalyticsEvent {
     /// (~2026-09 에는 `limit_source` 로 `gate`·`server` 를 실어 **막힌 시도**마다 발사했는데,
     /// 그러면 소진 후 재시도하지 않은 사용자가 통째로 빠지고 재시도한 사용자는 중복으로 잡혔다.)
     case pillLimitReached
-    /// 알약 식별 완주 — ⑨ 완료 버튼. (완료 수 / 시작 수). 완주 시 미확정=0.
-    case pillIdentifyComplete(detectedCount: Int, confirmedCount: Int, deletedCount: Int, manualAddedCount: Int)
+    /// 알약 식별 완주 — ⑤ 식별 결과의 `완료`로 기록을 저장했다. (완료 수 / 시작 수).
+    /// V2.1.0(NM-587)부터 모두 확정하지 않아도 끝낼 수 있어, 남긴 미확정 수를 함께 싣는다(이탈 이벤트와 같은 키).
+    case pillIdentifyComplete(detectedCount: Int, confirmedCount: Int, unconfirmedCount: Int, deletedCount: Int, manualAddedCount: Int)
     /// 알약 식별 중도이탈 — ⑤ 인식결과에서 확정 없이 나감. 미확정 개수·경과시간 포함.
     case pillIdentifySessionExit(detectedCount: Int, confirmedCount: Int, unconfirmedCount: Int, deletedCount: Int, manualAddedCount: Int, elapsedSec: Int)
 
@@ -116,8 +117,9 @@ public enum AnalyticsEvent {
                     "edit_count": editCount, "edit_count_bucket": Self.editCountBucket(editCount)]
         case .pillLimitReached:
             return [:]
-        case let .pillIdentifyComplete(detectedCount, confirmedCount, deletedCount, manualAddedCount):
+        case let .pillIdentifyComplete(detectedCount, confirmedCount, unconfirmedCount, deletedCount, manualAddedCount):
             return ["detected_count": detectedCount, "confirmed_count": confirmedCount,
+                    "unconfirmed_count": unconfirmedCount,
                     "deleted_count": deletedCount, "manual_added_count": manualAddedCount]
         case let .pillIdentifySessionExit(detectedCount, confirmedCount, unconfirmedCount, deletedCount, manualAddedCount, elapsedSec):
             // timer_cancel.elapsed_sec(타이머 경과)와 겹치지 않게 별도 키 사용.
