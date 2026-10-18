@@ -84,7 +84,7 @@ final class PhotoPreviewVC: UIViewController {
     // MARK: - Setup
 
     private func setUI() {
-        view.backgroundColor = DSColor.bgApp
+        view.backgroundColor = DSColor.surface
         photoImageView.image = capturedImage
     }
 
@@ -120,14 +120,14 @@ final class PhotoPreviewVC: UIViewController {
         // 남은 횟수는 '이 사진 사용' 위에 놓는다. 숨김 상태면 스택에서 자동으로 접힌다.
         let bottomStack = UIStackView(arrangedSubviews: [usageLabel, actionBar]).then {
             $0.axis = .vertical
-            $0.spacing = 8
+            $0.spacing = 10
         }
 
         view.addSubview(bottomStack)
         bottomStack.snp.makeConstraints {
             $0.top.equalTo(contentFrame.snp.bottom).offset(12)
             $0.leading.trailing.equalToSuperview().inset(20)
-            $0.bottom.equalTo(view.safeAreaLayoutGuide).offset(-28)
+            $0.bottom.equalTo(view.safeAreaLayoutGuide).offset(-12)
         }
     }
 

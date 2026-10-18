@@ -63,7 +63,7 @@ final class CameraOverlayView: UIView {
 
         // ─── Dim: Top (status bar + top bar → square) ───
         let topDim = UIView(frame: CGRect(x: 0, y: 0, width: w, height: squareY))
-        topDim.backgroundColor = DSColor.Neutral._900
+        topDim.backgroundColor = .black   // V2.1.0 camera-bg
         addSubview(topDim)
 
         // ─── Top Bar: Close (DSIcon.xMark, 26×26) ───
@@ -102,7 +102,7 @@ final class CameraOverlayView: UIView {
         let dimBottomH = controlsTop - squareBottom
         if dimBottomH > 0 {
             let bottomDim = UIView(frame: CGRect(x: 0, y: squareBottom, width: w, height: dimBottomH))
-            bottomDim.backgroundColor = DSColor.Neutral._900
+            bottomDim.backgroundColor = .black
             addSubview(bottomDim)
 
             // Guide Hint (pill, bg #000000A6, padding [9, 16])
@@ -131,7 +131,7 @@ final class CameraOverlayView: UIView {
 
         // ─── Controls Area ───
         let controlsDim = UIView(frame: CGRect(x: 0, y: controlsTop, width: w, height: h - controlsTop))
-        controlsDim.backgroundColor = DSColor.Neutral._900
+        controlsDim.backgroundColor = .black
         addSubview(controlsDim)
 
         let btnCenterY = controlsH / 2
@@ -140,7 +140,8 @@ final class CameraOverlayView: UIView {
         var galleryConfig = UIButton.Configuration.plain()
         galleryConfig.image = DSIcon.image.uiImage
         galleryConfig.baseForegroundColor = DSColor.Neutral._0
-        galleryConfig.contentInsets = NSDirectionalEdgeInsets(top: 13, leading: 13, bottom: 13, trailing: 13)
+        // 아이콘 에셋이 24pt — 48 칸 안에 꼭 맞게 12씩 둔다.
+        galleryConfig.contentInsets = NSDirectionalEdgeInsets(top: 12, leading: 12, bottom: 12, trailing: 12)
         galleryConfig.background.backgroundColor = DSColor.Neutral._700
         galleryConfig.background.cornerRadius = DSRadius.md
         galleryConfig.background.strokeColor = UIColor.white.withAlphaComponent(0.2)

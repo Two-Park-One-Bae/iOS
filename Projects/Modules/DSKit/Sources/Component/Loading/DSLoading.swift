@@ -115,6 +115,11 @@ extension DSLoading {
     public func setLabelHidden(_ hidden: Bool) {
         label.isHidden = hidden
     }
+
+    /// 고리 색. 기본 Info500 — V2.1.0 로딩 화면은 Primary500.
+    public func setSpinnerColor(_ color: UIColor) {
+        spinnerLayer.strokeColor = color.cgColor
+    }
 }
 
 // MARK: - Preview
