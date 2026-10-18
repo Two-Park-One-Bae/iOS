@@ -325,7 +325,7 @@ final class AppCoordinator: BaseCoordinator {
             // 한 런루프 뒤에 내린다. 인터셉터가 쏜 `.authSessionExpired` 는 **이 요청이 실패로
             // 돌아오기 전에** 메인 큐에 실리는데, 여기서 바로 내리면 둘의 순서가 보장되지 않아
             // 옵저버가 이미 false 를 읽는 경우가 생긴다.
-            defer { DispatchQueue.main.async { [weak self] in self?.isDeletingAccount = false } }
+            defer { Task { @MainActor in self.isDeletingAccount = false } }
 
             do {
                 try await authUseCase.deleteAccount()

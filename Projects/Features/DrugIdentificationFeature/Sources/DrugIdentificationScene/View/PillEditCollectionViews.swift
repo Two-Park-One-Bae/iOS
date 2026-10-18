@@ -538,12 +538,11 @@ final class CandidateListFooter: UICollectionReusableView {
         $0.textColor = DSColor.textTertiary
         $0.textAlignment = .center
     }
-    private let retry = UIButton(type: .system).then {
-        $0.setTitle("다시 시도", for: .normal)
-        $0.setTitleColor(DSColor.Primary._600, for: .normal)
-        $0.titleLabel?.font = DSKitFontFamily.Pretendard.semiBold.font(size: 13)
-        $0.contentEdgeInsets = UIEdgeInsets(top: 6, left: 8, bottom: 6, right: 8)
-    }
+    private let retry = UIButton(configuration: .retryText(
+        color: DSColor.Primary._600,
+        size: 13,
+        insets: NSDirectionalEdgeInsets(top: 6, leading: 8, bottom: 6, trailing: 8)
+    ))
     private lazy var row = UIStackView(arrangedSubviews: [label, retry]).then {
         $0.axis = .horizontal
         $0.spacing = 4
@@ -618,15 +617,15 @@ final class CandidateFailedCell: UICollectionViewCell {
             $0.textAlignment = .center
             $0.numberOfLines = 0
         }
-        let retry = UIButton(type: .system).then {
-            $0.setTitle("다시 시도", for: .normal)
-            $0.setTitleColor(DSColor.textPrimary, for: .normal)
-            $0.titleLabel?.font = DSKitFontFamily.Pretendard.semiBold.font(size: 15)
+        let retry = UIButton(configuration: .retryText(
+            color: DSColor.textPrimary,
+            size: 15,
+            insets: NSDirectionalEdgeInsets(top: 11, leading: 20, bottom: 11, trailing: 20)
+        )).then {
             $0.backgroundColor = DSColor.Neutral._100
             $0.layer.cornerRadius = 12
             $0.layer.borderWidth = 1
             $0.layer.borderColor = DSColor.Neutral._200.cgColor
-            $0.contentEdgeInsets = UIEdgeInsets(top: 11, left: 20, bottom: 11, right: 20)
             $0.addAction(UIAction { [weak self] _ in self?.onRetry?() }, for: .touchUpInside)
         }
         let texts = UIStackView(arrangedSubviews: [title, desc]).then {
@@ -646,4 +645,22 @@ final class CandidateFailedCell: UICollectionViewCell {
         }
     }
     required init?(coder: NSCoder) { fatalError() }
+}
+
+// MARK: - 다시 시도 버튼
+
+private extension UIButton.Configuration {
+    /// 글자만 있는 `다시 시도` 버튼 — Pretendard SemiBold.
+    static func retryText(color: UIColor, size: CGFloat, insets: NSDirectionalEdgeInsets) -> UIButton.Configuration {
+        var config = UIButton.Configuration.plain()
+        config.title = "다시 시도"
+        config.baseForegroundColor = color
+        config.contentInsets = insets
+        config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer {
+            var attributes = $0
+            attributes.font = DSKitFontFamily.Pretendard.semiBold.font(size: size)
+            return attributes
+        }
+        return config
+    }
 }

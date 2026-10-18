@@ -179,28 +179,28 @@ enum AirbridgeService {
      그래서 앱은 기존 `nursemate://` 라우팅 하나만 유지하면 된다.
 
      반환값이 true 면 에어브릿지 링크였다는 뜻 — 호출부는 기존 라우팅으로 넘기지 않는다.
-     변환된 URL 은 onOpen 으로 따로(비동기일 수 있다) 온다.
+     변환된 URL 은 onOpen 으로 따로 온다 — SDK 가 어느 스레드에서 부르든 메인에서 부른다.
      */
 
     /// 콜드런치 — 스킴·유니버설 링크 모두 `connectionOptions` 로 온다.
-    static func handle(connectionOptions: UIScene.ConnectionOptions, onOpen: @escaping (URL) -> Void) -> Bool {
+    static func handle(connectionOptions: UIScene.ConnectionOptions, onOpen: @escaping @MainActor @Sendable (URL) -> Void) -> Bool {
         guard isEnabled else { return false }
         Airbridge.trackDeeplink(connectionOptions: connectionOptions)
-        return Airbridge.handleDeeplink(connectionOptions: connectionOptions, onSuccess: onOpen)
+        return Airbridge.handleDeeplink(connectionOptions: connectionOptions) { url in Task { @MainActor in onOpen(url) } }
     }
 
     /// 실행 중 — 스킴 딥링크.
-    static func handle(openURLContexts: Set<UIOpenURLContext>, onOpen: @escaping (URL) -> Void) -> Bool {
+    static func handle(openURLContexts: Set<UIOpenURLContext>, onOpen: @escaping @MainActor @Sendable (URL) -> Void) -> Bool {
         guard isEnabled else { return false }
         Airbridge.trackDeeplink(openURLContexts: openURLContexts)
-        return Airbridge.handleDeeplink(openURLContexts: openURLContexts, onSuccess: onOpen)
+        return Airbridge.handleDeeplink(openURLContexts: openURLContexts) { url in Task { @MainActor in onOpen(url) } }
     }
 
     /// 실행 중 — 유니버설 링크.
-    static func handle(userActivity: NSUserActivity, onOpen: @escaping (URL) -> Void) -> Bool {
+    static func handle(userActivity: NSUserActivity, onOpen: @escaping @MainActor @Sendable (URL) -> Void) -> Bool {
         guard isEnabled else { return false }
         Airbridge.trackDeeplink(userActivity: userActivity)
-        return Airbridge.handleDeeplink(userActivity: userActivity, onSuccess: onOpen)
+        return Airbridge.handleDeeplink(userActivity: userActivity) { url in Task { @MainActor in onOpen(url) } }
     }
 
     /// 지연 딥링크 — 앱이 없을 때 트래킹 링크를 눌렀다가 설치 후 첫 실행에서 한 번 받는다.

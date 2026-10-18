@@ -83,6 +83,9 @@ private struct AlarmDisplayInfo {
             phase = .paused(remaining: remaining)
         case .alert:
             phase = .ringing
+        @unknown default:
+            // 새로 생긴 상태는 남은 시간을 모른다 — 울림으로 보여 앱을 열게 한다.
+            phase = .ringing
         }
     }
 }

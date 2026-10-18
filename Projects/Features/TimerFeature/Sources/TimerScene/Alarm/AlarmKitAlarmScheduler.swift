@@ -39,7 +39,7 @@ public final class AlarmKitAlarmScheduler: TimerAlarmScheduling {
     }
 
     public func cancelAlarm(id: UUID) {
-        Task { try? await AlarmManager.shared.cancel(id: id) }
+        try? AlarmManager.shared.cancel(id: id)
     }
 
     // 취소하지 않고 AlarmKit pause — 알람에 붙은 Live Activity 가 '일시정지됨'(Paused 표현)으로 남는다.

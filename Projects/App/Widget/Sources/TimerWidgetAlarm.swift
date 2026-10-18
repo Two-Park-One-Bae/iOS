@@ -71,7 +71,7 @@ enum TimerWidgetAlarmScheduler {
             stopIntent: TimerWidgetStopIntent(id: id.uuidString),
             sound: useSound ? .default : .named("silence.caf")
         )
-        try await AlarmManager.shared.schedule(id: id, configuration: configuration)
+        _ = try await AlarmManager.shared.schedule(id: id, configuration: configuration)
     }
 }
 
