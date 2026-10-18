@@ -62,6 +62,14 @@ enum RegisterDependencies {
         container.register(PillRepositoryProtocol.self) {
             PillRepository(service: pillService)
         }
+        container.register(PillHistoryRepositoryProtocol.self) {
+            let repository = PillHistoryRepository(service: pillService)
+            #if DEBUG
+            // 환경 변수 MOCK_PILL_HISTORY 가 있으면 기록 API 를 목으로 — 빈 상태 · 실패 화면 확인용.
+            if let mock = MockPillHistoryRepository.fromEnvironment(fallback: repository) { return mock }
+            #endif
+            return repository
+        }
         container.register(TimerRepositoryProtocol.self) {
             TimerRepository()
         }
@@ -91,6 +99,9 @@ enum RegisterDependencies {
         // 비즈니스 로직 계층. resolve 결과가 캐싱(싱글톤)되어 앱 전체가 같은 인스턴스를 공유한다.
         container.register(PillUseCase.self) {
             DefaultPillUseCase(repository: container.resolve(PillRepositoryProtocol.self))
+        }
+        container.register(PillHistoryUseCase.self) {
+            DefaultPillHistoryUseCase(repository: container.resolve(PillHistoryRepositoryProtocol.self))
         }
 
         container.register(AuthUseCase.self) {

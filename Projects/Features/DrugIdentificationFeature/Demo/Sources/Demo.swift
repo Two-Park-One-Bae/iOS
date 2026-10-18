@@ -6,6 +6,7 @@
 //
 
 import UIKit
+import Combine
 
 import BaseFeatureDependency
 import DrugIdentificationFeature
@@ -27,6 +28,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         }
         container.register(PillUseCase.self) {
             DefaultPillUseCase(repository: container.resolve(PillRepositoryProtocol.self))
+        }
+        container.register(PillHistoryUseCase.self) {
+            DemoPillHistoryUseCase()
         }
         container.register(DrugIdentificationFeatureBuildable.self) {
             DrugIdentificationBuilder()
@@ -68,5 +72,24 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         // 메인 앱에선 탭바가 알약 탭 선택 시 .pillTabSelected 를 쏴 카메라를 띄운다.
         // 데모는 탭바가 없으므로 직접 발행해 촬영 흐름을 시작한다.
         NotificationCenter.default.post(name: .pillTabSelected, object: nil)
+    }
+}
+
+/// 식별 기록 스텁 — 기록이 하나도 없는 계정처럼 동작하고, 저장은 늘 성공한다.
+final class DemoPillHistoryUseCase: PillHistoryUseCase {
+    func fetchHistories(limit: Int, cursor: String?) -> AnyPublisher<PillHistoryPageModel, Error> {
+        Just(PillHistoryPageModel(items: [], nextCursor: nil)).setFailureType(to: Error.self).eraseToAnyPublisher()
+    }
+    func fetchLatestHistory() -> AnyPublisher<PillHistorySummaryModel?, Error> {
+        Just(nil).setFailureType(to: Error.self).eraseToAnyPublisher()
+    }
+    func fetchHistory(historyId: String) -> AnyPublisher<PillHistoryModel, Error> {
+        Fail(error: PillHistoryNotFoundError()).eraseToAnyPublisher()
+    }
+    func saveHistory(historyId: String, pillCodes: [String]) -> AnyPublisher<Void, Error> {
+        Just(()).setFailureType(to: Error.self).eraseToAnyPublisher()
+    }
+    func deleteHistory(historyId: String) -> AnyPublisher<Void, Error> {
+        Just(()).setFailureType(to: Error.self).eraseToAnyPublisher()
     }
 }

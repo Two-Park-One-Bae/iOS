@@ -61,6 +61,16 @@ final class StubDrugIdentificationFeatureBuilder: DrugIdentificationFeatureBuild
     func makeDrugIdentificationCoordinator(navigationController: UINavigationController) -> CoordinatorProtocol {
         StubCoordinator.pushing("알약 (Stub)", into: navigationController)
     }
+
+    func makePillHistoryDetailCoordinator(
+        navigationController: UINavigationController,
+        historyId: String,
+        identifiedAt: Date?,
+        pillCount: Int,
+        onFinish: @escaping (PillHistoryDetailExit) -> Void
+    ) -> CoordinatorProtocol {
+        StubCoordinator(navigationController: navigationController)
+    }
 }
 
 final class StubCoordinator: CoordinatorProtocol {

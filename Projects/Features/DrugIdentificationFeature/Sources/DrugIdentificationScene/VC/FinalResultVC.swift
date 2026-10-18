@@ -5,7 +5,8 @@ import DSKit
 import Domain
 import Core
 
-// ⑨ 최종 결과 리스트 — 모든 알약 식별 완료 후 확정 결과를 보여주는 읽기전용 화면 (NM-136)
+// ⑨ 최종 결과 리스트 — 모든 알약 식별 완료 후 확정 결과를 보여주는 읽기전용 화면 (NM-136).
+// `완료`를 누르면 기록을 저장하고 들어온 화면으로 돌아간다 (NM-552).
 final class FinalResultVC: UIViewController {
 
     // MARK: - Callbacks
@@ -249,13 +250,13 @@ final class FinalResultVC: UIViewController {
 
     private func copyResultText() {
         UIPasteboard.general.string = PillShareComposer.plainText(pills: pills, candidates: candidates)
-        showToast("결과가 복사되었어요")
+        showToast("결과가 복사되었어요", above: footer)
     }
 
     private func saveResultPDF() {
         let text = PillShareComposer.plainText(pills: pills, candidates: candidates)
         guard let url = PillShareComposer.pdfURL(text: text) else {
-            showToast("PDF 생성에 실패했어요")
+            showToast("PDF 생성에 실패했어요", above: footer)
             return
         }
         let activity = UIActivityViewController(activityItems: [url], applicationActivities: nil)
@@ -264,44 +265,16 @@ final class FinalResultVC: UIViewController {
         present(activity, animated: true)
     }
 
-    // 간단한 확인 토스트 (하단에서 잠깐 떴다 사라짐)
-    private func showToast(_ message: String) {
-        let toast = PaddingLabel().then {
-            $0.text = message
-            $0.font = DSKitFontFamily.Pretendard.medium.font(size: 13)
-            $0.textColor = DSColor.Neutral._0
-            $0.backgroundColor = DSColor.textPrimary.withAlphaComponent(0.9)
-            $0.textAlignment = .center
-            $0.layer.cornerRadius = 10
-            $0.clipsToBounds = true
-            $0.alpha = 0
-        }
-        view.addSubview(toast)
-        toast.snp.makeConstraints {
-            $0.centerX.equalToSuperview()
-            $0.bottom.equalTo(footer.snp.top).offset(-16)
-            $0.leading.greaterThanOrEqualToSuperview().offset(40)
-            $0.trailing.lessThanOrEqualToSuperview().offset(-40)
-        }
-        UIView.animate(withDuration: 0.25, animations: { toast.alpha = 1 }) { _ in
-            UIView.animate(withDuration: 0.25, delay: 1.4, options: []) {
-                toast.alpha = 0
-            } completion: { _ in toast.removeFromSuperview() }
-        }
-    }
-
     @objc private func completeTapped() { onComplete?() }
-}
 
-// 토스트용 — 상하좌우 여백이 있는 라벨.
-private final class PaddingLabel: UILabel {
-    private let inset = UIEdgeInsets(top: 10, left: 16, bottom: 10, right: 16)
-    override func drawText(in rect: CGRect) {
-        super.drawText(in: rect.inset(by: inset))
-    }
-    override var intrinsicContentSize: CGSize {
-        let s = super.intrinsicContentSize
-        return CGSize(width: s.width + inset.left + inset.right,
-                      height: s.height + inset.top + inset.bottom)
+    /// 기록 저장 중 — `완료`는 `저장 중…`, `공유`는 비활성 (NM-552).
+    func setSaving(_ isSaving: Bool) {
+        // BaseButton.setTitle 은 configuration 에 반영되지 않아 제목을 직접 바꾼다(PrimaryButton 과 같은 글꼴).
+        var title = AttributedString(isSaving ? "저장 중…" : "완료")
+        title.font = DSKitFontFamily.Pretendard.semiBold.font(size: 16)
+        completeButton.configuration?.attributedTitle = title
+        completeButton.setEnabled(!isSaving)
+        shareButton.setEnabled(!isSaving)
+        navBar.isUserInteractionEnabled = !isSaving
     }
 }

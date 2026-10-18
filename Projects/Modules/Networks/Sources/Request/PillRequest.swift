@@ -99,3 +99,12 @@ public struct PillFaceRequest: Encodable {
         self.markEmbedding = markEmbedding
     }
 }
+
+/// `PUT /api/v0/pill-histories/{historyId}` 본문 — 확정한 품목, 화면 순서 그대로 (NM-552).
+public struct PillHistorySaveRequest: Encodable {
+    public let pillCodes: [String]
+
+    public init(pillCodes: [String]) {
+        self.pillCodes = pillCodes
+    }
+}

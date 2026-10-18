@@ -185,11 +185,12 @@ final class AppCoordinator: BaseCoordinator {
     private func showTabBar() {
         detachCurrentFlow()
 
+        let drugBuilder = DrugIdentificationBuilder()
         let tabBarCoordinator = TabBarCoordinator(
             navigationController: navigationController,
-            homeBuilder: HomeFeatureBuilder(),
+            homeBuilder: HomeFeatureBuilder(drugBuilder: drugBuilder),
             timerBuilder: TimerBuilder(),
-            drugBuilder: DrugIdentificationBuilder(),
+            drugBuilder: drugBuilder,
             makeConsentSettings: { [authBuilder = self.authBuilder] in authBuilder.makeConsentSettingsViewController() },
             onLogout: { [weak self] in self?.confirmSignOut() },
             onDeleteAccount: { [weak self] in self?.confirmAccountDeletion() }

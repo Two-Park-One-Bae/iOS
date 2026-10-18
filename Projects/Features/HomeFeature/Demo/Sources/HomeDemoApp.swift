@@ -14,6 +14,7 @@ final class HomeDemoAppDelegate: UIResponder, UIApplicationDelegate {
         // HomeViewModel이 @Injected로 PillUseCase를 받으므로 데모에서도 등록이 필요하다.
         // remaining을 0으로 주면 한도 소진 표시(경고색)와 카드 탭 시 안내 팝업을 볼 수 있다.
         DIContainer.shared.register(PillUseCase.self) { MockPillUseCase(remaining: 12) }
+        DIContainer.shared.register(PillHistoryUseCase.self) { EmptyPillHistoryUseCase() }
         return true
     }
 

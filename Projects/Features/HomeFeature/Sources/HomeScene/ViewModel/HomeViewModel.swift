@@ -9,6 +9,8 @@ public final class HomeViewModel {
 
     public var onDrugIdentifyTapped: (() -> Void)?
     public var onTreatmentTimerTapped: (() -> Void)?
+    /// 최근 식별 칩 → 그 기록의 상세 (NM-552)
+    public var onRecentHistoryTapped: ((PillHistorySummaryModel) -> Void)?
 
     // MARK: - Input / Output
 
@@ -17,17 +19,20 @@ public final class HomeViewModel {
         public let viewWillAppear: AnyPublisher<Void, Never>
         public let drugIdentifyTapped: AnyPublisher<Void, Never>
         public let treatmentTimerTapped: AnyPublisher<Void, Never>
+        public let recentHistoryTapped: AnyPublisher<Void, Never>
 
         public init(
             viewDidLoad: AnyPublisher<Void, Never>,
             viewWillAppear: AnyPublisher<Void, Never>,
             drugIdentifyTapped: AnyPublisher<Void, Never>,
-            treatmentTimerTapped: AnyPublisher<Void, Never>
+            treatmentTimerTapped: AnyPublisher<Void, Never>,
+            recentHistoryTapped: AnyPublisher<Void, Never> = Empty().eraseToAnyPublisher()
         ) {
             self.viewDidLoad = viewDidLoad
             self.viewWillAppear = viewWillAppear
             self.drugIdentifyTapped = drugIdentifyTapped
             self.treatmentTimerTapped = treatmentTimerTapped
+            self.recentHistoryTapped = recentHistoryTapped
         }
     }
 
@@ -40,12 +45,18 @@ public final class HomeViewModel {
         public let limitExceeded: AnyPublisher<PillUsageModel?, Never>
         /// 활성(진행 중, running) 타이머 개수. 칩에 "활성 타이머 N"으로 표시한다.
         public let activeTimerCount: AnyPublisher<Int, Never>
+        /// 가장 최근 식별 기록 — 최근 식별 칩. 기록이 없거나 불러오지 못했으면 nil(칩을 숨긴다)
+        public let latestHistory: AnyPublisher<PillHistorySummaryModel?, Never>
     }
 
     private var cancelBag = Set<AnyCancellable>()
 
     @Injected private var pillUseCase: PillUseCase
     @Injected private var timerUseCase: TimerUseCase
+    @Injected private var historyUseCase: PillHistoryUseCase
+
+    private let latestHistory = CurrentValueSubject<PillHistorySummaryModel?, Never>(nil)
+    private var historyRequest: AnyCancellable?
 
     public init() {}
 
@@ -61,6 +72,15 @@ public final class HomeViewModel {
                 self?.pillUseCase.fetchPillUsage()
                 // 위젯·라이브액티비티 등 다른 프로세스에서 시작된 타이머까지 반영되도록 재동기화.
                 self?.timerUseCase.reload()
+                // 식별을 저장하거나 기록을 지우고 돌아왔을 때 맞는 칩을 보이도록 보일 때마다 다시 받는다.
+                self?.fetchLatestHistory()
+            }
+            .store(in: &cancelBag)
+
+        input.recentHistoryTapped
+            .sink { [weak self] in
+                guard let self, let summary = self.latestHistory.value else { return }
+                self.onRecentHistoryTapped?(summary)
             }
             .store(in: &cancelBag)
 
@@ -94,7 +114,15 @@ public final class HomeViewModel {
             error: error.eraseToAnyPublisher(),
             usage: pillUseCase.pillUsage.eraseToAnyPublisher(),
             limitExceeded: limitExceeded.eraseToAnyPublisher(),
-            activeTimerCount: activeTimerCount
+            activeTimerCount: activeTimerCount,
+            latestHistory: latestHistory.removeDuplicates().eraseToAnyPublisher()
         )
+    }
+
+    /// 실패하면 칩을 숨긴다 — 홈에 다시 돌아오면 다시 받는다.
+    private func fetchLatestHistory() {
+        historyRequest = historyUseCase.fetchLatestHistory()
+            .replaceError(with: nil)
+            .sink { [weak self] summary in self?.latestHistory.send(summary) }
     }
 }
