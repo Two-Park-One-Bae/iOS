@@ -15,6 +15,7 @@ public final class HomeVC: UIViewController {
     private let viewWillAppearSubject = PassthroughSubject<Void, Never>()
     private let drugIdentifySubject = PassthroughSubject<Void, Never>()
     private let treatmentTimerSubject = PassthroughSubject<Void, Never>()
+    private let recentHistorySubject = PassthroughSubject<Void, Never>()
 
     // MARK: - UI
 
@@ -117,10 +118,17 @@ public final class HomeVC: UIViewController {
     // 활성 타이머 수를 갱신해야 해서 프로퍼티로 유지한다.
     private let timerChip = DSChip(text: "활성 타이머 0", icon: .timer, style: .secondary)
 
+    // 최근 식별 칩 — 가장 최근 기록 한 건. 기록이 없거나 불러오지 못했으면 숨긴다 (NM-552, 디자인 `CwGWk`).
+    private let recentChip = RecentHistoryChip().then { $0.isHidden = true }
+
     private func makeChipsRow() -> UIView {
         let spacer = UIView()
+        // 품목명이 길면 최근 식별 칩이 줄어든다 — 타이머 칩은 그대로 둔다.
+        timerChip.setContentCompressionResistancePriority(.required, for: .horizontal)
+        recentChip.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        recentChip.addAction(UIAction { [weak self] _ in self?.recentHistorySubject.send() }, for: .touchUpInside)
 
-        let stack = UIStackView(arrangedSubviews: [timerChip, spacer]).then {
+        let stack = UIStackView(arrangedSubviews: [timerChip, recentChip, spacer]).then {
             $0.axis = .horizontal
             $0.spacing = 8
         }
@@ -162,7 +170,8 @@ public final class HomeVC: UIViewController {
             viewDidLoad: Just(()).eraseToAnyPublisher(),
             viewWillAppear: viewWillAppearSubject.eraseToAnyPublisher(),
             drugIdentifyTapped: drugIdentifySubject.eraseToAnyPublisher(),
-            treatmentTimerTapped: treatmentTimerSubject.eraseToAnyPublisher()
+            treatmentTimerTapped: treatmentTimerSubject.eraseToAnyPublisher(),
+            recentHistoryTapped: recentHistorySubject.eraseToAnyPublisher()
         )
         let output = viewModel.transform(input: input)
 
@@ -192,6 +201,14 @@ public final class HomeVC: UIViewController {
             }
             .store(in: &cancelBag)
 
+        output.latestHistory
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] summary in
+                self?.recentChip.isHidden = summary == nil
+                if let summary { self?.recentChip.configure(summary) }
+            }
+            .store(in: &cancelBag)
+
         // 활성 타이머 수 — 0이어도 항상 표시한다(칩이 사라지면 홈이 허전해 보임).
         output.activeTimerCount
             .receive(on: DispatchQueue.main)
@@ -199,5 +216,64 @@ public final class HomeVC: UIViewController {
                 self?.timerChip.setText("활성 타이머 \(count)")
             }
             .store(in: &cancelBag)
+    }
+}
+
+// MARK: - Recent History Chip
+
+/// 최근 식별 칩 — `⟲ 품목명 외 N`. 배경 Primary50 · 테두리 Primary100 1px · 캡슐, padding (8, 14), gap 6.
+/// 품목명이 넘치면 말줄임하고 `외 N`은 남긴다(디자인 `g5naPt`) — DSChip 은 라벨이 하나라 따로 둔다.
+private final class RecentHistoryChip: UIControl {
+
+    private let nameLabel = UILabel().then {
+        $0.font = DSKitFontFamily.Pretendard.medium.font(size: 13)
+        $0.textColor = DSColor.Primary._600
+        $0.lineBreakMode = .byTruncatingTail
+        $0.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+    }
+
+    private let othersLabel = UILabel().then {
+        $0.font = DSKitFontFamily.Pretendard.medium.font(size: 13)
+        $0.textColor = DSColor.Primary._600
+        $0.setContentCompressionResistancePriority(.required, for: .horizontal)
+        $0.setContentHuggingPriority(.required, for: .horizontal)
+    }
+
+    init() {
+        super.init(frame: .zero)
+        backgroundColor = DSColor.Primary._50
+        layer.cornerRadius = 20
+        layer.borderWidth = 1
+        layer.borderColor = DSColor.Primary._100.cgColor
+
+        let icon = UIImageView(image: DSIcon.history.uiImage).then {
+            $0.tintColor = DSColor.Primary._500
+            $0.contentMode = .scaleAspectFit
+        }
+        icon.snp.makeConstraints { $0.width.height.equalTo(14) }
+
+        let stack = UIStackView(arrangedSubviews: [icon, nameLabel, othersLabel]).then {
+            $0.axis = .horizontal
+            $0.spacing = 6
+            $0.alignment = .center
+            $0.isUserInteractionEnabled = false
+        }
+        stack.setCustomSpacing(4, after: nameLabel)
+        addSubview(stack)
+        stack.snp.makeConstraints {
+            $0.top.bottom.equalToSuperview().inset(8)
+            $0.leading.trailing.equalToSuperview().inset(14)
+        }
+        accessibilityTraits = .button
+        isAccessibilityElement = true
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    func configure(_ summary: PillHistorySummaryModel) {
+        nameLabel.text = summary.firstPillName
+        othersLabel.text = summary.othersText
+        othersLabel.isHidden = summary.othersText == nil
+        accessibilityLabel = "최근 식별 \(summary.firstPillName) \(summary.othersText ?? "")"
     }
 }

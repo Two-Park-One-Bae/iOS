@@ -16,6 +16,7 @@ enum HomeTestDependencies {
         let container = DIContainer.shared
         container.register(PillUseCase.self) { StubPillUseCase() }
         container.register(TimerUseCase.self) { StubTimerUseCase() }
+        container.register(PillHistoryUseCase.self) { EmptyPillHistoryUseCase() }
     }
 }
 
@@ -60,4 +61,23 @@ final class StubTimerUseCase: TimerUseCase {
     func deletePreset(id: UUID) {}
     func requestAlarmPermission() {}
     func fetchAlarmPermission() {}
+}
+
+/// 식별 기록 스텁 — 기록이 하나도 없는 계정처럼 동작한다.
+final class EmptyPillHistoryUseCase: PillHistoryUseCase {
+    func fetchHistories(limit: Int, cursor: String?) -> AnyPublisher<PillHistoryPageModel, Error> {
+        Just(PillHistoryPageModel(items: [], nextCursor: nil)).setFailureType(to: Error.self).eraseToAnyPublisher()
+    }
+    func fetchLatestHistory() -> AnyPublisher<PillHistorySummaryModel?, Error> {
+        Just(nil).setFailureType(to: Error.self).eraseToAnyPublisher()
+    }
+    func fetchHistory(historyId: String) -> AnyPublisher<PillHistoryModel, Error> {
+        Fail(error: PillHistoryNotFoundError()).eraseToAnyPublisher()
+    }
+    func saveHistory(historyId: String, pillCodes: [String]) -> AnyPublisher<Void, Error> {
+        Just(()).setFailureType(to: Error.self).eraseToAnyPublisher()
+    }
+    func deleteHistory(historyId: String) -> AnyPublisher<Void, Error> {
+        Just(()).setFailureType(to: Error.self).eraseToAnyPublisher()
+    }
 }
