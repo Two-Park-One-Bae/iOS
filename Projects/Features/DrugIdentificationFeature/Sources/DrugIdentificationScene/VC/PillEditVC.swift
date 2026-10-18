@@ -16,7 +16,6 @@ final class PillEditVC: UIViewController {
     // MARK: - Callbacks
 
     var onConfirm: ((PillCandidateModel) -> Void)?
-    var onCancel: (() -> Void)?
     var onBackTapped: (() -> Void)?
     // 후보 ⓘ 탭 → 세부정보 진입 (pillCode, 허가상태). 세부 이미지는 상세 조회 응답에서 로드(NM-347).
     var onSelectDetail: ((String, LicenseStatus) -> Void)?
@@ -38,7 +37,16 @@ final class PillEditVC: UIViewController {
     private let viewDidLoadSubject = PassthroughSubject<Void, Never>()
     private var cancelBag = Set<AnyCancellable>()
 
-    private var listState: ListState = .loading
+    /// 결과(2열 격자)와 안내(폭 가득)는 섹션 모양이 달라 바뀔 때 레이아웃을 다시 잡는다.
+    private var listState: ListState = .loading {
+        didSet {
+            let wasGrid: Bool
+            if case .results = oldValue { wasGrid = true } else { wasGrid = false }
+            let isGrid: Bool
+            if case .results = listState { isGrid = true } else { isGrid = false }
+            if wasGrid != isGrid { collectionView.collectionViewLayout.invalidateLayout() }
+        }
+    }
     private var selectedPillCode: String?
     private weak var header: CandidateHeaderView?
     private weak var listFooter: CandidateListFooter?
@@ -65,7 +73,7 @@ final class PillEditVC: UIViewController {
     private lazy var collectionView = UICollectionView(
         frame: .zero, collectionViewLayout: makeLayout()
     ).then {
-        $0.backgroundColor = DSColor.bgApp
+        $0.backgroundColor = DSColor.surface
         $0.alwaysBounceVertical = true
         $0.showsVerticalScrollIndicator = false
         $0.keyboardDismissMode = .interactive
@@ -93,8 +101,7 @@ final class PillEditVC: UIViewController {
     private lazy var attributeCardView = PillAttributeCardView(
         title: "알약 \(viewModel.displayNumber)",
         thumbnail: viewModel.thumbnail,
-        conditions: viewModel.conditions,
-        expanded: viewModel.startsExpanded
+        conditions: viewModel.conditions
     )
 
     /// 키보드 위 각인 입력 줄. 화면에 보이지 않는 대리 필드의 inputAccessoryView 로 띄운 뒤
@@ -105,20 +112,16 @@ final class PillEditVC: UIViewController {
         $0.inputAccessoryView = imprintBar
     }
 
+    /// 하단 바 — 판 없이 `선택` 캡슐 + 고지(V2.1.0 `IkyB0`). 화면 뒤로가 취소다.
     private let footer = UIView().then {
-        $0.backgroundColor = DSColor.bgApp
-        $0.layer.shadowColor = DSColor.textPrimary.cgColor
-        $0.layer.shadowOpacity = 0.1
-        $0.layer.shadowOffset = CGSize(width: 0, height: -4)
-        $0.layer.shadowRadius = 16
+        $0.backgroundColor = DSColor.surface
     }
-    private let cancelButton = SecondaryButton(title: "취소")
-    private let confirmButton = PrimaryButton(title: "확인")
-    /// 취소·확인 묶음 — 후보를 골라야 나타난다. UIStackView 의 arranged subview 라 숨기면 접힌다.
-    private lazy var buttonsRow = UIStackView(arrangedSubviews: [cancelButton, confirmButton]).then {
+    private let confirmButton = PrimaryButton(title: "선택")
+        .setCapsule()
+        .changeInset(top: 16, leading: 24, bottom: 16, trailing: 24)
+    /// `선택` — 후보를 골라야 나타난다(고르기 전에는 없다). UIStackView 의 arranged subview 라 숨기면 접힌다.
+    private lazy var buttonsRow = UIStackView(arrangedSubviews: [confirmButton]).then {
         $0.axis = .horizontal
-        $0.spacing = 10
-        $0.distribution = .fillEqually
     }
     /// 고지 문구 (Guideline 1.4.1) — 선택 여부와 무관하게 항상 노출.
     private let disclaimerLabel = PillDisclaimer.makeLabel()
@@ -146,7 +149,7 @@ final class PillEditVC: UIViewController {
     // MARK: - Setup
 
     private func setUI() {
-        view.backgroundColor = DSColor.bgApp
+        view.backgroundColor = DSColor.surface
         // 이탈 계측(pill_flow_exit)은 여기가 아니라 viewDidDisappear 에서 잡는다 —
         // 이 화면을 나가는 길이 백 버튼 말고도 [취소] 버튼·스와이프 백으로 여럿이기 때문.
         navBar.onBackTapped = { [weak self] in
@@ -184,14 +187,14 @@ final class PillEditVC: UIViewController {
     private func setupFooter() {
         let stack = UIStackView(arrangedSubviews: [buttonsRow, disclaimerLabel]).then {
             $0.axis = .vertical
-            $0.spacing = 10
+            $0.spacing = 8
         }
         footer.addSubview(stack)
         footer.snp.makeConstraints { $0.leading.trailing.bottom.equalToSuperview() }
         stack.snp.makeConstraints {
-            $0.top.equalToSuperview().offset(12)
+            $0.top.equalToSuperview().offset(10)
             $0.leading.trailing.equalToSuperview().inset(20)
-            $0.bottom.equalTo(view.safeAreaLayoutGuide).offset(-28)
+            $0.bottom.equalTo(view.safeAreaLayoutGuide).offset(-6)
         }
     }
 
@@ -222,14 +225,23 @@ final class PillEditVC: UIViewController {
     }
 
     private func makeCandidateSection() -> NSCollectionLayoutSection {
-        let size = NSCollectionLayoutSize(
-            widthDimension: .fractionalWidth(1), heightDimension: .estimated(64)
-        )
-        let item = NSCollectionLayoutItem(layoutSize: size)
-        let group = NSCollectionLayoutGroup.vertical(layoutSize: size, repeatingSubitem: item, count: 1)
-        let section = NSCollectionLayoutSection(group: group)
-        // 칸끼리 붙여 흰 카드 하나로 보인다 — 구분선은 셀이 그린다.
-        section.interGroupSpacing = 0
+        let section: NSCollectionLayoutSection
+        if case .results = listState {
+            // 후보 격자 — 2열 카드, 간격 8. 같은 줄의 짝 카드는 높이를 맞춘다(면 요약이 두 줄로 내려간 카드 기준).
+            let itemSize = NSCollectionLayoutSize(widthDimension: .fractionalWidth(0.5), heightDimension: .estimated(150))
+            let item = NSCollectionLayoutItem(layoutSize: itemSize)
+            let groupSize = NSCollectionLayoutSize(widthDimension: .fractionalWidth(1), heightDimension: .estimated(150))
+            let group = NSCollectionLayoutGroup.horizontal(layoutSize: groupSize, repeatingSubitem: item, count: 2)
+            group.interItemSpacing = .fixed(8)
+            section = NSCollectionLayoutSection(group: group)
+            section.interGroupSpacing = 8
+        } else {
+            // 조회 중 · 0개 · 실패 · 입력 전 — 안내 한 칸을 폭 가득.
+            let size = NSCollectionLayoutSize(widthDimension: .fractionalWidth(1), heightDimension: .estimated(64))
+            let item = NSCollectionLayoutItem(layoutSize: size)
+            let group = NSCollectionLayoutGroup.vertical(layoutSize: size, repeatingSubitem: item, count: 1)
+            section = NSCollectionLayoutSection(group: group)
+        }
         // 상단 14 = "후보" 헤더 → 첫 후보 간격(헤더는 섹션 경계라 이 inset이 그 아래 여백이 됨).
         // 아래 여백 24 는 푸터(200개 초과 안내)가 갖는다 — 목록 → 안내 간격을 디자인(14 + 4)대로 두려고.
         section.contentInsets = NSDirectionalEdgeInsets(top: 14, leading: 20, bottom: 0, trailing: 20)
@@ -263,11 +275,25 @@ final class PillEditVC: UIViewController {
             self.viewModel.submitImprint(text, on: face)
             self.closeImprintInput()
         }
-        cancelButton.addTarget(self, action: #selector(cancelTapped), for: .touchUpInside)
+        // `모름` · `각인 없음` 은 누르면 바로 입력 줄을 닫는다. `원래 값` 은 사진에서 읽은 각인으로 되돌린다.
+        imprintBar.onUnknown = { [weak self] in
+            guard let self, let face = self.editingFace else { return }
+            self.viewModel.setImprint(.unknown, on: face)
+            self.closeImprintInput()
+        }
+        imprintBar.onNone = { [weak self] in
+            guard let self, let face = self.editingFace else { return }
+            self.viewModel.setImprint(.none, on: face)
+            self.closeImprintInput()
+        }
+        imprintBar.onRevert = { [weak self] in
+            guard let self, let face = self.editingFace else { return }
+            self.viewModel.revertImprint(on: face)
+            self.closeImprintInput()
+        }
         confirmButton.addTarget(self, action: #selector(confirmTapped), for: .touchUpInside)
     }
 
-    @objc private func cancelTapped() { onCancel?() }
     @objc private func confirmTapped() {
         guard let selected = currentResults.first(where: { $0.pillCode == selectedPillCode }) else { return }
         // pill_confirm — 알약 1개 확정: 몇 번째 후보·수정 횟수·수정 속성·확정까지 체류시간.
@@ -520,11 +546,7 @@ extension PillEditVC: UICollectionViewDataSource {
                     withReuseIdentifier: CandidateCell.reuseID, for: indexPath
                 ) as! CandidateCell
                 let candidate = candidates[indexPath.item]
-                cell.configure(
-                    candidate: candidate,
-                    selected: candidate.pillCode == selectedPillCode,
-                    position: .init(isFirst: indexPath.item == 0, isLast: indexPath.item == candidates.count - 1)
-                )
+                cell.configure(candidate: candidate, selected: candidate.pillCode == selectedPillCode)
                 cell.onInfoTap = { [weak self] in
                     self?.onSelectDetail?(candidate.pillCode, candidate.licenseStatus)
                 }
@@ -598,16 +620,14 @@ private extension PillEditVC {
 
     func handle(_ action: PillAttributeCardView.Action) {
         switch action {
-        case .toggleExpanded:
-            attributeCardView.setExpanded(!attributeCardView.isExpanded)
-            relayoutCard()
-
         case .colors(let anchor):
             let userColors = viewModel.conditions.colors.userValue ?? []
             let menu = ConditionGridMenuView(
                 items: Self.colorOrder.map(Self.colorItem),
                 selected: Set(userColors.map(\.rawValue)),
                 multiple: true,
+                topLabel: hasModelOutput ? "자동" : nil,
+                topSelected: viewModel.conditions.colors == .all,
                 modelPreview: modelColorPreview()
             )
             menu.onSelect = { [weak self, weak menu] id in
@@ -623,10 +643,13 @@ private extension PillEditVC {
                 items: Self.shapeOrder.map(Self.shapeItem),
                 selected: Set([viewModel.conditions.shape.userValue?.rawValue].compactMap { $0 }),
                 multiple: false,
+                topLabel: hasModelOutput ? "자동" : nil,
+                topSelected: viewModel.conditions.shape == .all,
                 modelPreview: viewModel.conditions.model.shape.map(Self.shapeIcon)
             )
-            menu.onSelect = { [weak self] id in
-                self?.viewModel.setShape(id.flatMap(PillShapeModel.init(rawValue:)))
+            menu.onSelect = { [weak self, weak menu] id in
+                // `자동` 이 없는 메뉴는 같은 값을 다시 눌러 푼다 — 메뉴가 고른 값을 들고 있다.
+                self?.viewModel.setShape(menu?.selectedIDs.first.flatMap(PillShapeModel.init(rawValue:)))
                 self?.dismissMenu?()
             }
             showMenu(menu, below: anchor, fullWidth: true, editing: "shape")
@@ -636,45 +659,24 @@ private extension PillEditVC {
                 items: Self.formulationOrder.map(Self.formulationItem),
                 selected: Set([viewModel.conditions.formulation.userValue?.rawValue].compactMap { $0 }),
                 multiple: false,
+                topLabel: hasModelOutput ? "자동" : nil,
+                topSelected: viewModel.conditions.formulation == .all,
                 modelPreview: viewModel.conditions.model.formulation.map(Self.formulationIcon)
             )
-            menu.onSelect = { [weak self] id in
-                self?.viewModel.setFormulation(id.flatMap(PillFormulationModel.init(rawValue:)))
+            menu.onSelect = { [weak self, weak menu] id in
+                self?.viewModel.setFormulation(menu?.selectedIDs.first.flatMap(PillFormulationModel.init(rawValue:)))
                 self?.dismissMenu?()
             }
             showMenu(menu, below: anchor, fullWidth: true, editing: "formulation")
 
-        case let .imprintMenu(face, anchor):
-            let current = faceConditions(face).imprint
-            let selected: Int
-            switch current {
-            case .all:   selected = 0
-            case .none:  selected = 1
-            case .value: selected = 2
-            }
-            let menu = ConditionListMenuView(options: ["전체", "없음", "입력"], selectedIndex: selected)
-            menu.onSelect = { [weak self] index in
-                guard let self else { return }
-                self.dismissMenu?()
-                switch index {
-                case 0: self.viewModel.setImprint(.all, on: face)
-                case 1: self.viewModel.setImprint(.none, on: face)
-                default: self.openImprintInput(face)
-                }
-            }
-            showMenu(menu, below: anchor, fullWidth: false, editing: "imprint")
-
         case .imprintField(let face):
             openImprintInput(face)
-
-        case .revertImprint(let face):
-            viewModel.revertImprint(on: face)
 
         case let .dividingLine(face, anchor):
             let current = faceConditions(face).dividingLine
             let selectedID: String?
             switch current {
-            case .all:                selectedID = nil
+            case .all, .unknown:      selectedID = nil
             case .none:               selectedID = "none"
             case .value(let line):    selectedID = line.rawValue
             }
@@ -686,12 +688,14 @@ private extension PillEditVC {
                 ],
                 selected: Set([selectedID].compactMap { $0 }),
                 multiple: false,
+                topLabel: "모름",
+                topSelected: current == .unknown,   // 손대지 않은 칸에는 체크가 없다
                 modelPreview: nil   // 구분선은 모델이 없다
             )
             menu.onSelect = { [weak self] id in
                 let condition: DividingLineCondition
                 switch id {
-                case nil:    condition = .all
+                case nil:    condition = .unknown
                 case "none": condition = .none
                 default:     condition = .value(DividingLineModel(rawValue: id ?? "") ?? .unknown)
                 }
@@ -702,22 +706,30 @@ private extension PillEditVC {
 
         case let .mark(face, anchor):
             let current = faceConditions(face).mark
+            // 손대지 않은 칸(-1)에는 체크가 없다.
             let selected: Int
             switch current {
-            case .all:     selected = 0
+            case .all:     selected = -1
+            case .unknown: selected = 0
             case .none:    selected = 1
             case .present: selected = 2
             }
-            let menu = ConditionListMenuView(options: ["전체", "없음", "있음"], selectedIndex: selected)
+            let menu = ConditionListMenuView(options: ["모름", "없음", "있음"], selectedIndex: selected)
             menu.onSelect = { [weak self] index in
                 guard let self else { return }
                 self.dismissMenu?()
                 // 메뉴에서 고른 `있음` 은 모델값이 아니라 사용자값이다.
-                let condition: MarkCondition = [MarkCondition.all, .none, .present(source: .user)][index]
+                let condition: MarkCondition = [MarkCondition.unknown, .none, .present(source: .user)][index]
                 self.viewModel.setMark(condition, on: face)
             }
             showMenu(menu, below: anchor, fullWidth: false, editing: "mark")
         }
+    }
+
+    /// 모델 출력이 있는가 — 없으면(수동 추가 · 추출 실패) 색 · 모양 · 제형 메뉴에 `자동` 을 두지 않는다.
+    var hasModelOutput: Bool {
+        let model = viewModel.conditions.model
+        return model.attributeToken != nil || !model.colorHexes.isEmpty || model.shape != nil || model.formulation != nil
     }
 
     func faceConditions(_ face: PillFace) -> FaceConditions {
@@ -749,7 +761,16 @@ private extension PillEditVC {
         editingAttribute = "imprint"
         let text: String
         if case .value(let value, _) = faceConditions(face).imprint { text = value } else { text = "" }
-        imprintBar.prepare(faceTitle: face == .front ? "앞면" : "뒷면", text: text)
+        // `원래 값`(사진에서 읽은 각인)은 고쳤을 때만 보인다 — 지금 값이 모델값이면 숨긴다.
+        let original = face == .front ? viewModel.conditions.model.frontImprint : nil
+        let isEdited = original != nil && faceConditions(face).imprint != .value(original ?? "", source: .model)
+        imprintBar.prepare(
+            placeholder: face == .front ? "앞면 각인" : "뒷면 각인",
+            text: text,
+            originalValue: isEdited ? original : nil
+        )
+        attributeCardView.setEditingImprint(face)
+        relayoutCard()
         imprintProxy.becomeFirstResponder()
         // 대리 필드로 키보드 + 입력 줄을 띄운 다음, 실제 입력은 줄 안의 필드로 넘긴다.
         DispatchQueue.main.async { [weak self] in self?.imprintBar.field.becomeFirstResponder() }
@@ -758,6 +779,8 @@ private extension PillEditVC {
     /// 확인하지 않고 닫으면 값은 그대로다 — 조건은 확인했을 때만 바뀐다.
     func closeImprintInput() {
         editingFace = nil
+        attributeCardView.setEditingImprint(nil)
+        relayoutCard()
         editingAttribute = "none"
         // 입력 줄의 필드는 키보드 창에 붙어 있어 view.endEditing 이 닿지 않는다 — 직접 내린다.
         imprintBar.field.resignFirstResponder()
@@ -796,21 +819,21 @@ private extension PillEditVC {
         }
         return ConditionGridItem(id: color.rawValue, label: color.menuLabel, icon: dot) { selected in
             dot.layer.borderWidth = selected ? 2 : 1
-            dot.layer.borderColor = (selected ? DSColor.Warning._700 : DSColor.Neutral._300).cgColor
+            dot.layer.borderColor = (selected ? DSColor.Primary._600 : DSColor.Neutral._300).cgColor
         }
     }
 
     static func shapeItem(_ shape: PillShapeModel) -> ConditionGridItem {
         let glyph = shapeIcon(shape)
         return ConditionGridItem(id: shape.rawValue, label: shape.menuLabel, icon: glyph) { selected in
-            glyph.setTint(selected ? DSColor.Warning._700 : DSColor.textSecondary)
+            glyph.setTint(selected ? DSColor.Primary._600 : DSColor.textSecondary)
         }
     }
 
     static func formulationItem(_ formulation: PillFormulationModel) -> ConditionGridItem {
         let icon = formulationIcon(formulation)
         return ConditionGridItem(id: formulation.rawValue, label: formulation.displayName, icon: icon) { selected in
-            let tint = selected ? DSColor.Warning._700 : DSColor.textSecondary
+            let tint = selected ? DSColor.Primary._600 : DSColor.textSecondary
             (icon as? FormulationIconView)?.setTint(tint)
             icon.tintColor = tint
         }
