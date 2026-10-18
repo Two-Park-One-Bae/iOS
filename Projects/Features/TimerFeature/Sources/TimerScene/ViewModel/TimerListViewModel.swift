@@ -61,6 +61,7 @@ public final class TimerListViewModel {
     }
     func updatePreset(_ preset: TimerPresetModel) { useCase.updatePreset(preset) }
     func deletePreset(id: UUID) { useCase.deletePreset(id: id) }
+    func movePreset(id: UUID, to index: Int) { useCase.movePreset(id: id, to: index) }
 
     func requestAlarmPermission() { useCase.requestAlarmPermission() }
     func fetchAlarmPermission() { useCase.fetchAlarmPermission() }

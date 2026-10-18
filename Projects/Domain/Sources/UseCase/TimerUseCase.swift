@@ -44,6 +44,8 @@ public protocol TimerUseCase {
     func addPreset(label: String, category: TimerCategory, duration: Int)
     func updatePreset(_ preset: TimerPresetModel)
     func deletePreset(id: UUID)
+    /// 편집 모드 드래그 정렬 — 저장 순서가 곧 노출 순서다(C3 시트 · 워치 · 위젯 공통).
+    func movePreset(id: UUID, to index: Int)
 
     // 알람 권한 — 첫 타이머 실행 직전 요청
     func requestAlarmPermission()
@@ -234,6 +236,16 @@ public final class DefaultTimerUseCase: TimerUseCase {
     public func deletePreset(id: UUID) {
         var list = presets.value
         list.removeAll { $0.id == id }
+        repository.savePresets(list)
+        presets.send(list)
+    }
+
+    public func movePreset(id: UUID, to index: Int) {
+        var list = presets.value
+        guard let from = list.firstIndex(where: { $0.id == id }) else { return }
+        let to = min(max(index, 0), list.count - 1)
+        guard from != to else { return }
+        list.insert(list.remove(at: from), at: to)
         repository.savePresets(list)
         presets.send(list)
     }
