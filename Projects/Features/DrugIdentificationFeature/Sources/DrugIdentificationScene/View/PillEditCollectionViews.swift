@@ -24,7 +24,7 @@ final class CandidateCell: UICollectionViewCell {
 
     private(set) var pillCode: String?
     var onInfoTap: (() -> Void)?
-    // 썸네일 탭 · `크게 보기` → 후보 이미지 비교 뷰어(NM-354).
+    // `크게 보기` 버튼 → 후보 이미지 비교 뷰어(NM-354). 사진을 누르면 카드 선택이다 — 뷰어를 열지 않는다.
     var onThumbnailTap: (() -> Void)?
 
     // 확대 트랜지션이 소스 프레임·이미지를 재려면 썸네일 뷰가 필요하다.
@@ -68,8 +68,6 @@ final class CandidateCell: UICollectionViewCell {
         thumb.snp.makeConstraints { $0.edges.equalToSuperview() }
         // 식약처 낱알 썸네일은 모두 256 × 140 — 카드 폭에 맞춰 같은 비율로 둔다.
         thumbBox.snp.makeConstraints { $0.height.equalTo(thumbBox.snp.width).multipliedBy(Self.thumbnailAspect) }
-        thumbBox.isUserInteractionEnabled = true
-        thumbBox.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(thumbTapped)))
         thumbBox.addSubview(licenseBadge)
         licenseBadge.snp.makeConstraints { $0.top.leading.equalToSuperview().inset(5) }
 
@@ -121,8 +119,6 @@ final class CandidateCell: UICollectionViewCell {
             $0.centerY.equalTo(thumbBox.snp.top).offset(18)
         }
     }
-
-    @objc private func thumbTapped() { onThumbnailTap?() }
 
     /// 식약처 낱알 썸네일 비율(세로 / 가로) — CDN 썸네일이 모두 256 × 140 이다(spec pillThumbnailUrl: 장변 256 · 종횡비 유지).
     static let thumbnailAspect: CGFloat = 140.0 / 256.0
