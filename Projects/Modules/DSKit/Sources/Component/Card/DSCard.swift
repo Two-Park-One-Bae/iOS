@@ -1,9 +1,10 @@
 import UIKit
 
 // MARK: - Card
-// 배경 white, cornerRadius 20, shadow(#1E293B 7%, y:2, blur:12), padding 20, gap 8
+// V2.1.0 유리 카드: 면 glassCard, cornerRadius 20, padding 20, gap 12
 // Title: Pretendard SemiBold 16, textPrimary
 // Body: Pretendard Regular 13, textSecondary, lineHeight 1.4
+// Actions(선택): 버튼을 가로로 같은 폭, gap 8 — `setActions`
 
 public final class DSCard: UIView {
 
@@ -25,11 +26,22 @@ public final class DSCard: UIView {
         return label
     }()
 
+    private let surface = DSSurfaceView(spec: .glassCard)
+
     private let stackView: UIStackView = {
         let stack = UIStackView()
         stack.axis = .vertical
-        stack.spacing = 8
+        stack.spacing = 12
         stack.translatesAutoresizingMaskIntoConstraints = false
+        return stack
+    }()
+
+    private let actionStack: UIStackView = {
+        let stack = UIStackView()
+        stack.axis = .horizontal
+        stack.spacing = 8
+        stack.distribution = .fillEqually
+        stack.isHidden = true
         return stack
     }()
 
@@ -49,15 +61,13 @@ public final class DSCard: UIView {
     // MARK: - Setup
 
     private func setupUI() {
-        backgroundColor = .white
-        layer.cornerRadius = DSRadius.xl
-        layer.shadowColor = DSColor.textPrimary.cgColor
-        layer.shadowOpacity = 0.07
-        layer.shadowOffset = CGSize(width: 0, height: 2)
-        layer.shadowRadius = 6
+        surface.frame = bounds
+        surface.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        addSubview(surface)
 
         stackView.addArrangedSubview(titleLabel)
         stackView.addArrangedSubview(bodyLabel)
+        stackView.addArrangedSubview(actionStack)
         addSubview(stackView)
 
         NSLayoutConstraint.activate([
@@ -75,6 +85,13 @@ extension DSCard {
 
     public func setTitle(_ title: String) {
         titleLabel.text = title
+    }
+
+    /// 카드 아래 버튼 줄. 빈 배열이면 줄을 숨긴다.
+    public func setActions(_ buttons: [UIButton]) {
+        actionStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        buttons.forEach(actionStack.addArrangedSubview)
+        actionStack.isHidden = buttons.isEmpty
     }
 
     public func setBody(_ body: String) {
@@ -96,6 +113,7 @@ extension DSCard {
 #if DEBUG
 #Preview("DSCard") {
     let card = DSCard(title: "카드 제목", body: "카드 본문 내용이 들어갑니다.")
+    card.setActions([SecondaryButton(title: "취소"), PrimaryButton(title: "확인")])
     card.widthAnchor.constraint(equalToConstant: 320).isActive = true
     return card
 }

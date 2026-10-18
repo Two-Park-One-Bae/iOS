@@ -14,6 +14,9 @@ import Then
 /// 되돌릴 수 없거나 흐름을 끊는 선택 앞에 세운다 — 로그아웃·계정 삭제·동의 취소가 전부 같은 모양이다
 /// (디자인: DESIGN.pen `zFi8P` · `jdS6i` · `Kf67G`).
 /// 선택지가 없는 단순 안내에는 `DSAlertCardView`(1버튼)를 쓴다.
+///
+/// V2.1.0 Modal(`uAIlL`): 유리 판(glassModal) · r24 · padding 20 · gap 16 · 제목 SemiBold 16,
+/// 버튼은 볼록 `SecondaryButton` + `PrimaryButton`/`DestructiveButton`, gap 8.
 public final class DSConfirmDialogView: UIView {
 
     /// 실행 버튼의 톤. 되돌릴 수 없는 삭제만 destructive 다.
@@ -21,10 +24,10 @@ public final class DSConfirmDialogView: UIView {
         case primary
         case destructive
 
-        var backgroundColor: UIColor {
+        func makeButton(title: String) -> BaseButton {
             switch self {
-            case .primary:     return DSColor.Primary._500
-            case .destructive: return DSColor.Error._500
+            case .primary:     return PrimaryButton(title: title)
+            case .destructive: return DestructiveButton(title: title)
             }
         }
     }
@@ -34,8 +37,7 @@ public final class DSConfirmDialogView: UIView {
 
     private let titleLabel = UILabel()
     private let messageLabel = UILabel()
-    private let cancelButton = UIButton(type: .system)
-    private let confirmButton = UIButton(type: .system)
+    private let surface = DSSurfaceView(spec: .glassModal, cornerRadius: DSRadius.xl)
 
     public init(
         title: String,
@@ -57,20 +59,14 @@ public final class DSConfirmDialogView: UIView {
         cancelTitle: String,
         confirmStyle: ConfirmStyle
     ) {
-        backgroundColor = DSColor.surface
-        layer.cornerRadius = DSRadius.lg
-        layer.masksToBounds = false
-
-        layer.shadowColor = UIColor.black.cgColor
-        layer.shadowOpacity = 0.25
-        layer.shadowOffset = CGSize(width: 0, height: 8)
-        layer.shadowRadius = 24
+        addSubview(surface)
+        surface.snp.makeConstraints { $0.edges.equalToSuperview() }
 
         snp.makeConstraints { $0.width.equalTo(300) }
 
         titleLabel.do {
             $0.text = title
-            $0.font = DSKitFontFamily.Pretendard.bold.font(size: 16)
+            $0.font = DSKitFontFamily.Pretendard.semiBold.font(size: 16)
             $0.textColor = DSColor.textPrimary
             $0.textAlignment = .center
             $0.numberOfLines = 0
@@ -85,14 +81,14 @@ public final class DSConfirmDialogView: UIView {
             $0.isHidden = (message == nil)
         }
 
-        configure(cancelButton, title: cancelTitle, background: DSColor.Neutral._100, foreground: DSColor.textPrimary)
-        configure(confirmButton, title: confirmTitle, background: confirmStyle.backgroundColor, foreground: .white)
+        let cancelButton = SecondaryButton(title: cancelTitle)
+        let confirmButton = confirmStyle.makeButton(title: confirmTitle)
         cancelButton.addTarget(self, action: #selector(cancelTapped), for: .touchUpInside)
         confirmButton.addTarget(self, action: #selector(confirmTapped), for: .touchUpInside)
 
         let buttons = UIStackView(arrangedSubviews: [cancelButton, confirmButton]).then {
             $0.axis = .horizontal
-            $0.spacing = 10
+            $0.spacing = 8
             $0.distribution = .fillEqually
         }
         buttons.snp.makeConstraints { $0.height.equalTo(48) }
@@ -102,29 +98,12 @@ public final class DSConfirmDialogView: UIView {
             $0.spacing = 6
             $0.alignment = .fill
         }
-        // 메시지가 없으면 제목 바로 아래에 버튼이 붙으므로 간격을 따로 준다(디자인: 메시지 유/무 22 · 16).
-        stack.setCustomSpacing(message == nil ? 16 : 22, after: messageLabel)
+        // 메시지가 없으면 제목 바로 아래에 버튼이 붙는다 — 어느 쪽이든 버튼 위는 16.
+        stack.setCustomSpacing(message == nil ? 16 : 6, after: titleLabel)
+        stack.setCustomSpacing(16, after: messageLabel)
 
         addSubview(stack)
-        stack.snp.makeConstraints {
-            $0.top.equalToSuperview().inset(22)
-            $0.leading.trailing.equalToSuperview().inset(20)
-            $0.bottom.equalToSuperview().inset(16)
-        }
-    }
-
-    private func configure(_ button: UIButton, title: String, background: UIColor, foreground: UIColor) {
-        var config = UIButton.Configuration.filled()
-        config.baseBackgroundColor = background
-        config.baseForegroundColor = foreground
-        config.cornerStyle = .fixed
-        config.background.cornerRadius = DSRadius.md
-
-        var attributed = AttributedString(title)
-        attributed.font = DSKitFontFamily.Pretendard.semiBold.font(size: 15)
-        config.attributedTitle = attributed
-
-        button.configuration = config
+        stack.snp.makeConstraints { $0.edges.equalToSuperview().inset(20) }
     }
 
     @objc private func cancelTapped() { onCancel?() }

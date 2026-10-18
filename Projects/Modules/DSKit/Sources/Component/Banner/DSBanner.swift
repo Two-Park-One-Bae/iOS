@@ -1,7 +1,7 @@
 import UIKit
 
 // MARK: - Banner
-// Warning 스타일: bg Warning100, stroke Warning200, icon Warning600, text Warning700
+// V2.1.0 평면 안내 띠. warning(기본)은 살구색: bg Caution50, stroke Caution300, icon Caution500, text Caution700
 // cornerRadius 12, padding (12, 14), gap 10, horizontal center
 // Icon: 18x18, Text: Pretendard Medium 13, lineHeight 1.4
 
@@ -19,7 +19,7 @@ public final class DSBanner: UIView {
             switch self {
             case .info:    return DSColor.Info._50
             case .success: return DSColor.Success._50
-            case .warning: return DSColor.Warning._50
+            case .warning: return DSColor.Caution._50
             case .error:   return DSColor.Error._50
             }
         }
@@ -28,7 +28,7 @@ public final class DSBanner: UIView {
             switch self {
             case .info:    return DSColor.Info._100
             case .success: return DSColor.Success._100
-            case .warning: return DSColor.Warning._100
+            case .warning: return DSColor.Caution._300
             case .error:   return DSColor.Error._100
             }
         }
@@ -37,7 +37,7 @@ public final class DSBanner: UIView {
             switch self {
             case .info:    return DSColor.Info._500
             case .success: return DSColor.Success._500
-            case .warning: return DSColor.Warning._600
+            case .warning: return DSColor.Caution._500
             case .error:   return DSColor.Error._500
             }
         }
@@ -46,7 +46,7 @@ public final class DSBanner: UIView {
             switch self {
             case .info:    return DSColor.Info._600
             case .success: return DSColor.Success._600
-            case .warning: return DSColor.Warning._700
+            case .warning: return DSColor.Caution._700
             case .error:   return DSColor.Error._600
             }
         }
@@ -97,7 +97,7 @@ public final class DSBanner: UIView {
     // MARK: - Setup
 
     private func setupUI() {
-        layer.cornerRadius = 12
+        layer.cornerRadius = DSRadius.md
 
         messageLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
@@ -151,7 +151,7 @@ extension DSBanner {
             attributes: [
                 .paragraphStyle: style,
                 .font: font,
-                .foregroundColor: messageLabel.textColor ?? DSColor.Warning._700
+                .foregroundColor: messageLabel.textColor ?? DSColor.Caution._700
             ]
         )
     }

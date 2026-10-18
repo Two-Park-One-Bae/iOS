@@ -113,8 +113,6 @@ public final class SettingsViewController: UIViewController {
     /// 이용약관·개인정보처리방침 링크 행을 따로 두지 않는다 — 들어간 화면의 `보기`로 확인한다 (spec NM-548).
     private func makeConsentsRow() -> UIView {
         let row = DSListRow(style: .compact, icon: .fileText, title: "약관 및 동의", subtitle: "")
-        row.setIconBackground(DSColor.Primary._50)
-        row.setIconTint(DSColor.Primary._500)
         row.onTap { [weak self] in self?.onConsentsTapped?() }
         return row
     }
@@ -126,8 +124,6 @@ public final class SettingsViewController: UIViewController {
             title: "로그아웃",
             subtitle: "언제든 다시 로그인할 수 있어요"
         )
-        row.setIconBackground(DSColor.Primary._50)
-        row.setIconTint(DSColor.Primary._500)
         row.onTap { [weak self] in self?.onLogoutTapped?() }
         return row
     }
@@ -136,7 +132,6 @@ public final class SettingsViewController: UIViewController {
         // 되돌릴 수 없는 액션이라 제목까지 Error 색으로 둔다 (디자인 Xoc5z).
         let row = DSListRow(style: .compact, icon: .userX, title: "계정 삭제", subtitle: "")
         row.setTitleColor(DSColor.Error._600)
-        row.setIconBackground(DSColor.Error._50)
         row.setIconTint(DSColor.Error._600)
         row.onTap { [weak self] in self?.onDeleteAccountTapped?() }
         return row

@@ -1,7 +1,8 @@
 import UIKit
 
 // MARK: - Chip Style
-// 칩의 배경/테두리/강조(dot·아이콘)/라벨 색 묶음. 기본 info(파랑), secondary(teal) 프리셋 제공.
+// 칩의 배경/테두리/강조(dot·아이콘)/라벨 색 묶음.
+// 기본 neutral(V2.1.0 표시용 칩 — 회색 평면, 테두리 없음). info(파랑), secondary(teal) 프리셋도 둔다.
 
 public struct DSChipStyle {
 
@@ -17,6 +18,13 @@ public struct DSChipStyle {
         self.accent = accent
         self.label = label
     }
+
+    public static let neutral = DSChipStyle(
+        background: DSColor.Neutral._100,
+        border: .clear,
+        accent: DSColor.textSecondary,
+        label: DSColor.textPrimary
+    )
 
     public static let info = DSChipStyle(
         background: DSColor.Info._50,
@@ -34,9 +42,10 @@ public struct DSChipStyle {
 }
 
 // MARK: - Chip
-// 배경 style.background, stroke style.border 1px, cornerRadius 20 (pill)
-// padding (8, 14), gap 6
-// 좌측: icon 지정 시 14x14 아이콘(accent tint), 아니면 14x14 dot ring(accent). Label Medium 13 (label)
+// V2.1.0 평면 · 표시용(누르지 않는다). 누르는 칩은 `DSDropdownChip`.
+// 높이 30, 배경 style.background, stroke style.border 1px(투명이면 없음), 캡슐
+// padding (0, 12), gap 6
+// 좌측: icon 지정 시 14x14 아이콘(accent tint), showDot이면 14x14 dot ring(accent). Label Medium 13 (label)
 
 public final class DSChip: UIView {
 
@@ -57,8 +66,8 @@ public final class DSChip: UIView {
     ///   - text: 라벨 텍스트
     ///   - icon: 좌측 아이콘. 지정하면 dot 대신 아이콘을 그린다.
     ///   - showDot: icon이 nil일 때만 유효 — dot ring 표시 여부.
-    ///   - style: 색 스타일(기본 info).
-    public init(text: String, icon: DSIcon? = nil, showDot: Bool = true, style: DSChipStyle = .info) {
+    ///   - style: 색 스타일(기본 neutral).
+    public init(text: String, icon: DSIcon? = nil, showDot: Bool = false, style: DSChipStyle = .neutral) {
         self.leadingView = DSChip.makeLeadingView(icon: icon, showDot: showDot, style: style)
         super.init(frame: .zero)
         label.text = text
@@ -98,9 +107,8 @@ public final class DSChip: UIView {
 
     private func setupUI(style: DSChipStyle) {
         backgroundColor = style.background
-        layer.cornerRadius = 20
         layer.borderColor = style.border.cgColor
-        layer.borderWidth = 1
+        layer.borderWidth = style.border == .clear ? 0 : 1
 
         let stack = UIStackView(arrangedSubviews: [leadingView, label])
         stack.axis = .horizontal
@@ -110,11 +118,16 @@ public final class DSChip: UIView {
 
         addSubview(stack)
         NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: topAnchor, constant: 8),
-            stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 14),
-            stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -14),
-            stack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -8)
+            heightAnchor.constraint(equalToConstant: 30),
+            stack.centerYAnchor.constraint(equalTo: centerYAnchor),
+            stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
+            stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12)
         ])
+    }
+
+    public override func layoutSubviews() {
+        super.layoutSubviews()
+        layer.cornerRadius = bounds.height / 2
     }
 }
 
@@ -132,9 +145,9 @@ extension DSChip {
 #if DEBUG
 #Preview("DSChip") {
     let stack = UIStackView(arrangedSubviews: [
-        DSChip(text: "라벨"),
+        DSChip(text: "표시용"),
         DSChip(text: "활성 타이머 2", icon: .timer, style: .secondary),
-        DSChip(text: "분류", showDot: false)
+        DSChip(text: "분류", showDot: true, style: .info)
     ])
     stack.axis = .vertical
     stack.spacing = 8
