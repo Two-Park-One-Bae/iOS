@@ -266,39 +266,17 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
             self?.trackButton("add_pill", screen: "identify_result")
             self?.showManualAdd()
         }
-        vc.onConfirm = { [weak self] in
-            self?.showFinalResult()
-        }
-        replace(loadingVC, with: vc)
-    }
-
-    // MARK: - ⑨ 최종 결과
-
-    private func showFinalResult() {
-        guard let resultVC else { return }
-        let results = resultVC.finalizedResults()
-        guard !results.isEmpty else { return }
-
-        let pills = results.map(\.pill)
-        let candidates = Dictionary(uniqueKeysWithValues: results.map { ($0.pill.index, $0.candidate) })
-
-        let vc = FinalResultVC(pills: pills, candidates: candidates)
-        vc.onBackTapped = { [weak self] in
-            self?.navigationController.popViewController(animated: true)
-        }
-        // 공유는 FinalResultVC 가 시스템 공유 시트(텍스트+PDF)를 직접 띄운다(PillShareComposer).
-        // 완료 → 기록 저장 → 들어온 화면으로 (NM-552).
-        let pillCodes = results.map(\.candidate.pillCode)
+        // 완료 → 기록 저장 → 들어온 화면으로 (NM-552 · NM-587). 결과 화면이 최종 결과를 겸한다.
         vc.onComplete = { [weak self, weak vc] in
             guard let self, let vc else { return }
-            self.saveHistory(pillCodes: pillCodes, from: vc)
+            self.saveHistory(from: vc)
         }
-        // ⑨ 카드 탭 → ⑩ 세부정보 진입 (NM-317)
+        // 식별 완료 카드 ⓘ → 세부정보 (NM-317)
         vc.onSelectDetail = { [weak self] pillCode, licenseStatus in
-            self?.trackButton("pill_detail", screen: "final_result")
+            self?.trackButton("pill_detail", screen: "identify_result")
             self?.showPillDetail(pillCode: pillCode, licenseStatus: licenseStatus)
         }
-        navigationController.pushViewController(vc, animated: true)
+        replace(loadingVC, with: vc)
     }
 
     // MARK: - ⑩ 세부정보
@@ -469,11 +447,12 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
         historyId = nil
     }
 
-    // MARK: - ⑨ 완료 → 기록 저장 (NM-552)
+    // MARK: - ⑤ 완료 → 기록 저장 (NM-552)
 
-    /// 확정한 품목을 저장한다. 성공하면 들어온 화면으로, 실패하면 화면에 남아 모달을 띄운다.
-    private func saveHistory(pillCodes: [String], from vc: FinalResultVC) {
-        guard let historyId else {
+    /// 확정한 품목을 화면 순서대로 저장한다. 성공하면 들어온 화면으로, 실패하면 화면에 남아 모달을 띄운다.
+    private func saveHistory(from vc: DrugIdentificationVC) {
+        let pillCodes = vc.finalizedResults().map(\.candidate.pillCode)
+        guard let historyId, !pillCodes.isEmpty else {
             exitToEntry()
             return
         }
@@ -481,13 +460,21 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
         historyUseCase.saveHistory(historyId: historyId, pillCodes: pillCodes)
             .receive(on: DispatchQueue.main)
             .sink { [weak self, weak vc] completion in
-                guard case .failure(let error) = completion, let vc else { return }
+                guard case .failure(let error) = completion, let self, let vc else { return }
                 vc.setSaving(false)
-                self?.presentSaveFailure(error, on: vc, pillCodes: pillCodes)
-            } receiveValue: { [weak self] in
+                // 400 은 같은 요청이 같은 결과라 다시 시도를 두지 않는다.
+                vc.showSaveFailure(
+                    canRetry: !(error is PillHistoryRejectedError),
+                    onExit: { [weak self] in self?.exitToEntry() },
+                    onRetry: { [weak self, weak vc] in
+                        guard let vc else { return }
+                        self?.saveHistory(from: vc)
+                    }
+                )
+            } receiveValue: { [weak self, weak vc] in
                 guard let self else { return }
-                // 완주(완료 버튼) — ⑤ 전원 확정 상태라 미확정=0.
-                if let s = self.resultVC?.identificationSummary() {
+                // 완주(완료 버튼) — 미확정이 남았어도 종료 확인을 거쳐 끝낸 경우를 함께 센다.
+                if let s = vc?.identificationSummary() {
                     AppAnalytics.track(.pillIdentifyComplete(
                         detectedCount: s.detectedCount, confirmedCount: s.confirmedCount,
                         deletedCount: s.deletedCount, manualAddedCount: s.manualAddedCount))
@@ -495,38 +482,6 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
                 self.exitToEntry()
             }
             .store(in: &cancelBag)
-    }
-
-    /// 저장 실패 — 통신 · 서버면 `나가기` / `다시 시도`, 요청이 잘못됐다는 응답(400)이면 `나가기`만.
-    /// `나가기`는 저장하지 않고 들어온 화면으로 간다.
-    private func presentSaveFailure(_ error: Error, on vc: FinalResultVC, pillCodes: [String]) {
-        let title = "식별 결과를 저장하지 못했어요"
-        guard !(error is PillHistoryRejectedError) else {
-            DSAlertCardView.present(
-                on: vc.view,
-                title: title,
-                message: "이 결과는 기록에 남길 수 없어요",
-                confirmTitle: "나가기"
-            ) { [weak self] in self?.exitToEntry() }
-            return
-        }
-
-        let card = ConfirmCardView(
-            title: title,
-            message: "네트워크 연결을 확인하고 다시 시도해 주세요",
-            cancelTitle: "나가기",
-            confirmTitle: "다시 시도"
-        )
-        vc.presentConfirmCard(card, dismissOnBackgroundTap: false) { [weak self, weak vc] in
-            guard let vc else { return }
-            self?.saveHistory(pillCodes: pillCodes, from: vc)
-        }
-        // ConfirmCardView 의 취소 자리가 `나가기`다 — dim 을 걷는 기본 동작 뒤에 이어서 나간다.
-        let dismiss = card.onCancel
-        card.onCancel = { [weak self] in
-            dismiss?()
-            self?.exitToEntry()
-        }
     }
 
     // MARK: - 기록 상세 (NM-552)

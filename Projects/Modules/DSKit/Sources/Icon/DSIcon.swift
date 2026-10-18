@@ -182,4 +182,9 @@ public enum DSIcon: String {
         UIImage(named: rawValue, in: .module, compatibleWith: nil)?
             .withRenderingMode(.alwaysTemplate) ?? UIImage()
     }
+
+    /// 지정한 크기(pt)로 그린 템플릿 이미지 — 버튼처럼 이미지 고유 크기로 그려지는 곳에 쓴다(벡터라 선명하다).
+    public func uiImage(size: CGFloat) -> UIImage {
+        uiImage.resized(to: CGSize(width: size, height: size))
+    }
 }
