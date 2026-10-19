@@ -1,7 +1,7 @@
 import UIKit
 
 // MARK: - Nav Bar
-// 높이 56, 배경 BgApp, 좌측 뒤로가기 버튼 56x56(chevron-left 아이콘 26), 중앙 제목 SemiBold 17, 우측 56x56 spacer
+// V2.1.0: 높이 56, 배경 Surface, 좌측 뒤로가기 버튼 56x56(chevron-left 아이콘 26), 중앙 제목 SemiBold 17, 우측 56x56 spacer
 
 public final class DSNavBar: UIView {
 
@@ -69,7 +69,7 @@ public final class DSNavBar: UIView {
 
 
     private func setupUI() {
-        backgroundColor = DSColor.bgApp
+        backgroundColor = DSColor.surface
 
         let stack = UIStackView(arrangedSubviews: [backButton, titleLabel, spacer])
         stack.axis = .horizontal

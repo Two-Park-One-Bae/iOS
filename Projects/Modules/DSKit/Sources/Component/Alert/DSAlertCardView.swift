@@ -12,9 +12,12 @@ import Then
 /// 확인 1버튼 알럿 카드 (콘텐츠 전용 — dim/positioning은 `present(on:)`가 담당).
 ///
 /// 대안 액션이 없는 안내에 쓴다. 선택지가 있으면 바텀시트나 2버튼 카드를 쓸 것.
+/// 판은 V2.1.0 Modal과 같다 — `DSConfirmDialogView` 참고.
 public final class DSAlertCardView: UIView {
 
     public var onConfirm: (() -> Void)?
+
+    private let surface = DSSurfaceView(spec: .glassModal, cornerRadius: DSRadius.xl)
 
     private let titleLabel = UILabel()
     private let messageLabel = UILabel()
@@ -27,20 +30,14 @@ public final class DSAlertCardView: UIView {
     required init?(coder: NSCoder) { fatalError() }
 
     private func setup(title: String, message: String?, confirmTitle: String) {
-        backgroundColor = DSColor.surface
-        layer.cornerRadius = DSRadius.lg
-        layer.masksToBounds = false
-
-        layer.shadowColor = UIColor.black.cgColor
-        layer.shadowOpacity = 0.25
-        layer.shadowOffset = CGSize(width: 0, height: 8)
-        layer.shadowRadius = 24
+        addSubview(surface)
+        surface.snp.makeConstraints { $0.edges.equalToSuperview() }
 
         snp.makeConstraints { $0.width.equalTo(300) }
 
         titleLabel.do {
             $0.text = title
-            $0.font = DSKitFontFamily.Pretendard.bold.font(size: 16)
+            $0.font = DSKitFontFamily.Pretendard.semiBold.font(size: 16)
             $0.textColor = DSColor.textPrimary
             $0.textAlignment = .center
             $0.numberOfLines = 0
@@ -65,14 +62,11 @@ public final class DSAlertCardView: UIView {
             $0.alignment = .fill
         }
         // 버튼 위쪽 추가 여백
+        stack.setCustomSpacing(message == nil ? 16 : 8, after: titleLabel)
         stack.setCustomSpacing(16, after: messageLabel)
 
         addSubview(stack)
-        stack.snp.makeConstraints {
-            $0.top.equalToSuperview().inset(22)
-            $0.leading.trailing.equalToSuperview().inset(20)
-            $0.bottom.equalToSuperview().inset(16)
-        }
+        stack.snp.makeConstraints { $0.edges.equalToSuperview().inset(20) }
     }
 
     @objc private func confirmTapped() { onConfirm?() }

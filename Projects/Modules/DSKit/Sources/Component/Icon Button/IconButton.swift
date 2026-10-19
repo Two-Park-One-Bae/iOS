@@ -1,9 +1,11 @@
 import UIKit
 
 // MARK: - Icon Button
-// 원형 40x40, 배경 Neutral100, 아이콘 22x22 TextPrimary
+// V2.1.0 볼록 · 흰색 원형 40x40: 면 surface→raised-neutral-bottom, 테두리 Neutral200 1px, 아이콘 20x20 TextPrimary
 
 public final class IconButton: UIButton {
+
+    private let surface = DSSurfaceView(spec: .raisedNeutral(), cornerRadius: nil)
 
     public init(icon: DSIcon) {
         super.init(frame: .zero)
@@ -20,22 +22,27 @@ public final class IconButton: UIButton {
     }
 
     private func configure(icon: DSIcon) {
-        configure(image: icon.uiImage)
+        configure(image: icon.uiImage.resized(to: CGSize(width: 20, height: 20)))
     }
 
     private func configure(image: UIImage?) {
-        var config = UIButton.Configuration.filled()
-        config.baseBackgroundColor = DSColor.Neutral._100
+        var config = UIButton.Configuration.plain()
         config.baseForegroundColor = DSColor.textPrimary
-        config.cornerStyle = .capsule
+        config.background.backgroundColor = .clear
         config.image = image
         config.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(
-            pointSize: 22, weight: .regular
+            pointSize: 17, weight: .semibold
         )
-        config.contentInsets = NSDirectionalEdgeInsets(
-            top: 9, leading: 9, bottom: 9, trailing: 9
-        )
+        config.contentInsets = .zero
         configuration = config
+
+        surface.frame = bounds
+        surface.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        insertSubview(surface, at: 0)
+
+        configurationUpdateHandler = { [weak self] button in
+            self?.surface.alpha = button.isHighlighted ? 0.85 : 1
+        }
 
         NSLayoutConstraint.activate([
             widthAnchor.constraint(equalToConstant: 40),

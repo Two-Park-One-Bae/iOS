@@ -1,11 +1,11 @@
 import UIKit
 
 // MARK: - List Row
-// 아이콘 + 제목/부제 + chevron 한 줄. 두 가지 크기가 있다.
+// 아이콘 + 제목/부제 + chevron 한 줄. 면은 V2.1.0 유리 목록 카드(glassListCard, r20).
 //
-// .default (홈 카드)   r20 · padding 20 · gap 16 · iconBg 56(r16)/icon 28 · 제목 16 · 부제 13
-// .compact (설정 행)   r14 · padding 14/16 · gap 12 · iconBg 40(r10)/icon 20 · 제목 14 · 부제 12
-//   — 디자인: DESIGN.pen `Xoc5z` 계정 섹션
+// .default (홈 카드)   padding 20 · gap 16 · iconBg 56(r16)/icon 28 · 제목 16 → 부제 13
+// .compact (V2.1.0 List Row) padding 16 · gap 12 · icon 24(배경 없음, Neutral700) · 부제 12 → 제목 15 · chevron 20
+//   — 디자인: DESIGN.pen `h4TX4` (Component V2.1.0 / List Row). 부제가 제목 위에 온다.
 
 public final class DSListRow: UIView {
 
@@ -13,28 +13,28 @@ public final class DSListRow: UIView {
         case `default`
         case compact
 
-        var cornerRadius: CGFloat { self == .default ? 20 : 14 }
-        var verticalPadding: CGFloat { self == .default ? 20 : 14 }
+        var verticalPadding: CGFloat { self == .default ? 20 : 16 }
         var horizontalPadding: CGFloat { self == .default ? 20 : 16 }
         var spacing: CGFloat { self == .default ? 16 : 12 }
-        var iconBackgroundLength: CGFloat { self == .default ? 56 : 40 }
-        var iconBackgroundRadius: CGFloat { self == .default ? 16 : 10 }
-        var iconLength: CGFloat { self == .default ? 28 : 20 }
-        var chevronSize: CGFloat { self == .default ? 16 : 18 }
-        var shadowOpacity: Float { self == .default ? 0.07 : 0.04 }
-        var shadowOffset: CGSize { self == .default ? CGSize(width: 0, height: 2) : CGSize(width: 0, height: 1) }
+        var iconBackgroundLength: CGFloat { self == .default ? 56 : 24 }
+        var iconBackgroundRadius: CGFloat { self == .default ? 16 : 0 }
+        var iconLength: CGFloat { self == .default ? 28 : 24 }
+        var chevronLength: CGFloat { self == .default ? 16 : 20 }
+        var iconTint: UIColor { self == .default ? DSColor.Info._500 : DSColor.Neutral._700 }
+        var iconBackgroundColor: UIColor { self == .default ? DSColor.Info._50 : .clear }
+        var chevronTint: UIColor { self == .default ? DSColor.Neutral._400 : DSColor.textSecondary }
+        /// V2.1.0 List Row는 부제를 제목 위에 둔다.
+        var subtitleFirst: Bool { self == .compact }
 
         var titleFont: UIFont {
-            DSKitFontFamily.Pretendard.semiBold.font(size: self == .default ? 16 : 14)
+            DSKitFontFamily.Pretendard.semiBold.font(size: self == .default ? 16 : 15)
         }
 
         var subtitleFont: UIFont {
             DSKitFontFamily.Pretendard.regular.font(size: self == .default ? 13 : 12)
         }
 
-        var subtitleColor: UIColor {
-            self == .default ? DSColor.textSecondary : DSColor.textTertiary
-        }
+        var subtitleColor: UIColor { DSColor.textSecondary }
     }
 
     // MARK: - Properties
@@ -43,9 +43,10 @@ public final class DSListRow: UIView {
 
     // MARK: - UI
 
+    private let surface = DSSurfaceView(spec: .glassListCard)
+
     private let iconImageView: UIImageView = {
         let iv = UIImageView()
-        iv.tintColor = DSColor.Info._500
         iv.contentMode = .scaleAspectFit
         iv.translatesAutoresizingMaskIntoConstraints = false
         return iv
@@ -53,7 +54,6 @@ public final class DSListRow: UIView {
 
     private let iconBackground: UIView = {
         let view = UIView()
-        view.backgroundColor = DSColor.Info._50
         view.translatesAutoresizingMaskIntoConstraints = false
         return view
     }()
@@ -78,7 +78,6 @@ public final class DSListRow: UIView {
 
     private let chevronView: UIImageView = {
         let iv = UIImageView()
-        iv.tintColor = DSColor.Neutral._400
         iv.contentMode = .scaleAspectFit
         iv.translatesAutoresizingMaskIntoConstraints = false
         return iv
@@ -104,18 +103,15 @@ public final class DSListRow: UIView {
     // MARK: - Setup
 
     private func setupUI() {
-        backgroundColor = .white
-        layer.cornerRadius = style.cornerRadius
-        layer.shadowColor = DSColor.textPrimary.cgColor
-        layer.shadowOpacity = style.shadowOpacity
-        layer.shadowOffset = style.shadowOffset
-        layer.shadowRadius = 6
+        surface.frame = bounds
+        surface.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        addSubview(surface)
 
+        iconImageView.tintColor = style.iconTint
+        iconBackground.backgroundColor = style.iconBackgroundColor
         iconBackground.layer.cornerRadius = style.iconBackgroundRadius
-        chevronView.image = UIImage(
-            systemName: "chevron.right",
-            withConfiguration: UIImage.SymbolConfiguration(pointSize: style.chevronSize, weight: .medium)
-        )
+        chevronView.image = DSIcon.chevronRight.uiImage
+        chevronView.tintColor = style.chevronTint
 
         iconBackground.addSubview(iconImageView)
         NSLayoutConstraint.activate([
@@ -124,12 +120,17 @@ public final class DSListRow: UIView {
             iconImageView.widthAnchor.constraint(equalToConstant: style.iconLength),
             iconImageView.heightAnchor.constraint(equalToConstant: style.iconLength),
             iconImageView.centerXAnchor.constraint(equalTo: iconBackground.centerXAnchor),
-            iconImageView.centerYAnchor.constraint(equalTo: iconBackground.centerYAnchor)
+            iconImageView.centerYAnchor.constraint(equalTo: iconBackground.centerYAnchor),
+            chevronView.widthAnchor.constraint(equalToConstant: style.chevronLength),
+            chevronView.heightAnchor.constraint(equalToConstant: style.chevronLength)
         ])
 
-        let textStack = UIStackView(arrangedSubviews: [titleLabel, subtitleLabel, captionLabel])
+        let labels = style.subtitleFirst
+            ? [subtitleLabel, titleLabel, captionLabel]
+            : [titleLabel, subtitleLabel, captionLabel]
+        let textStack = UIStackView(arrangedSubviews: labels)
         textStack.axis = .vertical
-        textStack.spacing = style == .default ? 4 : 2
+        textStack.spacing = style == .default ? 4 : 1
         textStack.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
         chevronView.setContentHuggingPriority(.required, for: .horizontal)
@@ -200,7 +201,9 @@ extension DSListRow {
         captionLabel.isHidden = (text == nil)
     }
 
+    /// 아이콘 뒤 둥근 판 색(.default 전용). .compact는 V2.1.0 디자인대로 판 없이 아이콘만 둔다.
     public func setIconBackground(_ color: UIColor) {
+        guard style == .default else { return }
         iconBackground.backgroundColor = color
     }
 
@@ -232,7 +235,8 @@ private final class DSListRowTapRecognizer: UITapGestureRecognizer {
 #Preview("DSListRow") {
     let stack = UIStackView(arrangedSubviews: [
         DSListRow(icon: .heart, title: "항목 제목", subtitle: "부가 설명"),
-        DSListRow(style: .compact, icon: .user, title: "로그아웃", subtitle: "언제든 다시 로그인할 수 있어요"),
+        DSListRow(style: .compact, icon: .logOut, title: "로그아웃", subtitle: "언제든 다시 로그인할 수 있어요"),
+        DSListRow(style: .compact, icon: .fileText, title: "약관 및 동의", subtitle: ""),
     ])
     stack.axis = .vertical
     stack.spacing = 12

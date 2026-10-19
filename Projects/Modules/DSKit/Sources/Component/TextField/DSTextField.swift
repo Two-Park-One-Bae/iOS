@@ -1,11 +1,20 @@
 import UIKit
 
 // MARK: - Text Field
+// V2.1.0 평면 입력 칸
 // Label: Pretendard Medium 13 textSecondary, gap 6
-// Field: white bg, cornerRadius 12, stroke Neutral200 1px, padding (14, 16)
-// Placeholder: Pretendard Regular 15 Neutral400
+// Field: surface bg, cornerRadius 12, padding (13, 14), Value Regular 15
+//   기본   — stroke Border 1px,      placeholder textTertiary
+//   포커스 — stroke Primary500 1.5px
+//   오류   — stroke Error500 1.5px    (`setError(true)`)
+//   비활성 — bg Neutral100, 테두리 없음, 글자 textTertiary (`setEnabled(false)`)
 
 public final class DSTextField: UIView {
+
+    // MARK: - Properties
+
+    private var isError = false
+    private var isEditingField = false
 
     // MARK: - UI
 
@@ -20,13 +29,11 @@ public final class DSTextField: UIView {
         let tf = UITextField()
         tf.font = DSKitFontFamily.Pretendard.regular.font(size: 15)
         tf.textColor = DSColor.textPrimary
-        tf.backgroundColor = .white
-        tf.layer.cornerRadius = 12
-        tf.layer.borderColor = DSColor.Neutral._200.cgColor
-        tf.layer.borderWidth = 1
-        tf.leftView = UIView(frame: CGRect(x: 0, y: 0, width: 16, height: 0))
+        tf.backgroundColor = DSColor.surface
+        tf.layer.cornerRadius = DSRadius.md
+        tf.leftView = UIView(frame: CGRect(x: 0, y: 0, width: 14, height: 0))
         tf.leftViewMode = .always
-        tf.rightView = UIView(frame: CGRect(x: 0, y: 0, width: 16, height: 0))
+        tf.rightView = UIView(frame: CGRect(x: 0, y: 0, width: 14, height: 0))
         tf.rightViewMode = .always
         tf.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
@@ -40,14 +47,9 @@ public final class DSTextField: UIView {
     public init(label: String, placeholder: String) {
         super.init(frame: .zero)
         titleLabel.text = label
-        textField.attributedPlaceholder = NSAttributedString(
-            string: placeholder,
-            attributes: [
-                .foregroundColor: DSColor.Neutral._400,
-                .font: DSKitFontFamily.Pretendard.regular.font(size: 15)
-            ]
-        )
+        setPlaceholder(placeholder)
         setupUI()
+        applyState()
     }
 
     public required init?(coder: NSCoder) {
@@ -69,6 +71,43 @@ public final class DSTextField: UIView {
             stack.trailingAnchor.constraint(equalTo: trailingAnchor),
             stack.bottomAnchor.constraint(equalTo: bottomAnchor)
         ])
+
+        textField.addTarget(self, action: #selector(editingDidBegin), for: .editingDidBegin)
+        textField.addTarget(self, action: #selector(editingDidEnd), for: .editingDidEnd)
+    }
+
+    @objc private func editingDidBegin() {
+        isEditingField = true
+        applyState()
+    }
+
+    @objc private func editingDidEnd() {
+        isEditingField = false
+        applyState()
+    }
+
+    /// 상태 우선순위: 비활성 > 오류 > 포커스 > 기본
+    private func applyState() {
+        let field = textField
+        if !field.isEnabled {
+            field.backgroundColor = DSColor.Neutral._100
+            field.textColor = DSColor.textTertiary
+            field.layer.borderWidth = 0
+            return
+        }
+
+        field.backgroundColor = DSColor.surface
+        field.textColor = DSColor.textPrimary
+        if isError {
+            field.layer.borderColor = DSColor.Error._500.cgColor
+            field.layer.borderWidth = 1.5
+        } else if isEditingField {
+            field.layer.borderColor = DSColor.Primary._500.cgColor
+            field.layer.borderWidth = 1.5
+        } else {
+            field.layer.borderColor = DSColor.border.cgColor
+            field.layer.borderWidth = 1
+        }
     }
 }
 
@@ -84,10 +123,21 @@ extension DSTextField {
         textField.attributedPlaceholder = NSAttributedString(
             string: text,
             attributes: [
-                .foregroundColor: DSColor.Neutral._400,
+                .foregroundColor: DSColor.textTertiary,
                 .font: DSKitFontFamily.Pretendard.regular.font(size: 15)
             ]
         )
+    }
+
+    /// 오류 테두리(Error500). 안내 문구는 화면이 따로 둔다.
+    public func setError(_ isError: Bool) {
+        self.isError = isError
+        applyState()
+    }
+
+    public func setEnabled(_ isEnabled: Bool) {
+        textField.isEnabled = isEnabled
+        applyState()
     }
 
     public var text: String? {
@@ -100,8 +150,18 @@ extension DSTextField {
 
 #if DEBUG
 #Preview("DSTextField") {
-    let field = DSTextField(label: "라벨", placeholder: "입력하세요")
-    field.widthAnchor.constraint(equalToConstant: 320).isActive = true
-    return field
+    let normal = DSTextField(label: "라벨", placeholder: "입력하세요")
+    let error = DSTextField(label: "라벨", placeholder: "입력하세요")
+    error.text = "AST"
+    error.setError(true)
+    let disabled = DSTextField(label: "라벨", placeholder: "입력하세요")
+    disabled.text = "AST"
+    disabled.setEnabled(false)
+
+    let stack = UIStackView(arrangedSubviews: [normal, error, disabled])
+    stack.axis = .vertical
+    stack.spacing = 16
+    stack.widthAnchor.constraint(equalToConstant: 320).isActive = true
+    return stack
 }
 #endif
