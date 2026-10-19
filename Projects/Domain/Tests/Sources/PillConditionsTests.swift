@@ -242,4 +242,26 @@ final class PillConditionsTests: XCTestCase {
         XCTAssertNil(q.attributeToken)
         XCTAssertEqual(q, PillCandidateQuery(attributeToken: nil, colors: [], shape: nil, formulation: nil, front: nil, back: nil))
     }
+
+    // MARK: - 모름 (V2.1.0 NM-588)
+
+    func test_모름은_회색이고_조건을_보내지_않는다_손대지_않음과_같다() {
+        var c = PillConditions(model: .empty)
+        c.setImprint(.unknown, on: .back)
+        c.setDividingLine(.unknown, on: .back)
+        c.setMark(.unknown, on: .back)
+
+        XCTAssertEqual(c.back.imprint.tone, .estimate)
+        XCTAssertEqual(c.back.dividingLine.tone, .estimate)
+        XCTAssertEqual(c.back.mark.tone, .estimate)
+        XCTAssertNil(c.query.back)
+        XCTAssertTrue(c.query.isWithoutInput)
+    }
+
+    func test_모름에서_되돌리면_모델_확신_글자로_돌아간다() {
+        var c = PillConditions(model: model)
+        c.setImprint(.unknown, on: .front)
+        c.revertImprint(on: .front)
+        XCTAssertEqual(c.front.imprint, .value("AX", source: .model))
+    }
 }

@@ -3,8 +3,8 @@ import SnapKit
 import Then
 import DSKit
 
-// 촬영 사진을 담는 흰색 카드 (④ 로딩 / ⑤ 결과 / ⑥ 결과없음 공용)
-// 300x300 정방형 사진 + 8pt 패딩 + 그림자
+// 촬영 사진을 담는 유리 카드 (④ 로딩 / ⑤ 결과 / ⑥ 결과없음 공용, V2.1.0)
+// 300x300 정방형 사진(r14) + 8pt 패딩, 면 glassCard(r20)
 final class PhotoCardView: UIView {
 
     let photoImageView = UIImageView().then {
@@ -27,13 +27,10 @@ final class PhotoCardView: UIView {
     required init?(coder: NSCoder) { fatalError() }
 
     private func setup(photoSize: CGFloat) {
-        backgroundColor = DSColor.Neutral._0
-        layer.cornerRadius = 20
-        layer.masksToBounds = false
-        layer.shadowColor = DSColor.textPrimary.cgColor
-        layer.shadowOpacity = 0.12
-        layer.shadowOffset = CGSize(width: 0, height: 4)
-        layer.shadowRadius = 16
+        let surface = DSSurfaceView(spec: .glassCard)
+        surface.frame = bounds
+        surface.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        addSubview(surface)
 
         photoContainer.addSubview(photoImageView)
         addSubview(photoContainer)

@@ -22,25 +22,8 @@ final class PillNotFoundVC: UIViewController {
         $0.translatesAutoresizingMaskIntoConstraints = false
     }
 
-    private let photoCard = UIView().then {
-        $0.backgroundColor = DSColor.Neutral._0
-        $0.layer.cornerRadius = 20
-        $0.layer.shadowColor = UIColor.black.cgColor
-        $0.layer.shadowOpacity = 0.12
-        $0.layer.shadowOffset = CGSize(width: 0, height: 4)
-        $0.layer.shadowRadius = 16
-        $0.layer.masksToBounds = false
-    }
-
-    private let photoContainer = UIView().then {
-        $0.layer.cornerRadius = 14
-        $0.clipsToBounds = true
-    }
-
-    private let photoImageView = UIImageView().then {
-        $0.contentMode = .scaleAspectFill
-        $0.clipsToBounds = true
-    }
+    // 사진 카드는 로딩 · 결과 화면과 같은 유리 카드 — 사진 위에 어둡게 덮고 아이콘을 얹는다.
+    private let photoCard = PhotoCardView()
 
     private let dimOverlay = UIView().then {
         $0.backgroundColor = DSColor.Neutral._900.withAlphaComponent(0.55)
@@ -92,8 +75,8 @@ final class PillNotFoundVC: UIViewController {
     // MARK: - Setup
 
     private func setUI() {
-        view.backgroundColor = DSColor.bgApp
-        photoImageView.image = image
+        view.backgroundColor = DSColor.surface
+        photoCard.setImage(image)
         navBar.onBackTapped = { [weak self] in self?.onBackTapped?() }
     }
 
@@ -104,15 +87,7 @@ final class PillNotFoundVC: UIViewController {
             $0.leading.trailing.equalToSuperview()
         }
 
-        photoCard.addSubview(photoContainer)
-        photoContainer.snp.makeConstraints {
-            $0.edges.equalToSuperview().inset(8)
-            $0.size.equalTo(300)
-        }
-
-        photoContainer.addSubview(photoImageView)
-        photoImageView.snp.makeConstraints { $0.edges.equalToSuperview() }
-
+        let photoContainer = photoCard.photoContainer
         photoContainer.addSubview(dimOverlay)
         dimOverlay.snp.makeConstraints { $0.edges.equalToSuperview() }
 
@@ -149,7 +124,7 @@ final class PillNotFoundVC: UIViewController {
         view.addSubview(footerStack)
         footerStack.snp.makeConstraints {
             $0.leading.trailing.equalToSuperview().inset(20)
-            $0.bottom.equalTo(view.safeAreaLayoutGuide).offset(-28)
+            $0.bottom.equalTo(view.safeAreaLayoutGuide).offset(-12)
         }
     }
 

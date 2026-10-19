@@ -10,8 +10,6 @@ final class PhotoPreviewVC: UIViewController {
     // MARK: - Callbacks
 
     var onRetake: (() -> Void)?
-    /// 촬영 중단 → 홈 복귀. 뒤로 탭 시 확인 팝업을 거쳐 호출된다.
-    var onExitToHome: (() -> Void)?
     var onUsePhoto: (() -> Void)?
 
     // MARK: - Properties
@@ -73,6 +71,18 @@ final class PhotoPreviewVC: UIViewController {
 
     // MARK: - Lifecycle
 
+    // 화면 가장자리를 밀어 뒤로 가는 것도 재촬영과 같아야 한다 — 시스템 pop 은 촬영을 다시 열지 않으므로 막고,
+    // 대신 같은 제스처를 재촬영으로 받는다.
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        navigationController?.interactivePopGestureRecognizer?.isEnabled = false
+    }
+
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        navigationController?.interactivePopGestureRecognizer?.isEnabled = true
+    }
+
     override func viewDidLoad() {
         super.viewDidLoad()
         navigationController?.setNavigationBarHidden(true, animated: false)
@@ -84,7 +94,7 @@ final class PhotoPreviewVC: UIViewController {
     // MARK: - Setup
 
     private func setUI() {
-        view.backgroundColor = DSColor.bgApp
+        view.backgroundColor = DSColor.surface
         photoImageView.image = capturedImage
     }
 
@@ -120,28 +130,34 @@ final class PhotoPreviewVC: UIViewController {
         // 남은 횟수는 '이 사진 사용' 위에 놓는다. 숨김 상태면 스택에서 자동으로 접힌다.
         let bottomStack = UIStackView(arrangedSubviews: [usageLabel, actionBar]).then {
             $0.axis = .vertical
-            $0.spacing = 8
+            $0.spacing = 10
         }
 
         view.addSubview(bottomStack)
         bottomStack.snp.makeConstraints {
             $0.top.equalTo(contentFrame.snp.bottom).offset(12)
             $0.leading.trailing.equalToSuperview().inset(20)
-            $0.bottom.equalTo(view.safeAreaLayoutGuide).offset(-28)
+            $0.bottom.equalTo(view.safeAreaLayoutGuide).offset(-12)
         }
     }
 
     private func setActions() {
-        navBar.onBackTapped = { [weak self] in
-            self?.presentExitConfirm(title: "지금 나가면 촬영한 사진이 사라져요") {
-                self?.onExitToHome?()
-            }
-        }
+        // 뒤로 = 재촬영 — 확인을 묻지 않는다. 잃는 것이 사진 한 장이라 다시 찍으면 되고,
+        // 경로마다 동작이 갈리면 어느 쪽으로 나갔는지에 따라 상태가 달라진다(spec 촬영 → 미리보기 §재촬영·뒤로).
+        navBar.onBackTapped = { [weak self] in self?.onRetake?() }
         retakeButton.addTarget(self, action: #selector(retakeTapped), for: .touchUpInside)
+        let edgeSwipe = UIScreenEdgePanGestureRecognizer(target: self, action: #selector(edgeSwiped(_:)))
+        edgeSwipe.edges = .left
+        view.addGestureRecognizer(edgeSwipe)
         usePhotoButton.addTarget(self, action: #selector(usePhotoTapped), for: .touchUpInside)
     }
 
     // MARK: - Actions
+
+    @objc private func edgeSwiped(_ gesture: UIScreenEdgePanGestureRecognizer) {
+        guard gesture.state == .ended, gesture.translation(in: view).x > 60 else { return }
+        onRetake?()
+    }
 
     @objc private func retakeTapped() {
         onRetake?()

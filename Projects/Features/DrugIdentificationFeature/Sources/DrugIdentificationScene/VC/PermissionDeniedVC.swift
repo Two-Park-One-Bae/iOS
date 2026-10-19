@@ -44,7 +44,8 @@ public final class PermissionDeniedVC: UIViewController {
     }
 
     private let settingsButton = PrimaryButton(title: "설정으로 이동")
-    private let galleryButton = TextButton(title: "갤러리에서 선택하기")
+    // 결과 없음 화면의 `갤러리에서 선택`과 같은 이름 · 모양 (spec: 권한 거부 우회 경로).
+    private let galleryButton = SecondaryButton(title: "갤러리에서 선택")
 
     // MARK: - Init
 
@@ -67,7 +68,7 @@ public final class PermissionDeniedVC: UIViewController {
     // MARK: - Setup
 
     private func setUI() {
-        view.backgroundColor = DSColor.bgApp
+        view.backgroundColor = DSColor.surface
         navBar.onBackTapped = { [weak self] in self?.onBackTapped?() }
     }
 
@@ -103,17 +104,18 @@ public final class PermissionDeniedVC: UIViewController {
             $0.leading.trailing.equalToSuperview().inset(40)
         }
 
+        // 두 버튼 모두 화면 폭 — 갤러리는 볼록 보조 버튼이다 (V2.1.0 ③).
         let footerStack = UIStackView(arrangedSubviews: [settingsButton, galleryButton]).then {
             $0.axis = .vertical
-            $0.spacing = 4
-            $0.alignment = .center
+            $0.spacing = 10
+            $0.alignment = .fill
         }
 
         view.addSubview(footerStack)
         settingsButton.snp.makeConstraints { $0.leading.trailing.equalToSuperview() }
         footerStack.snp.makeConstraints {
             $0.leading.trailing.equalToSuperview().inset(20)
-            $0.bottom.equalTo(view.safeAreaLayoutGuide).offset(-28)
+            $0.bottom.equalTo(view.safeAreaLayoutGuide).offset(-12)
         }
     }
 

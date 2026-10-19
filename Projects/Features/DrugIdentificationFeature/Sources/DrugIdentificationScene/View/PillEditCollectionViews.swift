@@ -11,54 +11,47 @@ import Kingfisher
 
 // MARK: - 후보 셀
 
-/// 후보 1개 (라디오 + 서버 낱알 썸네일 + 이름/회사 + ⓘ). 서브뷰는 init 에서 1회만 만들고
-/// configure 로 내용만 갈아끼워 재사용한다(=행마다 새 뷰 생성 안 함).
+/// 후보 카드 1개 — V2.1.0 2열 격자(NM-588 ②). 서브뷰는 init 에서 1회만 만들고 configure 로 내용만 갈아끼운다.
+///
+/// 유리 목록 카드(r20, padding 7 · 10 · 8 · 10, gap 5)
+/// - 낱알 사진: 카드 폭 · r12, 식약처 썸네일 비율(256 × 140) 그대로 — 자르지도 비우지도 않는다. 오른쪽 위 `크게 보기`(유리 아이콘 버튼),
+///   허가 종료 배지는 사진 왼쪽 위에 얹는다 — 카드 높이를 같게 두기 위해서다.
+/// - 품목명 SemiBold 13 한 줄 말줄임 · 세부정보(ⓘ, 흰 볼록 원 24)
+/// - 면 요약 한 줄(넘치면 앞 / 뒤 두 줄). 업체명은 두지 않는다.
+/// 고르면 파란 테두리 2.
 final class CandidateCell: UICollectionViewCell {
     static let reuseID = "CandidateCell"
 
-    /// 목록이 흰 카드 하나로 묶여 보이도록, 칸마다 제 위치에 맞는 모서리 · 테두리를 그린다(DESIGN.pen NM-490 S-4).
-    struct Position {
-        let isFirst: Bool
-        let isLast: Bool
-    }
-
     private(set) var pillCode: String?
     var onInfoTap: (() -> Void)?
-    // 썸네일 탭 → 후보 이미지 비교 뷰어(NM-354).
+    // `크게 보기` 버튼 → 후보 이미지 비교 뷰어(NM-354). 사진을 누르면 카드 선택이다 — 뷰어를 열지 않는다.
     var onThumbnailTap: (() -> Void)?
 
     // 확대 트랜지션이 소스 프레임·이미지를 재려면 썸네일 뷰가 필요하다.
     var thumbnailView: UIImageView { thumb }
 
-    private var position = Position(isFirst: true, isLast: true)
-    private let border = CAShapeLayer()
-    private let ring = UIView().then {
-        $0.layer.cornerRadius = 10
-        $0.layer.borderWidth = 2
-    }
-    private let dot = UIView().then {
-        $0.backgroundColor = DSColor.Primary._500
-        $0.layer.cornerRadius = 5
-        $0.isHidden = true
+    private let surface = DSSurfaceView(spec: .glassListCard)
+    private let thumbBox = UIView().then {
+        $0.backgroundColor = DSColor.Neutral._100
+        $0.layer.cornerRadius = DSRadius.md
+        $0.clipsToBounds = true
     }
     private let thumb = UIImageView().then {
-        $0.backgroundColor = DSColor.Neutral._100
-        $0.layer.cornerRadius = 6
-        $0.clipsToBounds = true
-        $0.contentMode = .scaleAspectFill
+        $0.contentMode = .scaleAspectFit
     }
+    private let zoomButton = GlassIconButton(icon: .openInFull)
     private let nameLabel = UILabel().then {
-        $0.font = DSKitFontFamily.Pretendard.semiBold.font(size: 14)
+        $0.font = DSKitFontFamily.Pretendard.semiBold.font(size: 13)
         $0.textColor = DSColor.textPrimary
-    }
-    private let companyLabel = UILabel().then {
-        $0.font = DSKitFontFamily.Pretendard.regular.font(size: 11)
-        $0.textColor = DSColor.textTertiary
+        $0.lineBreakMode = .byTruncatingTail
     }
     // 허가 취소·취하(REVOKED) 품목에만 노출. 기본 숨김 — configure에서 결정.
-    private let licenseBadge = LicenseRevokedBadge().then { $0.isHidden = true }
+    private let licenseBadge = LicenseRevokedBadge(compact: true).then { $0.isHidden = true }
     private let faceSummary = CandidateFaceSummaryView()
-    private let info = UIButton(type: .system)
+    /// 면 요약 자리 — 같은 줄 짝 카드가 두 줄이면 한 줄짜리도 같은 높이를 잡아 카드 높이를 맞춘다.
+    private let faceSummaryBox = UIView()
+    private var faceSummaryHeight: Constraint?
+    private let info = UIControl()
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -67,94 +60,87 @@ final class CandidateCell: UICollectionViewCell {
     required init?(coder: NSCoder) { fatalError() }
 
     private func setup() {
-        contentView.backgroundColor = DSColor.Neutral._0
-        contentView.layer.cornerRadius = 14
-        contentView.clipsToBounds = true
-        border.fillColor = UIColor.clear.cgColor
-        border.lineWidth = 1
-        layer.addSublayer(border)
+        surface.frame = contentView.bounds
+        surface.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        contentView.addSubview(surface)
 
-        let radio = UIView()
-        radio.addSubview(ring)
-        ring.addSubview(dot)
-        radio.snp.makeConstraints { $0.width.height.equalTo(20) }
-        ring.snp.makeConstraints { $0.edges.equalToSuperview() }
-        dot.snp.makeConstraints { $0.center.equalToSuperview(); $0.width.height.equalTo(10) }
+        thumbBox.addSubview(thumb)
+        thumb.snp.makeConstraints { $0.edges.equalToSuperview() }
+        // 식약처 낱알 썸네일은 모두 256 × 140 — 카드 폭에 맞춰 같은 비율로 둔다.
+        thumbBox.snp.makeConstraints { $0.height.equalTo(thumbBox.snp.width).multipliedBy(Self.thumbnailAspect) }
+        thumbBox.addSubview(licenseBadge)
+        licenseBadge.snp.makeConstraints { $0.top.leading.equalToSuperview().inset(5) }
 
-        thumb.snp.makeConstraints { $0.width.equalTo(48); $0.height.equalTo(28) }
-        thumb.isUserInteractionEnabled = true
-        thumb.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(thumbTapped)))
+        // `크게 보기`는 사진 칸 밖으로 누르는 영역(44)이 넘치므로 카드에 얹는다.
+        zoomButton.accessibilityLabel = "크게 보기"
+        zoomButton.addAction(UIAction { [weak self] _ in self?.onThumbnailTap?() }, for: .touchUpInside)
 
-        // 1줄: 이름 · 업체 · '허가 종료' — 이름이 길면 이름만 말줄임, 업체 · 배지는 고정.
-        let nameRow = UIStackView(arrangedSubviews: [nameLabel, companyLabel, licenseBadge, UIView()]).then {
-            $0.axis = .horizontal
-            $0.spacing = 5
-            $0.alignment = .center
+        // 세부정보 — 흰 볼록 원(24) 위에 ⓘ(16). 면이 아이콘을 덮지 않게 아이콘을 따로 얹는다.
+        let infoSurface = DSSurfaceView(spec: .raisedNeutral(), cornerRadius: nil)
+        infoSurface.isUserInteractionEnabled = false
+        let infoIcon = UIImageView(image: DSIcon.info.uiImage).then {
+            $0.tintColor = DSColor.Primary._500
+            $0.contentMode = .scaleAspectFit
+            $0.isUserInteractionEnabled = false
         }
-        nameLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        [companyLabel, licenseBadge].forEach {
-            $0.setContentHuggingPriority(.required, for: .horizontal)
-            $0.setContentCompressionResistancePriority(.required, for: .horizontal)
-        }
-
-        // 2줄: 면 요약(앞 | 뒤).
-        let texts = UIStackView(arrangedSubviews: [nameRow, faceSummary]).then {
-            $0.axis = .vertical
-            $0.spacing = 3
-            $0.alignment = .leading
-        }
-        nameRow.snp.makeConstraints { $0.width.equalTo(texts) }
-        // 면 요약이 넘치면 줄 안에서 각인이 줄어든다(칸 밖으로 밀려나지 않게).
-        faceSummary.snp.makeConstraints { $0.width.lessThanOrEqualTo(texts) }
-
-        info.setImage(DSIcon.info.uiImage, for: .normal)
-        info.tintColor = DSColor.Primary._500
+        info.addSubview(infoSurface)
+        info.addSubview(infoIcon)
+        infoSurface.snp.makeConstraints { $0.edges.equalToSuperview() }
+        infoIcon.snp.makeConstraints { $0.center.equalToSuperview(); $0.width.height.equalTo(16) }
+        info.isAccessibilityElement = true
+        info.accessibilityTraits = .button
         info.accessibilityLabel = "세부정보"
         info.addAction(UIAction { [weak self] _ in self?.onInfoTap?() }, for: .touchUpInside)
-        info.snp.makeConstraints { $0.width.height.equalTo(28) }
+        info.snp.makeConstraints { $0.width.height.equalTo(24) }
 
-        let row = UIStackView(arrangedSubviews: [radio, thumb, texts, info]).then {
+        nameLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        let nameRow = UIStackView(arrangedSubviews: [nameLabel, info]).then {
             $0.axis = .horizontal
-            $0.spacing = 10
+            $0.spacing = 4
             $0.alignment = .center
         }
-        contentView.addSubview(row)
-        row.snp.makeConstraints {
-            $0.top.bottom.equalToSuperview().inset(9)
-            $0.leading.trailing.equalToSuperview().inset(12)
+        nameLabel.snp.makeConstraints { $0.height.equalTo(18) }
+
+        faceSummaryBox.addSubview(faceSummary)
+        faceSummary.snp.makeConstraints { $0.top.leading.equalToSuperview(); $0.trailing.lessThanOrEqualToSuperview() }
+        faceSummaryBox.snp.makeConstraints { faceSummaryHeight = $0.height.equalTo(CandidateFaceSummaryView.lineHeight).constraint }
+
+        let stack = UIStackView(arrangedSubviews: [thumbBox, nameRow, faceSummaryBox]).then {
+            $0.axis = .vertical
+            $0.spacing = 5
+            $0.alignment = .fill
+        }
+        contentView.addSubview(stack)
+        stack.snp.makeConstraints { $0.edges.equalToSuperview().inset(UIEdgeInsets(top: 7, left: 10, bottom: 8, right: 10)) }
+
+        contentView.addSubview(zoomButton)
+        zoomButton.snp.makeConstraints {
+            $0.centerX.equalTo(thumbBox.snp.trailing).offset(-18)
+            $0.centerY.equalTo(thumbBox.snp.top).offset(18)
         }
     }
 
-    @objc private func thumbTapped() { onThumbnailTap?() }
+    /// 식약처 낱알 썸네일 비율(세로 / 가로) — CDN 썸네일이 모두 256 × 140 이다(spec pillThumbnailUrl: 장변 256 · 종횡비 유지).
+    static let thumbnailAspect: CGFloat = 140.0 / 256.0
 
-    /// 업체명은 4자를 넘으면 말줄임 — 이름에 자리를 내준다(spec pill-recognition 후보 목록).
-    private static func shortCompany(_ name: String) -> String {
-        name.count > 4 ? String(name.prefix(4)) + "…" : name
-    }
-
-    func configure(candidate: PillCandidateModel, selected: Bool, position: Position) {
+    /// - Parameters:
+    ///   - stacked: 이 카드의 면 요약이 카드 폭을 넘는다 — `앞` / `뒤` 두 줄로 내린다(각인은 자르지 않는다).
+    ///   - rowStacked: 같은 줄 짝 카드 중 하나라도 두 줄 — 높이를 맞춘다.
+    func configure(candidate: PillCandidateModel, selected: Bool, stacked: Bool, rowStacked: Bool) {
         pillCode = candidate.pillCode
         nameLabel.text = candidate.pillName ?? "이름 미상"
-        companyLabel.text = candidate.companyName.map(Self.shortCompany)
-        companyLabel.isHidden = candidate.companyName == nil
         licenseBadge.isHidden = candidate.licenseStatus != .revoked
-        faceSummary.configure(front: candidate.front, back: candidate.back)
-        self.position = position
-        var corners: CACornerMask = []
-        if position.isFirst { corners.formUnion([.layerMinXMinYCorner, .layerMaxXMinYCorner]) }
-        if position.isLast { corners.formUnion([.layerMinXMaxYCorner, .layerMaxXMaxYCorner]) }
-        contentView.layer.maskedCorners = corners
-        setNeedsLayout()
+        faceSummary.configure(front: candidate.front, back: candidate.back, stacked: stacked)
+        faceSummaryHeight?.update(offset: rowStacked ? CandidateFaceSummaryView.stackedHeight : CandidateFaceSummaryView.lineHeight)
 
-        // 서버 썸네일(pillThumbnailUrl, 장변 256px)을 Kingfisher로 로드. 셀 표시 크기(48×28)로
-        // 다운샘플 → 디코드·메모리 절감.
+        // 서버 썸네일(pillThumbnailUrl, 장변 256px)을 Kingfisher로 로드 — 카드 사진 칸 크기로 다운샘플.
         thumb.kf.cancelDownloadTask()
         thumb.image = nil
         if let urlString = candidate.pillThumbnailUrl, let url = URL(string: urlString) {
             thumb.kf.setImage(
                 with: url,
                 options: [
-                    .processor(DownsamplingImageProcessor(size: CGSize(width: 48, height: 28))),
+                    .processor(DownsamplingImageProcessor(size: CGSize(width: 180, height: 180 * Self.thumbnailAspect))),
                     .scaleFactor(UIScreen.main.scale),
                     .cacheOriginalImage,
                     .transition(.fade(0.2)),
@@ -164,25 +150,17 @@ final class CandidateCell: UICollectionViewCell {
         setSelected(selected)
     }
 
-    /// 고르면 행 배경이 연파랑 · 라디오가 채워진다(테두리는 그대로).
+    /// 고르면 파란 테두리 2.
     func setSelected(_ selected: Bool) {
-        dot.isHidden = !selected
-        ring.layer.borderColor = (selected ? DSColor.Primary._500 : DSColor.Neutral._400).cgColor
-        contentView.backgroundColor = selected ? DSColor.Primary._50 : DSColor.Neutral._0
+        surface.spec = selected
+            ? DSSurfaceSpec(
+                fills: DSSurfaceSpec.glassListCard.fills,
+                stroke: .solid(DSColor.Primary._500),
+                strokeWidth: 2,
+                shadows: DSSurfaceSpec.glassListCard.shadows
+            )
+            : .glassListCard
         accessibilityTraits = selected ? [.button, .selected] : .button
-    }
-
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        // 첫 칸이 아니면 윗선을 1pt 위로 올려 앞 칸의 아랫선과 겹친다 — 칸 사이 구분선이 두 겹이 되지 않는다.
-        let top: CGFloat = position.isFirst ? 0.5 : -0.5
-        let rect = CGRect(x: 0.5, y: top, width: bounds.width - 1, height: bounds.height - 0.5 - top)
-        var corners: UIRectCorner = []
-        if position.isFirst { corners.formUnion([.topLeft, .topRight]) }
-        if position.isLast { corners.formUnion([.bottomLeft, .bottomRight]) }
-        border.path = UIBezierPath(roundedRect: rect, byRoundingCorners: corners,
-                                   cornerRadii: CGSize(width: 13.5, height: 13.5)).cgPath
-        border.strokeColor = DSColor.Neutral._200.resolvedColor(with: traitCollection).cgColor
     }
 
     override func prepareForReuse() {
@@ -203,29 +181,50 @@ final class CandidateCell: UICollectionViewCell {
 /// 면에 아무것도 없으면 `—`.
 final class CandidateFaceSummaryView: UIStackView {
 
+    /// 칸 높이 18 — 한 줄 / 두 줄(앞 · 뒤, 사이 3).
+    static let lineHeight: CGFloat = 18
+    static let stackedHeight: CGFloat = 18 * 2 + 3
+
     init() {
         super.init(frame: .zero)
         axis = .horizontal
-        spacing = 6
+        spacing = 4
         alignment = .center
     }
     required init(coder: NSCoder) { fatalError() }
 
-    func configure(front: PillFaceModel?, back: PillFaceModel?) {
+    /// - Parameter stacked: 카드 폭을 넘으면 `앞` / `뒤` 두 줄로 내린다 — 각인은 자르지 않는다(이 화면에서 가장 중요한 단서).
+    func configure(front: PillFaceModel?, back: PillFaceModel?, stacked: Bool = false) {
         arrangedSubviews.forEach { $0.removeFromSuperview() }
+        axis = stacked ? .vertical : .horizontal
+        spacing = stacked ? 3 : 4
+        alignment = stacked ? .leading : .center
         addArrangedSubview(faceGroup("앞", front))
-        addArrangedSubview(UIView().then {
-            $0.backgroundColor = DSColor.Neutral._300
-            $0.snp.makeConstraints { $0.width.equalTo(1); $0.height.equalTo(10) }
-        })
+        if !stacked {
+            addArrangedSubview(UIView().then {
+                $0.backgroundColor = DSColor.Neutral._300
+                $0.snp.makeConstraints { $0.width.equalTo(1); $0.height.equalTo(12) }
+            })
+        }
         addArrangedSubview(faceGroup("뒤", back))
         accessibilityLabel = "앞면 \(Self.spoken(front)), 뒷면 \(Self.spoken(back))"
+    }
+
+    /// 한 줄로 그렸을 때의 폭 — 카드 안쪽 폭과 견줘 두 줄로 내릴지 정한다.
+    static func singleLineWidth(front: PillFaceModel?, back: PillFaceModel?) -> CGFloat {
+        let probe = CandidateFaceSummaryView()
+        probe.configure(front: front, back: back, stacked: false)
+        return probe.systemLayoutSizeFitting(
+            CGSize(width: UIView.layoutFittingExpandedSize.width, height: lineHeight),
+            withHorizontalFittingPriority: .fittingSizeLevel,
+            verticalFittingPriority: .required
+        ).width
     }
 
     private func faceGroup(_ title: String, _ face: PillFaceModel?) -> UIView {
         var items: [UIView] = [UILabel().then {
             $0.text = title
-            $0.font = DSKitFontFamily.Pretendard.semiBold.font(size: 10)
+            $0.font = DSKitFontFamily.Pretendard.semiBold.font(size: 11)
             $0.textColor = DSColor.textTertiary
         }]
         if let imprint = face?.imprint, !imprint.isEmpty { items.append(imprintCell(imprint)) }
@@ -245,40 +244,37 @@ final class CandidateFaceSummaryView: UIStackView {
         }
     }
 
-    private func box(fill: UIColor) -> UIView {
+    /// 흰 바탕 + 연한 테두리, r4, 높이 18.
+    private func box() -> UIView {
         UIView().then {
-            $0.backgroundColor = fill
+            $0.backgroundColor = DSColor.surface
             $0.layer.cornerRadius = 4
             $0.layer.borderWidth = 1
-            $0.layer.borderColor = DSColor.Neutral._300.cgColor
-            $0.snp.makeConstraints { $0.height.equalTo(22) }
+            $0.layer.borderColor = DSColor.Neutral._200.cgColor
+            $0.snp.makeConstraints { $0.height.equalTo(Self.lineHeight) }
         }
     }
 
     private func imprintCell(_ imprint: String) -> UIView {
-        let cell = box(fill: DSColor.Neutral._100)
+        let cell = box()
         let label = UILabel().then {
-            // 넘치면 각인만 말줄임 — 구분선 · 마크 칸은 지킨다(spec).
-            $0.lineBreakMode = .byTruncatingTail
-            $0.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
             $0.attributedText = NSAttributedString(string: imprint, attributes: [
-                .font: DSKitFontFamily.Pretendard.bold.font(size: 12),
+                .font: DSKitFontFamily.Pretendard.bold.font(size: 11),
                 .foregroundColor: DSColor.textPrimary,
-                .kern: 0.5,
             ])
+            $0.setContentCompressionResistancePriority(.required, for: .horizontal)
         }
         cell.addSubview(label)
-        label.snp.makeConstraints { $0.centerY.equalToSuperview(); $0.leading.trailing.equalToSuperview().inset(5) }
-        cell.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        label.snp.makeConstraints { $0.centerY.equalToSuperview(); $0.leading.trailing.equalToSuperview().inset(4) }
         return cell
     }
 
     private func dividingCell(_ line: DividingLineModel) -> UIView {
-        let cell = box(fill: DSColor.Neutral._100)
-        cell.snp.makeConstraints { $0.width.equalTo(22) }
+        let cell = box()
+        cell.snp.makeConstraints { $0.width.equalTo(Self.lineHeight) }
         let glyph = DividingLineGlyphView(line: line, tint: DSColor.Neutral._700)
         cell.addSubview(glyph)
-        glyph.snp.makeConstraints { $0.center.equalToSuperview(); $0.width.height.equalTo(15) }
+        glyph.snp.makeConstraints { $0.center.equalToSuperview(); $0.width.height.equalTo(12) }
         return cell
     }
 
@@ -296,12 +292,13 @@ final class CandidateFaceSummaryView: UIStackView {
     /// 식약처 마크 그림 — 에셋 `PillMarks/{markCode}`(여백을 잘라 낸 흑백 GIF 150px, 같은 파일이 S3 assets/pill-marks).
     /// 앱에 없는 코드(데이터 갱신으로 새로 생긴 마크)는 일반 마크 아이콘으로 '있음'만 보인다.
     private func markCell(code: String?) -> UIView {
-        let cell = box(fill: DSColor.Neutral._0)
-        cell.snp.makeConstraints { $0.width.equalTo(22) }
+        let cell = box()
+        cell.snp.makeConstraints { $0.width.equalTo(Self.lineHeight) }
         let icon: UIImageView
         if let code, let image = Self.markImage(code) {
+            // 칸 안쪽 1pt 여백(spec 면 요약 칸).
             icon = UIImageView(image: image).then { $0.contentMode = .scaleAspectFit }
-            icon.snp.makeConstraints { $0.width.height.equalTo(18) }
+            icon.snp.makeConstraints { $0.width.height.equalTo(Self.lineHeight - 2) }
         } else {
             icon = UIImageView(image: UIImage(systemName: "seal",
                                               withConfiguration: UIImage.SymbolConfiguration(pointSize: 12, weight: .semibold)))
@@ -329,23 +326,23 @@ final class CandidateFaceSummaryView: UIStackView {
 
 /// 허가 취소·취하(REVOKED) 품목 표시 배지 — 품목명 옆 (XGm3Z).
 /// warning-50 배경 / warning-100 테두리 1px / warning-700 텍스트 10pt, radius 4, padding (2,6).
+/// V2.1.0: 살구색 태그 — 배경 Caution50 · 글자 Caution700 Medium 11 · r8. 테두리 없음.
+/// compact(후보 사진 위)는 여백 1 · 5, 기본(결과 · 기록 행)은 3 · 8.
 final class LicenseRevokedBadge: UIView {
-    init() {
+    init(compact: Bool = false) {
         super.init(frame: .zero)
-        backgroundColor = DSColor.Warning._50
-        layer.cornerRadius = 4
-        layer.borderWidth = 1
-        layer.borderColor = DSColor.Warning._100.cgColor
+        backgroundColor = DSColor.Caution._50
+        layer.cornerRadius = DSRadius.sm
 
         let label = UILabel().then {
             $0.text = "허가 종료"
-            $0.font = DSKitFontFamily.Pretendard.medium.font(size: 10)
-            $0.textColor = DSColor.Warning._700
+            $0.font = DSKitFontFamily.Pretendard.medium.font(size: 11)
+            $0.textColor = DSColor.Caution._700
         }
         addSubview(label)
         label.snp.makeConstraints {
-            $0.top.bottom.equalToSuperview().inset(1)
-            $0.leading.trailing.equalToSuperview().inset(5)
+            $0.top.bottom.equalToSuperview().inset(compact ? 1 : 3)
+            $0.leading.trailing.equalToSuperview().inset(compact ? 5 : 8)
         }
     }
     required init?(coder: NSCoder) { fatalError() }

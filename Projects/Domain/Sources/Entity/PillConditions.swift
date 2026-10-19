@@ -14,9 +14,9 @@ import Foundation
 
 /// 칸이 **확실한 값**인지. 필터인지 점수인지가 아니다 — 계약에서 필터·점수가 바뀌어도 화면 규칙은 그대로다.
 public enum ConditionTone: Equatable {
-    /// 회색 — `전체`(조건 없음), 모델이 추정한 색·모양·제형.
+    /// 회색 — 손대지 않음 · `모름`(조건 없음), 모델이 추정한 색·모양·제형.
     case estimate
-    /// 호박색 — 모델이 확신한 각인·마크 유무, 사용자가 정한 모든 값.
+    /// 파랑(V2.1.0, 출시된 앱은 호박색) — 모델이 확신한 각인·마크 유무, 사용자가 정한 모든 값.
     case confirmed
 }
 
@@ -127,7 +127,10 @@ public enum AppearanceCondition<Value: Equatable>: Equatable {
     }
 }
 
-// MARK: - 면 (각인 · 구분선 · 마크) — 3단
+// MARK: - 면 (각인 · 구분선 · 마크) — 4단 (V2.1.0 NM-588)
+//
+// 손대지 않음(`all`) / `모름`(`unknown`) / `없음`(`none`) / 값.
+// `모름`은 사용자가 모른다고 고른 칸 — 검색에서는 손대지 않음과 같다(조건 없음). 앱이 스스로 `모름`을 채우지는 않는다.
 
 /// 값의 출처. 각인은 요청에 그대로 실린다(`imprintSource`) — 서버가 이걸 보고 매칭 엄격도를 정한다
 /// (모델값은 확신 글자만이라 사이 글자가 빠져 있을 수 있다). 마크는 칸 표시에만 쓴다.
@@ -136,38 +139,45 @@ public enum ValueSource: Equatable {
     case user
 }
 
-/// 각인 한 칸 — `전체 · 없음 · 값`.
+/// 각인 한 칸 — 손대지 않음 · `모름` · `없음` · 값.
 public enum ImprintCondition: Equatable {
+    /// 손대지 않음 — 칩에 회색 `입력`.
     case all
-    /// 각인 없는 알약만. **사용자만** 고른다(입력칸을 비우고 확인).
+    /// 사용자가 모른다고 고른 칸 — 조건 없음.
+    case unknown
+    /// 각인 없는 알약만. **사용자만** 고른다(입력 줄의 `각인 없음`).
     case none
     case value(String, source: ValueSource)
 
     public var tone: ConditionTone {
-        self == .all ? .estimate : .confirmed
+        self == .all || self == .unknown ? .estimate : .confirmed
     }
 }
 
-/// 구분선 한 칸 — `전체 · 없음 · (+)형 · (−)형`. 모델이 없어 모든 값이 사용자값이다.
+/// 구분선 한 칸 — 손대지 않음 · `모름` · `없음` · (+)형 · (−)형. 모델이 없어 모든 값이 사용자값이다.
 public enum DividingLineCondition: Equatable {
+    /// 손대지 않음 — 칩에 회색 `선택`.
     case all
+    case unknown
     case none
     case value(DividingLineModel)
 
     public var tone: ConditionTone {
-        self == .all ? .estimate : .confirmed
+        self == .all || self == .unknown ? .estimate : .confirmed
     }
 }
 
-/// 마크 유무 한 칸 — `전체 · 없음 · 있음`.
+/// 마크 유무 한 칸 — 손대지 않음 · `모름` · `없음` · `있음`.
 public enum MarkCondition: Equatable {
+    /// 손대지 않음 — 칩에 회색 `선택`.
     case all
+    case unknown
     /// 마크 없는 알약만. **사용자만** 고른다 — 모델이 마크를 놓치고 `없음` 을 보내면 정답이 통째로 빠진다.
     case none
     case present(source: ValueSource)
 
     public var tone: ConditionTone {
-        self == .all ? .estimate : .confirmed
+        self == .all || self == .unknown ? .estimate : .confirmed
     }
 }
 
@@ -246,7 +256,7 @@ public struct PillConditions: Equatable {
         update(face) { $0.imprint = trimmed.isEmpty ? .none : .value(trimmed, source: .user) }
     }
 
-    /// 각인 드롭다운에서 `전체` / `없음` 을 고른 경우.
+    /// 입력 줄의 `모름` / `각인 없음`.
     public mutating func setImprint(_ condition: ImprintCondition, on face: PillFace) {
         update(face) { $0.imprint = condition }
     }
@@ -294,14 +304,14 @@ public struct PillConditions: Equatable {
     private static func faceQuery(_ face: FaceConditions, embedding: [Float]?) -> PillFaceQuery? {
         let imprint: (String, ValueSource)?
         switch face.imprint {
-        case .all:                      imprint = nil
+        case .all, .unknown:            imprint = nil
         case .none:                     imprint = ("", .user)
         case .value(let text, let src): imprint = (text, src)
         }
 
         let dividingLine: PillDividingLineQuery?
         switch face.dividingLine {
-        case .all:            dividingLine = nil
+        case .all, .unknown:  dividingLine = nil
         case .none:           dividingLine = PillDividingLineQuery.none
         case .value(.plus):   dividingLine = .plus
         case .value(.minus):  dividingLine = .minus
@@ -310,7 +320,7 @@ public struct PillConditions: Equatable {
 
         let hasMark: Bool?
         switch face.mark {
-        case .all:     hasMark = nil
+        case .all, .unknown: hasMark = nil
         case .none:    hasMark = false
         case .present: hasMark = true
         }

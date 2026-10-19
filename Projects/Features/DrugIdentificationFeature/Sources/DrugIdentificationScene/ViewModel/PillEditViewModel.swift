@@ -48,8 +48,6 @@ final class PillEditViewModel {
     /// 수동 추가(NM-187) 알약 여부. true면 편집·확정·이탈 이벤트를 집계에서 제외한다.
     /// (검출 모델과 무관 — pill_attr_edit/pill_confirm/pill_flow_exit 정확도 지표 오염 방지)
     let isManual: Bool
-    /// 처음부터 펼친 상태로 연다 — 수동 추가 · 추출 실패는 보여 줄 모델 값이 없어 바로 입력하게 한다.
-    let startsExpanded: Bool
 
     // MARK: - State
 
@@ -95,8 +93,7 @@ final class PillEditViewModel {
         conditions: PillConditions,
         editRecord: PillEditRecord = PillEditRecord(),
         thumbnail: UIImage?,
-        isManual: Bool = false,
-        startsExpanded: Bool = false
+        isManual: Bool = false
     ) {
         self.pillIndex = pillIndex
         self.displayNumber = displayNumber
@@ -104,7 +101,6 @@ final class PillEditViewModel {
         self.editRecordSubject = CurrentValueSubject(editRecord)
         self.thumbnail = thumbnail
         self.isManual = isManual
-        self.startsExpanded = startsExpanded || isManual
     }
 
     // MARK: - Transform

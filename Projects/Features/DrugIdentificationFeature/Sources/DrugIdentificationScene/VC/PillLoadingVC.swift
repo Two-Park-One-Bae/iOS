@@ -31,7 +31,16 @@ final class PillLoadingVC: UIViewController {
 
     private let photoCard = PhotoCardView()
 
-    private let spinner = DSLoading(text: "식별 중...")
+    // V2.1.0: 하늘색 원(72) 안에 고리(40, Primary500). 문구는 아래 제목 · 부제가 맡는다.
+    private let spinnerWrap = UIView().then {
+        $0.backgroundColor = DSColor.Primary._50
+        $0.layer.cornerRadius = 36
+    }
+
+    private let spinner = DSLoading(text: "").then {
+        $0.setLabelHidden(true)
+        $0.setSpinnerColor(DSColor.Primary._500)
+    }
 
     private let titleLabel = UILabel().then {
         $0.text = "알약을 식별하고 있어요"
@@ -71,7 +80,7 @@ final class PillLoadingVC: UIViewController {
     // MARK: - Setup
 
     private func setUI() {
-        view.backgroundColor = DSColor.bgApp
+        view.backgroundColor = DSColor.surface
         photoCard.setImage(capturedImage)
         // 식별 요청이 이미 나간 상태라 중단해도 횟수가 차감된다 — 아예 나갈 수 없게 한다.
         // 응답이 늦어도 타임아웃 후 ⑦ 분석 실패로 떨어져 영구히 갇히지는 않는다.
@@ -79,7 +88,8 @@ final class PillLoadingVC: UIViewController {
     }
 
     private func setLayout() {
-        [navBar, photoCard, spinner, titleLabel, subtitleLabel].forEach(view.addSubview)
+        [navBar, photoCard, spinnerWrap, titleLabel, subtitleLabel].forEach(view.addSubview)
+        spinnerWrap.addSubview(spinner)
 
         navBar.snp.makeConstraints {
             $0.top.equalTo(view.safeAreaLayoutGuide)
@@ -91,13 +101,15 @@ final class PillLoadingVC: UIViewController {
             $0.centerX.equalToSuperview()
         }
 
-        spinner.snp.makeConstraints {
+        spinnerWrap.snp.makeConstraints {
             $0.top.equalTo(photoCard.snp.bottom).offset(48)
             $0.centerX.equalToSuperview()
+            $0.size.equalTo(72)
         }
+        spinner.snp.makeConstraints { $0.center.equalToSuperview() }
 
         titleLabel.snp.makeConstraints {
-            $0.top.equalTo(spinner.snp.bottom).offset(4)
+            $0.top.equalTo(spinnerWrap.snp.bottom).offset(18)
             $0.leading.trailing.equalToSuperview().inset(20)
         }
         subtitleLabel.snp.makeConstraints {

@@ -33,6 +33,7 @@ final class ConfirmCardView: UIView {
 
     required init?(coder: NSCoder) { fatalError() }
 
+    /// V2.1.0 Modal(`uAIlL`) — 유리 판(r24) · padding 20 · 제목 SemiBold 16, 볼록 버튼 두 개(gap 8).
     private func setup(
         title: String,
         message: String?,
@@ -40,20 +41,15 @@ final class ConfirmCardView: UIView {
         confirmTitle: String,
         isDestructive: Bool
     ) {
-        backgroundColor = DSColor.Neutral._0
-        layer.cornerRadius = 16
-        layer.masksToBounds = false
-
-        layer.shadowColor = UIColor.black.cgColor
-        layer.shadowOpacity = 0.25
-        layer.shadowOffset = CGSize(width: 0, height: 8)
-        layer.shadowRadius = 24
+        let surface = DSSurfaceView(spec: .glassModal, cornerRadius: DSRadius.xl)
+        addSubview(surface)
+        surface.snp.makeConstraints { $0.edges.equalToSuperview() }
 
         snp.makeConstraints { $0.width.equalTo(300) }
 
         let titleLabel = UILabel().then {
             $0.text = title
-            $0.font = DSKitFontFamily.Pretendard.bold.font(size: 16)
+            $0.font = DSKitFontFamily.Pretendard.semiBold.font(size: 16)
             $0.textColor = DSColor.textPrimary
             $0.textAlignment = .center
             $0.numberOfLines = 0
@@ -68,67 +64,31 @@ final class ConfirmCardView: UIView {
             $0.isHidden = (message == nil)
         }
 
-        let cancelButton = makeButton(
-            title: cancelTitle,
-            titleColor: DSColor.textPrimary,
-            background: DSColor.Neutral._100,
-            action: #selector(cancelTapped)
-        )
-        let confirmButton = makeButton(
-            title: confirmTitle,
-            titleColor: DSColor.Neutral._0,
-            background: isDestructive ? DSColor.Error._500 : DSColor.Primary._500,
-            action: #selector(confirmTapped)
-        )
+        let cancelButton = SecondaryButton(title: cancelTitle)
+        let confirmButton: BaseButton = isDestructive
+            ? DestructiveButton(title: confirmTitle)
+            : PrimaryButton(title: confirmTitle)
+        cancelButton.addTarget(self, action: #selector(cancelTapped), for: .touchUpInside)
+        confirmButton.addTarget(self, action: #selector(confirmTapped), for: .touchUpInside)
+
         let buttonsRow = UIStackView(arrangedSubviews: [cancelButton, confirmButton]).then {
             $0.axis = .horizontal
-            $0.spacing = 10
+            $0.spacing = 8
             $0.distribution = .fillEqually
         }
-        cancelButton.snp.makeConstraints { $0.height.equalTo(48) }
-        confirmButton.snp.makeConstraints { $0.height.equalTo(48) }
+        buttonsRow.snp.makeConstraints { $0.height.equalTo(48) }
 
         let stack = UIStackView(arrangedSubviews: [titleLabel, messageLabel, buttonsRow]).then {
             $0.axis = .vertical
-            $0.spacing = 8
-            $0.alignment = .center
+            $0.spacing = 6
+            $0.alignment = .fill
         }
-        // 버튼 행 위쪽에 추가 여백 (top padding 8)
+        // 버튼 위는 16 — 메시지가 없으면 제목 바로 아래.
+        stack.setCustomSpacing(message == nil ? 16 : 6, after: titleLabel)
         stack.setCustomSpacing(16, after: messageLabel)
 
         addSubview(stack)
-        stack.snp.makeConstraints {
-            $0.top.equalToSuperview().inset(22)
-            $0.leading.equalToSuperview().inset(20)
-            $0.trailing.equalToSuperview().inset(20)
-            $0.bottom.equalToSuperview().inset(16)
-        }
-        buttonsRow.snp.makeConstraints { $0.width.equalToSuperview() }
-    }
-
-    private func makeButton(
-        title: String,
-        titleColor: UIColor,
-        background: UIColor,
-        action: Selector
-    ) -> UIControl {
-        let button = UIControl().then {
-            $0.backgroundColor = background
-            $0.layer.cornerRadius = 12
-            $0.layer.masksToBounds = true
-        }
-        let label = UILabel().then {
-            $0.text = title
-            $0.font = DSKitFontFamily.Pretendard.semiBold.font(size: 16)
-            $0.textColor = titleColor
-            $0.textAlignment = .center
-            $0.isUserInteractionEnabled = false
-        }
-        button.addSubview(label)
-        label.snp.makeConstraints { $0.center.equalToSuperview() }
-
-        button.addTarget(self, action: action, for: .touchUpInside)
-        return button
+        stack.snp.makeConstraints { $0.edges.equalToSuperview().inset(20) }
     }
 
     @objc private func cancelTapped() { onCancel?() }

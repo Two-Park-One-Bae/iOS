@@ -3,6 +3,7 @@ import SnapKit
 import Then
 import DSKit
 import Domain
+import Core
 
 /// ⑤ 인식 결과 세션의 카운트 요약 (완주/이탈 분석용).
 struct PillIdentificationSummary {
@@ -14,14 +15,18 @@ struct PillIdentificationSummary {
     let elapsedSec: Int
 }
 
-// ⑤ 인식 결과 — 촬영 사진(bbox 오버레이) + 알약 목록 + 결과 확인 푸터
+// ⑤ 식별 결과 (V2.1.0 NM-587) — 촬영 사진(bbox 오버레이) + 진행 + 알약 목록 + 하단 바(공유 · 완료).
+// 결과를 확인하는 화면을 따로 두지 않는다 — 이 화면이 최종 결과를 겸한다.
 public final class DrugIdentificationVC: UIViewController {
 
     // MARK: - Callbacks
 
     var onSelectPill: ((IdentifiedPill) -> Void)?
     var onAddPill: (() -> Void)?
-    var onConfirm: (() -> Void)?
+    /// `완료`(미확정이 남았으면 종료 확인 뒤) — 받는 쪽이 기록을 저장한다.
+    var onComplete: (() -> Void)?
+    /// 식별 완료 카드의 ⓘ → 세부정보
+    var onSelectDetail: ((String, LicenseStatus) -> Void)?
     /// 식별 중단 → 홈 복귀. 뒤로 탭 시 확인 팝업을 거쳐 호출된다.
     var onExitToHome: (() -> Void)?
 
@@ -48,7 +53,7 @@ public final class DrugIdentificationVC: UIViewController {
 
     // MARK: - UI
 
-    private let navBar = DSNavBar(title: "인식 결과").then {
+    private let navBar = DSNavBar(title: "식별 결과").then {
         $0.translatesAutoresizingMaskIntoConstraints = false
     }
 
@@ -75,19 +80,26 @@ public final class DrugIdentificationVC: UIViewController {
         $0.layoutMargins = UIEdgeInsets(top: 20, left: 20, bottom: 20, right: 20)
     }
 
-    private let footer = UIView().then {
-        $0.backgroundColor = DSColor.bgApp
+    // 진행 — `2 / 3 식별 완료` · `1개 남음` + 막대(초록)
+    private let progressDoneLabel = UILabel().then {
+        $0.font = DSKitFontFamily.Pretendard.semiBold.font(size: 13)
+        $0.textColor = DSColor.textPrimary
     }
 
-    private let progressLabel = UILabel().then {
-        $0.font = DSKitFontFamily.Pretendard.medium.font(size: 12)
+    private let progressLeftLabel = UILabel().then {
+        $0.font = DSKitFontFamily.Pretendard.regular.font(size: 12)
         $0.textColor = DSColor.textTertiary
-        $0.textAlignment = .center
     }
 
-    private let confirmButton = PrimaryButton(title: "결과 확인").then {
-        $0.changeCornerRadius(radius: 14)
-        $0.setEnabled(false)
+    private let progressBar = ResultProgressBar()
+
+    private let shareButton = SecondaryButton(title: "공유").setEnabled(false)
+    private let completeButton = PrimaryButton(title: "완료").setEnabled(false)
+    private lazy var bottomBar = DSBottomBar(
+        buttons: [shareButton, completeButton],
+        disclaimer: PillDisclaimer.notice
+    ).then {
+        $0.backgroundColor = DSColor.surface
     }
 
     // MARK: - Init
@@ -113,24 +125,24 @@ public final class DrugIdentificationVC: UIViewController {
 
     public override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        scrollView.contentInset.bottom = footer.frame.height
+        scrollView.contentInset.bottom = bottomBar.frame.height
     }
 
     // MARK: - Setup
 
     private func setUI() {
-        view.backgroundColor = DSColor.bgApp
+        view.backgroundColor = DSColor.surface
         photoCard.setImage(capturedImage)
-        progressLabel.text = "알약을 모두 식별해주세요 · 0/\(pills.count)"
-        // 뒤로가기는 이전 화면이 아니라 '중단하고 홈으로' — 확인 팝업을 먼저 띄운다.
+        // 뒤로가기는 이전 화면이 아니라 '중단하고 들어온 화면으로' — 확인 팝업을 먼저 띄운다.
         navBar.onBackTapped = { [weak self] in self?.showExitConfirm() }
-        confirmButton.addTarget(self, action: #selector(confirmTapped), for: .touchUpInside)
+        completeButton.addTarget(self, action: #selector(completeTapped), for: .touchUpInside)
+        shareButton.addTarget(self, action: #selector(shareTapped), for: .touchUpInside)
     }
 
     private func setLayout() {
         view.addSubview(navBar)
         view.addSubview(scrollView)
-        view.addSubview(footer)
+        view.addSubview(bottomBar)
         scrollView.addSubview(contentStack)
 
         navBar.snp.makeConstraints {
@@ -149,22 +161,11 @@ public final class DrugIdentificationVC: UIViewController {
         setupFooter()
     }
 
+    /// 하단 바는 판 없이 탭 바 위에 띄운다(디자인 `IkyB0`) — 목록은 그 뒤로 스크롤된다.
     private func setupFooter() {
-        let footerStack = UIStackView(arrangedSubviews: [progressLabel, confirmButton]).then {
-            $0.axis = .vertical
-            $0.spacing = 8
-            $0.alignment = .fill
-        }
-        footer.addSubview(footerStack)
-        confirmButton.snp.makeConstraints { $0.height.equalTo(52) }
-
-        footer.snp.makeConstraints {
-            $0.leading.trailing.bottom.equalToSuperview()
-        }
-        footerStack.snp.makeConstraints {
-            $0.top.equalToSuperview().offset(12)
-            $0.leading.trailing.equalToSuperview().inset(20)
-            $0.bottom.equalTo(view.safeAreaLayoutGuide).offset(-28)
+        bottomBar.snp.makeConstraints {
+            $0.leading.trailing.equalToSuperview()
+            $0.bottom.equalTo(view.safeAreaLayoutGuide)
         }
     }
 
@@ -182,9 +183,17 @@ public final class DrugIdentificationVC: UIViewController {
         contentStack.addArrangedSubview(photoHeader)
         addBoundingBoxes()
 
-        // Result List
+        // Result List — 제목 · 진행
         updateListTitle()
-        listStack.addArrangedSubview(listTitle)
+        let progressText = UIStackView(arrangedSubviews: [progressDoneLabel, UIView(), progressLeftLabel]).then {
+            $0.axis = .horizontal
+            $0.alignment = .lastBaseline
+        }
+        let head = UIStackView(arrangedSubviews: [listTitle, progressText, progressBar]).then {
+            $0.axis = .vertical
+            $0.spacing = 6
+        }
+        listStack.addArrangedSubview(head)
 
         for pill in pills {
             let row = makeRow(for: pill)
@@ -282,6 +291,10 @@ public final class DrugIdentificationVC: UIViewController {
         let row = PillResultRowView(number: number(of: pill.index), thumbnail: pill.thumbnail, state: state(of: pill))
         row.onTap = { [weak self] in self?.onSelectPill?(pill) }
         row.onMenu = { [weak self] in self?.showRowMenu(for: pill, anchor: row) }
+        row.onInfo = { [weak self] in
+            guard let self, let candidate = self.selectedCandidates[pill.index] else { return }
+            self.onSelectDetail?(candidate.pillCode, candidate.licenseStatus)
+        }
         rowViews[pill.index] = row
         return row
     }
@@ -378,15 +391,13 @@ public final class DrugIdentificationVC: UIViewController {
         updateProgress()
     }
 
-    // 최종 결과 리스트에 넘길 확정 결과 (삭제 제외 + 선택된 후보 매핑)
+    /// 기록 · 공유에 넣을 확정 결과 — 화면 순서 그대로, 삭제 · 미확정 제외.
     func finalizedResults() -> [(pill: IdentifiedPill, candidate: PillCandidateModel)] {
-        let base = pills
-            .filter { !deletedIndices.contains($0.index) }
-            .compactMap { pill in selectedCandidates[pill.index].map { (pill, $0) } }
-        let manual = manualPills
-            .filter { !deletedIndices.contains($0.index) }
-            .compactMap { pill in selectedCandidates[pill.index].map { (pill, $0) } }
-        return base + manual
+        let all = Dictionary(uniqueKeysWithValues: (pills + manualPills).map { ($0.index, $0) })
+        return displayOrder.compactMap { index in
+            guard let pill = all[index], let candidate = selectedCandidates[index] else { return nil }
+            return (pill, candidate)
+        }
     }
 
     /// 완주/이탈 분석용 카운트 요약.
@@ -416,19 +427,16 @@ public final class DrugIdentificationVC: UIViewController {
             : "찾은 알약을 모두 지웠어요"
     }
 
+    /// 하나라도 확정하면 `완료` · `공유`를 켠다 — 모두 확정할 필요는 없다(빈 기록은 만들지 않는다).
     private func updateProgress() {
         let total = pills.count - deletedIndices.count + manualPills.count
         let done = identifiedIndices.count
-
-        if done == total {
-            progressLabel.text = "모든 알약을 식별했어요"
-            progressLabel.textColor = DSColor.Primary._500
-            confirmButton.setEnabled(true)
-        } else {
-            progressLabel.text = "알약을 모두 식별해주세요 · \(done)/\(total)"
-            progressLabel.textColor = DSColor.textTertiary
-            confirmButton.setEnabled(false)
-        }
+        progressDoneLabel.text = "\(done) / \(total) 식별 완료"
+        progressLeftLabel.text = "\(max(0, total - done))개 남음"
+        progressLeftLabel.isHidden = done >= total
+        progressBar.progress = total > 0 ? CGFloat(done) / CGFloat(total) : 0
+        completeButton.setEnabled(done > 0)
+        shareButton.setEnabled(done > 0)
     }
 
     // 사진 위 bbox + 번호 태그
@@ -488,8 +496,94 @@ public final class DrugIdentificationVC: UIViewController {
 
     // MARK: - Actions
 
-    @objc private func confirmTapped() {
-        onConfirm?()
+    /// 확정하지 않은 알약이 남았으면 종료 확인을 먼저 받는다. 모두 확정했으면 바로 저장.
+    @objc private func completeTapped() {
+        let unconfirmed = identificationSummary().unconfirmedCount
+        guard unconfirmed > 0 else {
+            onComplete?()
+            return
+        }
+        let card = ConfirmCardView(
+            title: "알약 식별을 종료할까요?",
+            message: "확정하지 않은 \(unconfirmed)개는 기록에 남지 않아요",
+            cancelTitle: "취소",
+            confirmTitle: "종료"
+        )
+        presentConfirmCard(card, dismissOnBackgroundTap: false) { [weak self] in
+            self?.onComplete?()
+        }
+    }
+
+    // 공유 — 텍스트 복사 / PDF로 저장. 공유는 저장과 별개다(기록은 `완료`를 눌러야 남는다).
+    @objc private func shareTapped() {
+        let results = finalizedResults()
+        guard !results.isEmpty else { return }
+        let text = PillShareComposer.plainText(
+            pills: results.map(\.pill),
+            candidates: Dictionary(uniqueKeysWithValues: results.map { ($0.pill.index, $0.candidate) })
+        )
+        let sheet = ShareActionSheetVC(
+            onCopyText: { [weak self] in
+                guard let self else { return }
+                AppAnalytics.track(.share(method: "copy_text", contentType: "pill_result"))
+                UIPasteboard.general.string = text
+                self.showToast("결과가 복사되었어요", above: self.bottomBar)
+            },
+            onSavePDF: { [weak self] in
+                guard let self else { return }
+                AppAnalytics.track(.share(method: "save_pdf", contentType: "pill_result"))
+                guard let url = PillShareComposer.pdfURL(text: text) else {
+                    self.showToast("PDF 생성에 실패했어요", above: self.bottomBar)
+                    return
+                }
+                let activity = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+                activity.popoverPresentationController?.sourceView = self.shareButton
+                activity.popoverPresentationController?.sourceRect = self.shareButton.bounds
+                self.present(activity, animated: true)
+            }
+        )
+        present(sheet, animated: false)
+    }
+
+    // MARK: - 저장 (NM-552)
+
+    /// 기록 저장 중 — `완료`는 `저장 중…`, `공유`는 비활성, 뒤로도 막는다.
+    func setSaving(_ isSaving: Bool) {
+        var title = AttributedString(isSaving ? "저장 중…" : "완료")
+        title.font = DSKitFontFamily.Pretendard.semiBold.font(size: 16)
+        completeButton.configuration?.attributedTitle = title
+        completeButton.setEnabled(!isSaving)
+        shareButton.setEnabled(!isSaving)
+        navBar.isUserInteractionEnabled = !isSaving
+        if !isSaving { updateProgress() }
+    }
+
+    /// 저장 실패 — 통신 · 서버면 `나가기` / `다시 시도`, 400이면 `나가기`만(같은 요청은 같은 결과다).
+    func showSaveFailure(canRetry: Bool, onExit: @escaping () -> Void, onRetry: @escaping () -> Void) {
+        let title = "식별 결과를 저장하지 못했어요"
+        guard canRetry else {
+            DSAlertCardView.present(
+                on: view,
+                title: title,
+                message: "이 결과는 기록에 남길 수 없어요",
+                confirmTitle: "나가기",
+                confirmed: onExit
+            )
+            return
+        }
+        let card = ConfirmCardView(
+            title: title,
+            message: "네트워크 연결을 확인하고 다시 시도해 주세요",
+            cancelTitle: "나가기",
+            confirmTitle: "다시 시도"
+        )
+        presentConfirmCard(card, dismissOnBackgroundTap: false, confirmed: onRetry)
+        // ConfirmCardView 의 취소 자리가 `나가기`다 — dim 을 걷는 기본 동작 뒤에 이어서 나간다.
+        let dismiss = card.onCancel
+        card.onCancel = {
+            dismiss?()
+            onExit()
+        }
     }
 
     @objc private func addTapped() {
@@ -503,5 +597,37 @@ extension DrugIdentificationVC: UIGestureRecognizerDelegate {
     public func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
         // 오버레이(scrim/dim) 자체를 탭했을 때만 닫기 — 메뉴/카드 내부 터치는 통과
         touch.view === gestureRecognizer.view
+    }
+}
+
+// MARK: - Progress Bar
+
+/// 진행 막대 — 높이 4, 트랙 Neutral100, 채움 Success500, 캡슐.
+private final class ResultProgressBar: UIView {
+
+    var progress: CGFloat = 0 {
+        didSet { setNeedsLayout() }
+    }
+
+    private let fill = UIView()
+
+    init() {
+        super.init(frame: .zero)
+        backgroundColor = DSColor.Neutral._100
+        layer.cornerRadius = 2
+        clipsToBounds = true
+        fill.backgroundColor = DSColor.Success._500
+        fill.layer.cornerRadius = 2
+        addSubview(fill)
+        snp.makeConstraints { $0.height.equalTo(4) }
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        UIView.animate(withDuration: 0.25) {
+            self.fill.frame = CGRect(x: 0, y: 0, width: self.bounds.width * max(0, min(1, self.progress)), height: self.bounds.height)
+        }
     }
 }

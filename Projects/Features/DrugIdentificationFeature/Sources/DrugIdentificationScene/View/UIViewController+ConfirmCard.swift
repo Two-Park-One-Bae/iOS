@@ -55,7 +55,7 @@ extension UIViewController {
         let card = ConfirmCardView(
             title: title,
             message: message,
-            cancelTitle: "계속하기",
+            cancelTitle: "취소",
             confirmTitle: "나가기",
             isDestructive: true
         )

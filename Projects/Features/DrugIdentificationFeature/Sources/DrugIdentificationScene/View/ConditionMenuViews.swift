@@ -5,9 +5,12 @@ import DSKit
 
 // ⑧ 수정 화면 조건 메뉴 (DESIGN.pen NM-490 ⑧-b~d · 마크 · 구분선 메뉴)
 //
-// 격자형 — 색(복수) · 모양 · 제형 · 구분선: 맨 위 `전체` + 값 칸.
-// 목록형 — 각인(전체 · 없음 · 입력) · 마크(전체 · 없음 · 있음).
-// 고른 칸은 호박색(= 확실한 값), `전체` 는 체크로 표시한다.
+// V2.1.0 (NM-588)
+// 격자형 — 색(복수) · 모양 · 제형: 맨 위 `자동`(조건 없음 · 모델 출력으로 정렬만) + 값 칸.
+//          모델 출력이 없으면(수동 추가 · 추출 실패) `자동` 을 두지 않는다 — 고른 값을 풀려면 같은 값을 다시 누른다.
+//          구분선: 맨 위 `모름` + 없음 · (+)형 · (−)형.
+// 목록형 — 마크(모름 · 없음 · 있음).
+// 고른 칸은 파랑(= 확실한 값), 맨 위 칸은 체크로 표시한다. 손대지 않은 칸의 메뉴에는 체크가 없다.
 
 // MARK: - 격자형
 
@@ -21,7 +24,7 @@ struct ConditionGridItem {
 
 final class ConditionGridMenuView: UIView {
 
-    /// 칸을 눌렀다(nil = `전체`). 복수 선택이 아니면 누른 뒤 메뉴가 닫힌다.
+    /// 칸을 눌렀다(nil = 맨 위 칸). 복수 선택이 아니면 누른 뒤 메뉴가 닫힌다.
     var onSelect: ((String?) -> Void)?
 
     private let items: [ConditionGridItem]
@@ -31,12 +34,26 @@ final class ConditionGridMenuView: UIView {
     private let allCheck = UIImageView(image: DSIcon.check.uiImage)
     private let allLabel = UILabel()
     private let allRow = UIControl()
+    private let topLabel: String?
+    private var isTopSelected: Bool
 
-    /// - Parameter modelPreview: `전체` 옆 '사진 기준' 그림 — 모델값이 있을 때만.
-    init(items: [ConditionGridItem], selected: Set<String>, multiple: Bool, modelPreview: UIView?) {
+    /// - Parameters:
+    ///   - topLabel: 맨 위 칸 이름(`자동` · `모름`). nil이면 맨 위 칸이 없다.
+    ///   - topSelected: 맨 위 칸 체크 — 손대지 않은 칸이면 false.
+    ///   - modelPreview: 맨 위 칸 옆 '사진 기준' 그림 — 모델값이 있을 때만.
+    init(
+        items: [ConditionGridItem],
+        selected: Set<String>,
+        multiple: Bool,
+        topLabel: String?,
+        topSelected: Bool,
+        modelPreview: UIView?
+    ) {
         self.items = items
         self.multiple = multiple
         self.selected = selected
+        self.topLabel = topLabel
+        self.isTopSelected = topSelected
         super.init(frame: .zero)
         backgroundColor = DSColor.surface
         layer.cornerRadius = 16
@@ -52,11 +69,11 @@ final class ConditionGridMenuView: UIView {
 
     private func setup(modelPreview: UIView?) {
         allRow.layer.cornerRadius = 10
-        allRow.accessibilityLabel = "전체"
+        allRow.accessibilityLabel = topLabel
         allRow.addAction(UIAction { [weak self] _ in self?.tap(nil) }, for: .touchUpInside)
         allCheck.tintColor = DSColor.Primary._600
         allCheck.snp.makeConstraints { $0.width.height.equalTo(16) }
-        allLabel.text = "전체"
+        allLabel.text = topLabel
         var rowItems: [UIView] = [allCheck, allLabel, UIView()]
         if let modelPreview {
             let caption = UILabel().then {
@@ -80,7 +97,7 @@ final class ConditionGridMenuView: UIView {
             $0.backgroundColor = DSColor.Neutral._200
             $0.snp.makeConstraints { $0.height.equalTo(1) }
         }
-        let stack = UIStackView(arrangedSubviews: [allRow, divider]).then {
+        let stack = UIStackView(arrangedSubviews: topLabel == nil ? [] : [allRow, divider]).then {
             $0.axis = .vertical
             $0.spacing = 6
         }
@@ -127,13 +144,16 @@ final class ConditionGridMenuView: UIView {
 
     private func tap(_ id: String?) {
         if let id {
-            if multiple {
-                if selected.contains(id) { selected.remove(id) } else { selected.insert(id) }
+            if multiple || topLabel == nil {
+                // 맨 위 칸이 없으면 같은 값을 다시 눌러 푼다.
+                if selected.contains(id) { selected.remove(id) } else if multiple { selected.insert(id) } else { selected = [id] }
             } else {
                 selected = [id]
             }
+            isTopSelected = false
         } else {
             selected = []
+            isTopSelected = true
         }
         refresh()
         onSelect?(id)
@@ -143,17 +163,17 @@ final class ConditionGridMenuView: UIView {
     var selectedIDs: [String] { items.map(\.id).filter(selected.contains) }
 
     private func refresh() {
-        let isAll = selected.isEmpty
+        let isAll = isTopSelected && selected.isEmpty
         allCheck.alpha = isAll ? 1 : 0
         allRow.backgroundColor = isAll ? DSColor.Neutral._100 : .clear
         allLabel.font = isAll ? DSKitFontFamily.Pretendard.bold.font(size: 14) : DSKitFontFamily.Pretendard.medium.font(size: 14)
         allLabel.textColor = DSColor.textPrimary
         for (id, views) in cellViews {
             let on = selected.contains(id)
-            views.box.backgroundColor = on ? DSColor.Warning._50 : .clear
-            views.box.layer.borderWidth = on ? 1 : 0
-            views.box.layer.borderColor = DSColor.Warning._300.cgColor
-            views.label.textColor = on ? DSColor.Warning._900 : DSColor.textSecondary
+            views.box.backgroundColor = on ? DSColor.Primary._50 : .clear
+            views.box.layer.borderWidth = on ? 1.5 : 0
+            views.box.layer.borderColor = DSColor.Primary._500.cgColor
+            views.label.textColor = on ? DSColor.Primary._700 : DSColor.textSecondary
             views.label.font = on ? DSKitFontFamily.Pretendard.bold.font(size: 11) : DSKitFontFamily.Pretendard.medium.font(size: 11)
             views.box.accessibilityTraits = on ? [.button, .selected] : .button
             views.applySelected?(on)

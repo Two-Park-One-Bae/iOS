@@ -20,25 +20,27 @@ final class PillActionMenuView: UIView {
     required init?(coder: NSCoder) { fatalError() }
 
     private func setup() {
-        // Card (자기 자신을 카드로 사용 — shadow가 보이도록 clip 하지 않음)
-        backgroundColor = DSColor.Neutral._0
-        layer.cornerRadius = 12
-        layer.borderWidth = 1
-        layer.borderColor = DSColor.Neutral._200.cgColor
-        layer.masksToBounds = false
+        // V2.1.0 Menu(`kZaQ3`) — 흰 평면, r12, 테두리 Border, 목록 그림자, 폭 160
+        let surface = DSSurfaceView(
+            spec: DSSurfaceSpec(
+                fills: [.solid(DSColor.surface)],
+                stroke: .solid(DSColor.border),
+                shadows: [
+                    DSShadow(color: DSColor.Neutral._900.withAlphaComponent(0.09), y: 8, blur: 22),
+                    DSShadow(color: DSColor.Neutral._900.withAlphaComponent(0.08), y: 1, blur: 2)
+                ]
+            ),
+            cornerRadius: DSRadius.md
+        )
+        addSubview(surface)
+        surface.snp.makeConstraints { $0.edges.equalToSuperview() }
 
-        // Outer shadow
-        layer.shadowColor = DSColor.textPrimary.cgColor
-        layer.shadowOpacity = 0.15
-        layer.shadowOffset = CGSize(width: 0, height: 4)
-        layer.shadowRadius = 16
-
-        snp.makeConstraints { $0.width.equalTo(150) }
+        snp.makeConstraints { $0.width.equalTo(160) }
 
         // Rows
         let editRow = makeRow(
             icon: DSIcon.pencil.uiImage,
-            iconTint: DSColor.textSecondary,
+            iconTint: DSColor.textPrimary,
             title: "수정",
             titleColor: DSColor.textPrimary,
             action: #selector(editTapped)
@@ -48,9 +50,9 @@ final class PillActionMenuView: UIView {
         }
         let deleteRow = makeRow(
             icon: DSIcon.trash.uiImage,
-            iconTint: DSColor.Error._500,
+            iconTint: DSColor.Error._600,
             title: "삭제",
-            titleColor: DSColor.Error._500,
+            titleColor: DSColor.Error._600,
             action: #selector(deleteTapped)
         )
 
@@ -96,10 +98,11 @@ final class PillActionMenuView: UIView {
         }
         row.addSubview(content)
         content.snp.makeConstraints {
-            $0.top.bottom.equalToSuperview().inset(12)
+            $0.centerY.equalToSuperview()
             $0.leading.trailing.equalToSuperview().inset(14)
         }
-        imageView.snp.makeConstraints { $0.width.height.equalTo(16) }
+        row.snp.makeConstraints { $0.height.equalTo(44) }
+        imageView.snp.makeConstraints { $0.width.height.equalTo(18) }
 
         row.addTarget(self, action: action, for: .touchUpInside)
         return row

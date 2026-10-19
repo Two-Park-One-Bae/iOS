@@ -75,7 +75,7 @@ final class AnalysisFailedVC: UIViewController {
     // MARK: - Setup
 
     private func setUI() {
-        view.backgroundColor = DSColor.bgApp
+        view.backgroundColor = DSColor.surface
         navBar.onBackTapped = { [weak self] in self?.onBackTapped?() }
 
         // 사유를 받았으면 그대로 보여 주고 아이콘도 일반 경고로 바꾼다.
@@ -125,7 +125,7 @@ final class AnalysisFailedVC: UIViewController {
         view.addSubview(footerStack)
         footerStack.snp.makeConstraints {
             $0.leading.trailing.equalToSuperview().inset(20)
-            $0.bottom.equalTo(view.safeAreaLayoutGuide).offset(-28)
+            $0.bottom.equalTo(view.safeAreaLayoutGuide).offset(-12)
         }
     }
 
