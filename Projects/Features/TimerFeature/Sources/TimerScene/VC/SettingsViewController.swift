@@ -10,7 +10,7 @@ import TimerShared
 // 타이머 화면이 Auth 계층에 묶이므로, 콜백만 노출하고 조립은 App 이 한다.
 public final class SettingsViewController: UIViewController {
 
-    private let selector = RingModeSelectorView(selected: RingModeStore.shared.current)
+    private let selector = RingModeSelectorView(selected: RingModeStore.shared.current, style: .raised)
 
     /// 약관 및 동의 행을 눌렀을 때. 화면은 AuthFeature 에 있어 주입한 쪽이 띄운다.
     public var onConsentsTapped: (() -> Void)?
@@ -27,7 +27,7 @@ public final class SettingsViewController: UIViewController {
     public override func viewDidLoad() {
         super.viewDidLoad()
         navigationController?.setNavigationBarHidden(true, animated: false)
-        view.backgroundColor = DSColor.bgApp
+        view.backgroundColor = DSColor.surface
         setLayout()
         selector.onChange = { mode in RingModeStore.shared.current = mode }
     }
@@ -35,12 +35,12 @@ public final class SettingsViewController: UIViewController {
     private func setLayout() {
         let title = UILabel()
         title.text = "설정"
-        title.font = DSKitFontFamily.Pretendard.bold.font(size: 28)
+        title.font = DSKitFontFamily.Pretendard.bold.font(size: 24)
         title.textColor = DSColor.textPrimary
 
         let note = UILabel()
-        note.text = "‘소리’는 무음 모드에서도 크게 울려요.\n‘무음’은 벨소리가 켜져있으면 진동, 꺼져있으면 무음이에요."
-        note.font = DSKitFontFamily.Pretendard.regular.font(size: 11)
+        note.text = "‘소리’는 무음 모드에서도 크게 울려요. ‘무음’은 벨소리가 켜져있으면 진동, 꺼져있으면 무음이에요."
+        note.font = DSKitFontFamily.Pretendard.regular.font(size: 12)
         note.textColor = DSColor.textTertiary
         note.numberOfLines = 0
 
@@ -85,26 +85,26 @@ public final class SettingsViewController: UIViewController {
     private func makeRingModeCard() -> UIView {
         let cardTitle = UILabel()
         cardTitle.text = "울림 방식"
-        cardTitle.font = DSKitFontFamily.Pretendard.bold.font(size: 15)
+        cardTitle.font = DSKitFontFamily.Pretendard.semiBold.font(size: 14)
         cardTitle.textColor = DSColor.textPrimary
 
         let cardSubtitle = UILabel()
         cardSubtitle.text = "타이머가 끝날 때 알리는 방식"
         cardSubtitle.font = DSKitFontFamily.Pretendard.regular.font(size: 12)
-        cardSubtitle.textColor = DSColor.textSecondary
+        cardSubtitle.textColor = DSColor.textTertiary
 
         let cardStack = UIStackView(arrangedSubviews: [cardTitle, cardSubtitle, selector])
         cardStack.axis = .vertical
-        cardStack.spacing = 6
-        cardStack.setCustomSpacing(12, after: cardSubtitle)
+        cardStack.spacing = 2
+        cardStack.setCustomSpacing(14, after: cardSubtitle)
         cardStack.isLayoutMarginsRelativeArrangement = true
         cardStack.layoutMargins = UIEdgeInsets(top: 16, left: 16, bottom: 16, right: 16)
 
+        // 유리 카드 (V2.1.0)
         let card = UIView()
-        card.backgroundColor = DSColor.surface
-        card.layer.cornerRadius = 14
-        card.layer.borderWidth = 1
-        card.layer.borderColor = DSColor.border.cgColor
+        let surface = DSSurfaceView(spec: .glassCard)
+        card.addSubview(surface)
+        surface.snp.makeConstraints { $0.edges.equalToSuperview() }
         card.addSubview(cardStack)
         cardStack.snp.makeConstraints { $0.edges.equalToSuperview() }
         return card
@@ -130,7 +130,7 @@ public final class SettingsViewController: UIViewController {
 
     private func makeDeleteAccountRow() -> UIView {
         // 되돌릴 수 없는 액션이라 제목까지 Error 색으로 둔다 (디자인 Xoc5z).
-        let row = DSListRow(style: .compact, icon: .userX, title: "계정 삭제", subtitle: "")
+        let row = DSListRow(style: .compact, icon: .userX, title: "계정 삭제", subtitle: "계정과 데이터가 모두 삭제돼요")
         row.setTitleColor(DSColor.Error._600)
         row.setIconTint(DSColor.Error._600)
         row.onTap { [weak self] in self?.onDeleteAccountTapped?() }

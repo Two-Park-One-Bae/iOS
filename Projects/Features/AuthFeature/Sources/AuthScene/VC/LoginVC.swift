@@ -29,19 +29,11 @@ public final class LoginVC: UIViewController {
 
     // MARK: - UI
 
-    private let markView = UIImageView().then {
-        $0.image = DSBrandImage.logoMark.uiImage
+    // 워드마크 (V2.1.0 — 홈과 같은 커스텀 워드마크 이미지)
+    private let wordmarkView = UIImageView().then {
+        $0.image = DSBrandImage.wordmark.uiImage
         $0.contentMode = .scaleAspectFit
-    }
-
-    /// 워드마크만 Plus Jakarta Sans 를 쓴다 — 본문·라벨은 한글이 필요해 그대로 Pretendard.
-    private let wordmarkLabel = UILabel().then {
-        $0.attributedText = NSAttributedString(
-            string: "NurseMate",
-            attributes: [.kern: -0.7,
-                         .font: DSKitFontFamily.PlusJakartaSans.extraBold.font(size: 18),
-                         .foregroundColor: DSColor.textPrimary]
-        )
+        $0.accessibilityLabel = "NurseMate"
     }
 
     private let headlineLabel = UILabel().then {
@@ -92,7 +84,7 @@ public final class LoginVC: UIViewController {
     public override func viewDidLoad() {
         super.viewDidLoad()
         navigationController?.setNavigationBarHidden(true, animated: false)
-        view.backgroundColor = DSColor.Neutral._0
+        view.backgroundColor = DSColor.surface
         setLayout()
         bind()
     }
@@ -100,7 +92,7 @@ public final class LoginVC: UIViewController {
     // MARK: - Setup
 
     private func setLayout() {
-        let lockupStack = UIStackView(arrangedSubviews: [markView, wordmarkLabel]).then {
+        let lockupStack = UIStackView(arrangedSubviews: [wordmarkView]).then {
             $0.axis = .horizontal
             $0.spacing = 8
             $0.alignment = .center
@@ -119,9 +111,9 @@ public final class LoginVC: UIViewController {
 
         [lockupStack, copyStack, buttonStack, loadingIndicator].forEach(view.addSubview)
 
-        markView.snp.makeConstraints {
-            $0.width.equalTo(27)
-            $0.height.equalTo(24)
+        wordmarkView.snp.makeConstraints {
+            $0.width.equalTo(152)
+            $0.height.equalTo(26)
         }
 
         // 락업·카피는 화면 높이의 비율로 잡는다 — 시안(390x844)의 세로 비례를 기기 크기와

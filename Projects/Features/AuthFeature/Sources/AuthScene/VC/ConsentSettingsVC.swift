@@ -29,9 +29,11 @@ public final class ConsentSettingsVC: UIViewController {
 
     private let navBar = DSNavBar(title: "약관 및 동의")
 
+    // 유리 카드 (V2.1.0)
     private let card = UIView().then {
-        $0.backgroundColor = DSColor.surface
-        $0.layer.cornerRadius = 14
+        let surface = DSSurfaceView(spec: .glassCard)
+        $0.addSubview(surface)
+        surface.snp.makeConstraints { $0.edges.equalToSuperview() }
     }
 
     private let itemStack = UIStackView().then {
@@ -55,7 +57,7 @@ public final class ConsentSettingsVC: UIViewController {
 
     public override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = DSColor.bgApp
+        view.backgroundColor = DSColor.surface
         setLayout()
         bind()
         viewModel.load()
