@@ -352,11 +352,17 @@ final class PillDetailVC: UIViewController {
     }
 
     private func makeTabButton(title: String, index: Int) -> UIButton {
-        let button = UIButton(type: .system)
-        button.setTitle(title, for: .normal)
-        button.titleLabel?.font = DSKitFontFamily.Pretendard.semiBold.font(size: 14)
-        button.titleLabel?.numberOfLines = 1
-        button.contentEdgeInsets = UIEdgeInsets(top: 14, left: 4, bottom: 14, right: 4)
+        var config = UIButton.Configuration.plain()
+        config.title = title
+        config.titleLineBreakMode = .byTruncatingTail
+        config.contentInsets = NSDirectionalEdgeInsets(top: 14, leading: 4, bottom: 14, trailing: 4)
+        config.baseForegroundColor = DSColor.textTertiary
+        config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer {
+            var attributes = $0
+            attributes.font = DSKitFontFamily.Pretendard.semiBold.font(size: 14)
+            return attributes
+        }
+        let button = UIButton(configuration: config)
 
         let underline = UIView()
         underline.backgroundColor = DSColor.Primary._500
@@ -381,7 +387,7 @@ final class PillDetailVC: UIViewController {
     private func updateTabSelection() {
         for (index, button) in tabButtons.enumerated() {
             let selected = index == selectedDocIndex
-            button.setTitleColor(selected ? DSColor.Primary._600 : DSColor.textTertiary, for: .normal)
+            button.configuration?.baseForegroundColor = selected ? DSColor.Primary._600 : DSColor.textTertiary
             button.viewWithTag(99)?.isHidden = !selected
         }
     }

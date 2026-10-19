@@ -28,6 +28,7 @@ final class ShapeGlyphView: UIView {
         self.atDesignSize = atDesignSize
         super.init(frame: .zero)
         backgroundColor = .clear
+        observeAppearance()
         if shape.spec == nil {
             otherImageView.contentMode = .scaleAspectFit
             otherImageView.image = UIImage(named: "PillShapes/other", in: .module, compatibleWith: nil)?
@@ -66,10 +67,11 @@ final class ShapeGlyphView: UIView {
         shapeLayer.path = spec.kind.path(in: box, cornerRadius: spec.cornerRadius * scale)
     }
 
-    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
-        super.traitCollectionDidChange(previousTraitCollection)
-        // CGColor 는 다크 모드를 따라가지 않는다 — 지금 모드로 다시 푼다.
-        shapeLayer.fillColor = tint.resolvedColor(with: traitCollection).cgColor
+    // CGColor 는 다크 모드를 따라가지 않는다 — 모드가 바뀌면 지금 모드로 다시 푼다.
+    private func observeAppearance() {
+        registerForTraitChanges([UITraitUserInterfaceStyle.self]) { (self: Self, _: UITraitCollection) in
+            self.shapeLayer.fillColor = self.tint.resolvedColor(with: self.traitCollection).cgColor
+        }
     }
 }
 
