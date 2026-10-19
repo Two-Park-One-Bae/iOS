@@ -58,7 +58,21 @@ public final class DSListRow: UIView {
         return view
     }()
 
-    private let titleLabel = UILabel()
+    private let titleLabel: UILabel = {
+        let label = UILabel()
+        label.lineBreakMode = .byTruncatingTail
+        label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        return label
+    }()
+
+    /// 제목 뒤에 붙는 짧은 글(예: `외 3`). 제목이 넘쳐도 말줄임되지 않고 남는다. 기본 숨김.
+    private let titleAccessoryLabel: UILabel = {
+        let label = UILabel()
+        label.isHidden = true
+        label.setContentCompressionResistancePriority(.required, for: .horizontal)
+        label.setContentHuggingPriority(.required, for: .horizontal)
+        return label
+    }()
 
     private let subtitleLabel: UILabel = {
         let label = UILabel()
@@ -91,6 +105,8 @@ public final class DSListRow: UIView {
         iconImageView.image = icon.uiImage
         titleLabel.font = style.titleFont
         titleLabel.textColor = DSColor.textPrimary
+        titleAccessoryLabel.font = style.titleFont
+        titleAccessoryLabel.textColor = DSColor.textPrimary
         titleLabel.text = title
         setSubtitle(subtitle)
         setupUI()
@@ -125,9 +141,13 @@ public final class DSListRow: UIView {
             chevronView.heightAnchor.constraint(equalToConstant: style.chevronLength)
         ])
 
+        let titleRow = UIStackView(arrangedSubviews: [titleLabel, titleAccessoryLabel, UIView()])
+        titleRow.axis = .horizontal
+        titleRow.spacing = 4
+        titleRow.alignment = .firstBaseline
         let labels = style.subtitleFirst
-            ? [subtitleLabel, titleLabel, captionLabel]
-            : [titleLabel, subtitleLabel, captionLabel]
+            ? [subtitleLabel, titleRow, captionLabel]
+            : [titleRow, subtitleLabel, captionLabel]
         let textStack = UIStackView(arrangedSubviews: labels)
         textStack.axis = .vertical
         textStack.spacing = style == .default ? 4 : 1
@@ -161,9 +181,16 @@ extension DSListRow {
         titleLabel.text = title
     }
 
-    /// 제목 색. 파괴적 액션(계정 삭제)만 Error 계열로 바꾼다.
+    /// 제목 뒤 짧은 글(예: `외 3`). nil이면 숨긴다 — 제목이 넘치면 제목만 말줄임한다.
+    public func setTitleAccessory(_ text: String?) {
+        titleAccessoryLabel.text = text
+        titleAccessoryLabel.isHidden = (text == nil)
+    }
+
+    /// 제목 색. 파괴적 액션(계정 삭제) · 빈 상태 안내(textTertiary)에 바꾼다.
     public func setTitleColor(_ color: UIColor) {
         titleLabel.textColor = color
+        titleAccessoryLabel.textColor = color
     }
 
     /// 빈 문자열이면 줄 자체를 숨긴다 — 부제 없는 행(계정 삭제)에서 빈 줄이 생기지 않게.

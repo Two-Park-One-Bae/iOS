@@ -2,17 +2,20 @@ import UIKit
 
 // MARK: - Tag
 // V2.1.0 평면 · 작은 분류 꼬리표. cornerRadius 8, padding (3, 8), Label Medium 11
+// primary(하늘):   배경 Primary50,   글자 Primary700   — 투약
 // secondary(teal): 배경 Secondary50, 글자 Secondary700 — 처치
 // info(파랑):      배경 Info50,      글자 Info700      — 검사
 
 public final class DSTag: UIView {
 
     public enum Style {
+        case primary
         case secondary
         case info
 
         var background: UIColor {
             switch self {
+            case .primary:   return DSColor.Primary._50
             case .secondary: return DSColor.Secondary._50
             case .info:      return DSColor.Info._50
             }
@@ -20,6 +23,7 @@ public final class DSTag: UIView {
 
         var label: UIColor {
             switch self {
+            case .primary:   return DSColor.Primary._700
             case .secondary: return DSColor.Secondary._700
             case .info:      return DSColor.Info._700
             }

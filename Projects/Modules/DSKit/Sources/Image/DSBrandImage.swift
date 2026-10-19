@@ -14,6 +14,8 @@ public enum DSBrandImage: String {
 
     /// 널스메이트 로고 마크. 스플래시·로그인 화면이 같은 이미지를 쓴다.
     case logoMark = "Brand/logo_mark"
+    /// 널스메이트 글자 로고(152×26) — V2.1.0 홈 맨 위. 글자 속이 흰색이라 흰 바탕 위에 둔다.
+    case wordmark = "Brand/wordmark"
     /// 구글 "G" — 브랜드 가이드상 원색을 바꾸면 안 되므로 template 이 아니다.
     case google = "Brand/logo_google"
     /// 카카오 말풍선. template 이라 버튼 전경색(검정)으로 tint 된다.

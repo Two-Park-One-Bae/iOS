@@ -51,7 +51,12 @@ public final class TabBarCoordinator: CoordinatorProtocol {
         self.tabBarVC = tabBar
 
         tabBar.viewControllers = makeTabViewControllers()
-        configureAppearance(tabBar)
+        tabBar.installTabBar(items: [
+            .init(title: "홈", icon: .house),
+            .init(title: "알약", icon: .pill),
+            .init(title: "타이머", icon: .timer),
+            .init(title: "설정", icon: .settings)
+        ])
 
         navigationController.setViewControllers([tabBar], animated: false)
         navigationController.setNavigationBarHidden(true, animated: false)
@@ -111,19 +116,5 @@ public final class TabBarCoordinator: CoordinatorProtocol {
         settingsNav.tabBarItem = UITabBarItem(title: "설정", image: DSIcon.settings.uiImage, tag: 3)
 
         return [homeNav, pillNav, timerNav, settingsNav]
-    }
-
-    private func configureAppearance(_ tabBar: UITabBarController) {
-        let appearance = UITabBarAppearance()
-        appearance.configureWithOpaqueBackground()
-        appearance.backgroundColor = .white
-
-        appearance.stackedLayoutAppearance.normal.iconColor = DSColor.Neutral._400
-        appearance.stackedLayoutAppearance.normal.titleTextAttributes = [.foregroundColor: DSColor.Neutral._400]
-        appearance.stackedLayoutAppearance.selected.iconColor = DSColor.Primary._500
-        appearance.stackedLayoutAppearance.selected.titleTextAttributes = [.foregroundColor: DSColor.Primary._500]
-
-        tabBar.tabBar.standardAppearance = appearance
-        tabBar.tabBar.scrollEdgeAppearance = appearance
     }
 }

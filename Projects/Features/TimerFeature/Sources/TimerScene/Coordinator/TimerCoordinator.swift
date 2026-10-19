@@ -12,6 +12,11 @@ public final class TimerCoordinator: BaseCoordinator {
     private weak var presetSheet: PresetSheetVC?
     private var cancelBag = Set<AnyCancellable>()
     private var pendingPermissionFlow = false
+    private var newTimerObserver: NSObjectProtocol?
+
+    deinit {
+        if let newTimerObserver { NotificationCenter.default.removeObserver(newTimerObserver) }
+    }
 
     public override func start() {
         // 타이머는 AlarmKit(26.1+) 전용 — 그 미만은 알람을 보장할 수 없어 안내만 띄운다.
@@ -29,6 +34,15 @@ public final class TimerCoordinator: BaseCoordinator {
 
         bindPermission(viewModel)
         bindPresets(viewModel)
+
+        // 홈 '새 타이머' — 추가 버튼과 같은 경로(권한 확인 → 프리셋 시트). 탭 전환은 보낸 쪽이 먼저 한다.
+        newTimerObserver = NotificationCenter.default.addObserver(
+            forName: .startNewTimer, object: nil, queue: .main
+        ) { [weak self] _ in
+            guard let self, self.navigationController.presentedViewController == nil else { return }
+            self.navigationController.popToRootViewController(animated: false)
+            self.checkPermissionThenOpenSheet()
+        }
     }
 
     // MARK: - 권한 (spec: 첫 타이머 실행 직전 요청, 거부 시 시작 차단)

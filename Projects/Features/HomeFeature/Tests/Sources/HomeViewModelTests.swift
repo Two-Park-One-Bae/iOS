@@ -1,5 +1,6 @@
 import XCTest
 import Combine
+import Domain
 @testable import HomeFeature
 
 final class HomeViewModelTests: XCTestCase {
@@ -19,35 +20,53 @@ final class HomeViewModelTests: XCTestCase {
         super.tearDown()
     }
 
-    func test_drugIdentifyTapped_triggersNavigationCallback() {
-        let expectation = expectation(description: "drug identify callback fired")
-        sut.onDrugIdentifyTapped = { expectation.fulfill() }
+    func test_captureTapped_triggersNavigationCallback() {
+        let expectation = expectation(description: "capture callback fired")
+        sut.onCaptureTapped = { expectation.fulfill() }
 
         let tap = PassthroughSubject<Void, Never>()
         _ = sut.transform(input: HomeViewModel.Input(
-            viewDidLoad: Empty().eraseToAnyPublisher(),
             viewWillAppear: Empty().eraseToAnyPublisher(),
-            drugIdentifyTapped: tap.eraseToAnyPublisher(),
-            treatmentTimerTapped: Empty().eraseToAnyPublisher()
+            captureTapped: tap.eraseToAnyPublisher()
         ))
         tap.send(())
 
         waitForExpectations(timeout: 1)
     }
 
-    func test_treatmentTimerTapped_triggersNavigationCallback() {
-        let expectation = expectation(description: "treatment timer callback fired")
-        sut.onTreatmentTimerTapped = { expectation.fulfill() }
+    func test_timerCardTapped_triggersNavigationCallback() {
+        let expectation = expectation(description: "timer tab callback fired")
+        sut.onTimerTabTapped = { expectation.fulfill() }
 
         let tap = PassthroughSubject<Void, Never>()
         _ = sut.transform(input: HomeViewModel.Input(
-            viewDidLoad: Empty().eraseToAnyPublisher(),
             viewWillAppear: Empty().eraseToAnyPublisher(),
-            drugIdentifyTapped: Empty().eraseToAnyPublisher(),
-            treatmentTimerTapped: tap.eraseToAnyPublisher()
+            timerCardTapped: tap.eraseToAnyPublisher()
         ))
         tap.send(())
 
         waitForExpectations(timeout: 1)
+    }
+
+    /// 순서: 만료 → 진행 중(남은 시간이 짧은 순) → 일시정지, 3줄까지 (spec: feature/home/README.md).
+    func test_makeTimerList_ordersAndCapsAtThree() {
+        let now = Date()
+        func timer(_ label: String, _ state: TreatmentTimerState, remaining: Int) -> TreatmentTimerModel {
+            TreatmentTimerModel(
+                label: label, category: .treatment, duration: 3600,
+                endAt: now.addingTimeInterval(TimeInterval(remaining)),
+                remaining: state == .paused ? remaining : nil, state: state
+            )
+        }
+        let list = HomeViewModel.makeTimerList([
+            timer("일시정지", .paused, remaining: 10),
+            timer("긴 진행", .running, remaining: 900),
+            timer("짧은 진행", .running, remaining: 60),
+            timer("만료", .ringing, remaining: 0),
+        ], now: now)
+
+        XCTAssertEqual(list.rows.map(\.label), ["만료", "짧은 진행", "긴 진행"])
+        XCTAssertEqual(list.totalCount, 4)
+        XCTAssertTrue(list.showsAll)
     }
 }
