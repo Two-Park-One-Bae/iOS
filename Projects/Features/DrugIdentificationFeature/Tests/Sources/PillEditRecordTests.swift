@@ -56,8 +56,8 @@ private final class StubPillUseCase: PillUseCase {
     let pillDetailNotFound = PassthroughSubject<Void, Never>()
     let pillDetailFailure = PassthroughSubject<String, Never>()
 
-    func fetchPillAttributes(items: [(pillId: String, croppedImage: String)]) {}
-    func uploadOriginalImage(_ jpegData: Data) {}
+    func fetchPillAttributes(items: [PillAttributeInput], capture: PillImageCapture?) {}
+    func uploadOriginalImage(_ jpegData: Data, imageId: String?) {}
     func fetchPillCandidates(query: PillCandidateQuery) -> AnyPublisher<PillCandidateResultModel, Error> {
         Empty().eraseToAnyPublisher()
     }

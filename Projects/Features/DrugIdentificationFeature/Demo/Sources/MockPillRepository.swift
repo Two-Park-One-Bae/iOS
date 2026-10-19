@@ -13,7 +13,8 @@ import Domain
 final class MockPillRepository: PillRepositoryProtocol {
 
     func fetchPillAttributes(
-        items: [(pillId: String, croppedImage: String)]
+        items: [PillAttributeInput],
+        capture: PillImageCapture?
     ) -> AnyPublisher<PillAttributeResultModel, Error> {
         // 두 번째 알약은 추출 실패 — 부분 실패가 없어 실패면 나머지가 모두 비어 있다.
         // 데모는 한도를 소진하지 않는다 — 잔여를 넉넉히 준다. 한도 UI는 fetchPillUsage 스텁으로 확인.
@@ -29,7 +30,7 @@ final class MockPillRepository: PillRepositoryProtocol {
             .eraseToAnyPublisher()
     }
 
-    func uploadOriginalImage(_ jpegData: Data) -> AnyPublisher<Void, Error> {
+    func uploadOriginalImage(_ jpegData: Data, imageId: String?) -> AnyPublisher<Void, Error> {
         // 데모: 실제 업로드 없이 성공 처리(베스트 에포트).
         Just(())
             .setFailureType(to: Error.self)

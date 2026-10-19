@@ -10,8 +10,10 @@ import Foundation
 
 public protocol PillUseCase {
     // 촬영 → 속성 추출. 성공 시 pillAttributes 방출 (원본은 별도 S3 업로드, NM-348)
+    // capture 가 있으면 학습용 라벨 값을 함께 보낸다 (NM-568)
     func fetchPillAttributes(
-        items: [(pillId: String, croppedImage: String)]
+        items: [PillAttributeInput],
+        capture: PillImageCapture?
     )
 
     // 속성 수정 → 후보 조회 (NM-488). 실시간 재호출용. 속성 토큰을 서버가 못 읽으면(INVALID_ATTRIBUTE_TOKEN) 토큰 없이 한 번 더 조회한다.
@@ -22,7 +24,8 @@ public protocol PillUseCase {
     func fetchPillCandidateItems(pillCodes: [String]) -> AnyPublisher<PillCandidateItemsModel, Error>
 
     // 원본 이미지 S3 업로드 (NM-348). 식별과 분리된 베스트 에포트 — 실패해도 무시, 방출 없음.
-    func uploadOriginalImage(_ jpegData: Data)
+    // imageId 는 속성 추출의 capture 와 같은 값 (NM-568)
+    func uploadOriginalImage(_ jpegData: Data, imageId: String?)
 
     // 후보 선택 확정(pillCode) → 세부정보 조회 (NM-312)
     func fetchPillDetail(pillCode: String)
@@ -64,9 +67,10 @@ public final class DefaultPillUseCase: PillUseCase {
     }
 
     public func fetchPillAttributes(
-        items: [(pillId: String, croppedImage: String)]
+        items: [PillAttributeInput],
+        capture: PillImageCapture?
     ) {
-        repository.fetchPillAttributes(items: items)
+        repository.fetchPillAttributes(items: items, capture: capture)
             .catch { [weak self] error in
                 // 429는 일반 오류(분석 실패 화면)가 아니라 한도 안내 팝업으로 분기한다
                 if let limit = error as? PillLimitExceededError {
@@ -85,9 +89,9 @@ public final class DefaultPillUseCase: PillUseCase {
             .store(in: &cancellables)
     }
 
-    public func uploadOriginalImage(_ jpegData: Data) {
+    public func uploadOriginalImage(_ jpegData: Data, imageId: String?) {
         // 베스트 에포트 — 성공·실패 모두 무시하고 방출하지 않는다. 식별 플로우와 완전 분리 (NM-348).
-        repository.uploadOriginalImage(jpegData)
+        repository.uploadOriginalImage(jpegData, imageId: imageId)
             .sink(receiveCompletion: { _ in }, receiveValue: { _ in })
             .store(in: &cancellables)
     }
