@@ -4,8 +4,15 @@ import BaseFeatureDependency
 import Core
 import Domain
 import DSKit
+import DrugIdentificationFeatureInterface
 
 public final class DrugIdentificationCoordinator: BaseCoordinator {
+
+    /// 식별을 어디서 시작했나 — 끝내거나 그만두면 그 화면으로 돌아간다 (spec: "들어온 화면 (홈 / 알약 탭)").
+    private enum Entry {
+        case home
+        case pillTab
+    }
 
     private let cameraPicker: CameraPicker = {
         let picker = CameraPicker()
@@ -17,6 +24,12 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
     }()
 
     private var pillTabObserver: NSObjectProtocol?
+    private var captureObserver: NSObjectProtocol?
+    private var entry: Entry = .pillTab
+    private weak var listVC: PillHistoryListVC?
+    /// 지금 식별의 기록 id — 결과 화면이 열릴 때 만들어 저장 · 다시 시도까지 같은 값을 쓴다
+    /// (같은 id 로 다시 보내면 통째로 바뀌어 중복 기록이 생기지 않는다 — spec: domains/history.md).
+    private var historyId: String?
 
     /// 알약별 체류시간 누적기 — `PillEditVC` 가 매번 새로 만들어져도 값이 이어지도록 여기서 소유한다.
     /// 이 Coordinator 는 탭당 하나로 앱 수명 내내 살아 있어서, 새 인식 세션마다 `reset()` 해야
@@ -27,52 +40,61 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
         setupOverlay()
         setupCameraPickerCallbacks()
 
-        // 알약 탭의 루트 — 카메라는 이 위에 모달로 뜬다. 탭바가 런치 시 모든 탭을 미리 빌드해도
-        // 여기선 카메라를 띄우지 않아, 앱 시작하자마자 촬영 화면이 뜨는 문제를 막는다.
-        let root = UIViewController()
-        root.view.backgroundColor = .systemBackground
-        navigationController.setViewControllers([root], animated: false)
+        // 알약 탭의 루트 — 촬영 버튼 + 식별 기록 목록 (NM-552). 촬영은 이 위에 모달로 뜬다.
+        let list = PillHistoryListVC(viewModel: PillHistoryListViewModel())
+        listVC = list
+        list.onCaptureTapped = { [weak self] in
+            self?.trackButton("capture", screen: "pill_history")
+            self?.startCapture(from: .pillTab)
+        }
+        list.onSelectHistory = { [weak self] summary in
+            self?.showHistoryDetail(summary)
+        }
+        navigationController.setViewControllers([list], animated: false)
 
-        // 알약 탭이 실제로 선택될 때만 카메라를 present (사용자 탭 + 프로그래밍 전환 모두).
+        // 알약 탭 진입 — 목록 화면이 잔여 횟수를 보이므로 갱신하고, 촬영에 대비해 모델을 미리 연다.
+        // 카메라는 띄우지 않는다: 알약 탭은 기록 목록이고, 촬영은 촬영 버튼으로 시작한다.
         pillTabObserver = NotificationCenter.default.addObserver(
             forName: .pillTabSelected, object: nil, queue: .main
         ) { [weak self] _ in
-            guard let self else { return }
-            // 진입 시 잔여 조회 (spec: §식별 횟수 제한 "첫 실행·재설치·화면 진입 시 표시값의 기준").
-            // 조회 전용이라 카운트는 늘지 않는다(NM-331). 홈이 viewWillAppear 마다 하는 것과 같은
-            // 이유로, 홈을 거치지 않고 탭으로 바로 들어온 경우에도 값을 최신으로 만든다.
-            self.pillUseCase.fetchPillUsage()
+            // 조회 전용이라 카운트는 늘지 않는다(NM-331).
+            self?.pillUseCase.fetchPillUsage()
             // 각인·마크 모델을 촬영하는 동안 미리 연다 — 마크 ANE 첫 컴파일이 수 초 걸린다.
             PillFaceAnalyzer.shared.prewarm()
-            self.presentCameraIfAppropriate()
+        }
+
+        // 홈 '알약 식별' 카드 → 곧장 촬영. 끝나면 홈으로 돌아간다.
+        captureObserver = NotificationCenter.default.addObserver(
+            forName: .startPillCapture, object: nil, queue: .main
+        ) { [weak self] _ in
+            self?.startCapture(from: .home)
         }
     }
 
     deinit {
         if let pillTabObserver { NotificationCenter.default.removeObserver(pillTabObserver) }
+        if let captureObserver { NotificationCenter.default.removeObserver(captureObserver) }
     }
 
     /// 알약 탭 루트에서(식별 결과 등이 push되지 않았고 모달도 없을 때) 카메라를 present.
-    private func presentCameraIfAppropriate() {
+    private func startCapture(from entry: Entry) {
         guard navigationController.presentedViewController == nil,
               navigationController.viewControllers.count <= 1 else { return }
+        self.entry = entry
+        PillFaceAnalyzer.shared.prewarm()
 
         /*
          진입 게이트 (spec: feature/pill-recognition/README.md §식별 횟수 제한 §흐름 규칙
-         "식별 진입 시점(홈 '알약 식별' 카드/탭)에 … 0이면 안내 팝업을 띄우고 진입하지 않는다").
-
-         홈 카드는 HomeViewModel 이 같은 규칙으로 막는데 **탭 경로에만 게이트가 없어서**,
-         탭으로 들어오면 0회여도 촬영까지 그대로 진행됐다.
+         "식별 진입 시점(홈 '알약 식별' 카드 / 알약 탭 촬영 버튼)에 … 0이면 안내 팝업을 띄우고 진입하지 않는다").
 
          값을 모르면 통과한다 — 최종 판정은 서버 429 다(spec: "잔여 미확인 시 통과").
 
-         막을 때는 홈으로 되돌린다. 알약 탭 루트는 **카메라가 덮는 걸 전제로 한 빈 화면**이라
-         그대로 두면 흰 화면만 남는다. spec 흐름도도 팝업 확인 뒤를 홈으로 둔다(P -->|확인| H).
-         (미리보기에서 막힌 경우는 반대로 화면을 유지한다 — 거긴 찍은 사진이 있고, 잔여 0회를
+         막을 때는 들어온 화면에 머문다 — 홈에서 왔으면 홈으로 되돌리고, 알약 탭이면 기록 목록이 그대로 보인다.
+         (미리보기에서 막힌 경우도 화면을 유지한다 — 거긴 찍은 사진이 있고, 잔여 0회를
           경고색으로 보여 주는 자리다.)
          */
         if let usage = pillUseCase.pillUsage.value, usage.isExhausted {
-            NotificationCenter.default.post(name: .selectHomeTab, object: nil)
+            if entry == .home { NotificationCenter.default.post(name: .selectHomeTab, object: nil) }
             presentLimitAlert(usage: usage)
             return
         }
@@ -112,13 +134,14 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
             self?.showPermissionDenied()
         }
         cameraPicker.onCancelled = { [weak self] in
-            // 촬영 취소 → 알약 탭 루트는 빈 화면이므로 홈 탭으로 복귀.
-            self?.navigationController.popToRootViewController(animated: false)
-            NotificationCenter.default.post(name: .selectHomeTab, object: nil)
+            // 촬영 취소 → 들어온 화면으로 (홈 / 알약 탭 기록 목록).
+            self?.exitToEntry()
         }
     }
 
     @Injected private var pillUseCase: PillUseCase
+    @Injected private var historyUseCase: PillHistoryUseCase
+    private var cancelBag = Set<AnyCancellable>()
 
     // MARK: - ② 미리보기
 
@@ -148,7 +171,7 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
 
             self.startIdentification(image: image)
         }
-        vc.onExitToHome = { [weak self] in self?.exitToHome() }
+        vc.onExitToHome = { [weak self] in self?.exitToEntry() }
         // 미리보기에도 남은 횟수를 표시한다 (촬영 화면에는 표시하지 않는다).
         vc.bindUsage(pillUseCase.pillUsage.eraseToAnyPublisher())
         navigationController.pushViewController(vc, animated: true)
@@ -222,6 +245,8 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
     private func showResult(pills: [IdentifiedPill], image: UIImage, replacing loadingVC: UIViewController) {
         // 새 인식 세션 — 이전 사진의 알약별 누적 체류시간을 비운다.
         dwellTracker.reset()
+        // 기록 id 는 앱이 만든다 — 응답은 소문자라 처음부터 소문자로 둔다 (spec: domains/history.md).
+        historyId = UUID().uuidString.lowercased()
         let vc = DrugIdentificationVC(pills: pills, image: image)
         resultVC = vc
         vc.onExitToHome = { [weak self, weak vc] in
@@ -232,7 +257,7 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
                     unconfirmedCount: s.unconfirmedCount, deletedCount: s.deletedCount,
                     manualAddedCount: s.manualAddedCount, elapsedSec: s.elapsedSec))
             }
-            self?.exitToHome()
+            self?.exitToEntry()
         }
         vc.onSelectPill = { [weak self] pill in
             self?.showEdit(pill: pill)
@@ -262,17 +287,11 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
             self?.navigationController.popViewController(animated: true)
         }
         // 공유는 FinalResultVC 가 시스템 공유 시트(텍스트+PDF)를 직접 띄운다(PillShareComposer).
-        // 완료 → 알약 탭 스택을 루트(빈 화면)로 정리하고 홈 탭으로 복귀.
-        // 촬영 취소 흐름과 동일. 다음에 알약 탭을 다시 선택하면 카메라가 새로 뜬다.
-        vc.onComplete = { [weak self] in
-            // 완주(완료 버튼) — ⑤ 전원 확정 상태라 미확정=0.
-            if let s = self?.resultVC?.identificationSummary() {
-                AppAnalytics.track(.pillIdentifyComplete(
-                    detectedCount: s.detectedCount, confirmedCount: s.confirmedCount,
-                    deletedCount: s.deletedCount, manualAddedCount: s.manualAddedCount))
-            }
-            self?.navigationController.popToRootViewController(animated: false)
-            NotificationCenter.default.post(name: .selectHomeTab, object: nil)
+        // 완료 → 기록 저장 → 들어온 화면으로 (NM-552).
+        let pillCodes = results.map(\.candidate.pillCode)
+        vc.onComplete = { [weak self, weak vc] in
+            guard let self, let vc else { return }
+            self.saveHistory(pillCodes: pillCodes, from: vc)
         }
         // ⑨ 카드 탭 → ⑩ 세부정보 진입 (NM-317)
         vc.onSelectDetail = { [weak self] pillCode, licenseStatus in
@@ -398,7 +417,7 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
 
     private func showNotFound(image: UIImage, replacing loadingVC: UIViewController) {
         let vc = PillNotFoundVC(image: image)
-        vc.onBackTapped = { [weak self] in self?.exitToHome() }
+        vc.onBackTapped = { [weak self] in self?.exitToEntry() }
         vc.onRetake = { [weak self] in
             guard let self else { return }
             self.trackButton("retake", screen: "not_found")
@@ -440,19 +459,99 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
         replace(loadingVC, with: vc)
     }
 
-    /// 식별을 중단하고 홈 탭으로 되돌린다.
-    /// 알약 탭 루트는 빈 화면이라 그대로 두면 갈 곳이 없어, 촬영 취소와 같은 경로를 쓴다.
-    private func exitToHome() {
+    /// 식별을 끝내거나 그만두고 들어온 화면으로 돌아간다 — 홈이면 홈 탭, 알약 탭이면 기록 목록.
+    private func exitToEntry() {
         navigationController.popToRootViewController(animated: false)
-        NotificationCenter.default.post(name: .selectHomeTab, object: nil)
+        if entry == .home {
+            NotificationCenter.default.post(name: .selectHomeTab, object: nil)
+        }
+        entry = .pillTab
+        historyId = nil
+    }
+
+    // MARK: - ⑨ 완료 → 기록 저장 (NM-552)
+
+    /// 확정한 품목을 저장한다. 성공하면 들어온 화면으로, 실패하면 화면에 남아 모달을 띄운다.
+    private func saveHistory(pillCodes: [String], from vc: FinalResultVC) {
+        guard let historyId else {
+            exitToEntry()
+            return
+        }
+        vc.setSaving(true)
+        historyUseCase.saveHistory(historyId: historyId, pillCodes: pillCodes)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self, weak vc] completion in
+                guard case .failure(let error) = completion, let vc else { return }
+                vc.setSaving(false)
+                self?.presentSaveFailure(error, on: vc, pillCodes: pillCodes)
+            } receiveValue: { [weak self] in
+                guard let self else { return }
+                // 완주(완료 버튼) — ⑤ 전원 확정 상태라 미확정=0.
+                if let s = self.resultVC?.identificationSummary() {
+                    AppAnalytics.track(.pillIdentifyComplete(
+                        detectedCount: s.detectedCount, confirmedCount: s.confirmedCount,
+                        deletedCount: s.deletedCount, manualAddedCount: s.manualAddedCount))
+                }
+                self.exitToEntry()
+            }
+            .store(in: &cancelBag)
+    }
+
+    /// 저장 실패 — 통신 · 서버면 `나가기` / `다시 시도`, 요청이 잘못됐다는 응답(400)이면 `나가기`만.
+    /// `나가기`는 저장하지 않고 들어온 화면으로 간다.
+    private func presentSaveFailure(_ error: Error, on vc: FinalResultVC, pillCodes: [String]) {
+        let title = "식별 결과를 저장하지 못했어요"
+        guard !(error is PillHistoryRejectedError) else {
+            DSAlertCardView.present(
+                on: vc.view,
+                title: title,
+                message: "이 결과는 기록에 남길 수 없어요",
+                confirmTitle: "나가기"
+            ) { [weak self] in self?.exitToEntry() }
+            return
+        }
+
+        let card = ConfirmCardView(
+            title: title,
+            message: "네트워크 연결을 확인하고 다시 시도해 주세요",
+            cancelTitle: "나가기",
+            confirmTitle: "다시 시도"
+        )
+        vc.presentConfirmCard(card, dismissOnBackgroundTap: false) { [weak self, weak vc] in
+            guard let vc else { return }
+            self?.saveHistory(pillCodes: pillCodes, from: vc)
+        }
+        // ConfirmCardView 의 취소 자리가 `나가기`다 — dim 을 걷는 기본 동작 뒤에 이어서 나간다.
+        let dismiss = card.onCancel
+        card.onCancel = { [weak self] in
+            dismiss?()
+            self?.exitToEntry()
+        }
+    }
+
+    // MARK: - 기록 상세 (NM-552)
+
+    private func showHistoryDetail(_ summary: PillHistorySummaryModel) {
+        trackButton("history_item", screen: "pill_history")
+        let coordinator = PillHistoryDetailCoordinator(navigationController: navigationController, summary: summary)
+        coordinator.onFinish = { [weak self, weak coordinator] exit in
+            guard let self else { return }
+            if let coordinator { self.removeChild(coordinator) }
+            // 목록은 보일 때마다 다시 받으므로 지웠거나 없어진 기록은 돌아오면 빠진다.
+            if exit == .notFound {
+                self.listVC?.showToast("기록을 찾을 수 없어요")
+            }
+        }
+        addChild(coordinator)
+        coordinator.start()
     }
 
     // MARK: - ③ 권한 거부
 
     private func showPermissionDenied() {
         let vc = PermissionDeniedVC()
-        // 뒤로가기 → 홈으로. 단순 pop이면 알약탭 스택에 빈 화면만 남으므로 popToRoot + 홈탭 전환.
-        vc.onBackTapped = { [weak self] in self?.exitToHome() }
+        // 뒤로가기 → 들어온 화면으로 (홈 / 알약 탭 기록 목록).
+        vc.onBackTapped = { [weak self] in self?.exitToEntry() }
         vc.onOpenSettings = {
             guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
             UIApplication.shared.open(url)

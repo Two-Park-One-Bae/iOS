@@ -22,6 +22,11 @@ public protocol PillService {
     func fetchPillUsage() -> AnyPublisher<PillUsageEntity, Error>
     // 원본 이미지 S3 업로드용 presigned URL 발급 (NM-348). 식별과 분리된 베스트 에포트.
     func issuePillImageUploadURL() -> AnyPublisher<PillImageUploadURLEntity, Error>
+    // 식별 기록 요약 목록, 최신순 (NM-552)
+    func fetchPillHistories(limit: Int, cursor: String?) -> AnyPublisher<PillHistoryPageEntity, Error>
+    func fetchPillHistory(historyId: String) -> AnyPublisher<PillHistoryEntity, Error>
+    func savePillHistory(historyId: String, pillCodes: [String]) -> AnyPublisher<Void, Error>
+    func deletePillHistory(historyId: String) -> AnyPublisher<Void, Error>
 }
 
 extension DefaultPillService: PillService {
@@ -33,6 +38,26 @@ extension DefaultPillService: PillService {
     // 조회 전용 — 호출해도 카운트가 늘지 않는다 (NM-331)
     public func fetchPillUsage() -> AnyPublisher<PillUsageEntity, Error> {
         requestObjectWithNetworkErrorInCombine(.pillAttributesUsage)
+    }
+
+    public func fetchPillHistories(limit: Int, cursor: String?) -> AnyPublisher<PillHistoryPageEntity, Error> {
+        requestObjectWithNetworkErrorInCombine(.pillHistories(limit: limit, cursor: cursor))
+    }
+
+    // 404(없어진 기록)를 Repository 가 구분할 수 있도록 에러 코드를 보존한다.
+    public func fetchPillHistory(historyId: String) -> AnyPublisher<PillHistoryEntity, Error> {
+        requestObjectWithNetworkErrorInCombine(.pillHistory(historyId: historyId))
+    }
+
+    // 204. 400(카탈로그에 없는 pillCode)은 다시 시도하지 않으므로 상태코드를 보존한다.
+    public func savePillHistory(historyId: String, pillCodes: [String]) -> AnyPublisher<Void, Error> {
+        requestNoContentWithNetworkErrorInCombine(
+            .savePillHistory(historyId: historyId, request: PillHistorySaveRequest(pillCodes: pillCodes))
+        )
+    }
+
+    public func deletePillHistory(historyId: String) -> AnyPublisher<Void, Error> {
+        requestNoContentWithNetworkErrorInCombine(.deletePillHistory(historyId: historyId))
     }
 
     // 400 INVALID_ATTRIBUTE_TOKEN 을 Repository 가 구분할 수 있도록 에러 코드를 보존한다 (NM-488)

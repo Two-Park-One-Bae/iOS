@@ -22,6 +22,14 @@ public enum PillAPI {
     // POST /api/v0/pill-images/upload-url — 원본 이미지 S3 업로드용 presigned URL 발급 (NM-348).
     // 본문 없음 · App Check만 · usage 무관. 식별과 분리된 베스트 에포트.
     case pillImagesUploadUrl
+    // GET /api/v0/pill-histories?limit&cursor — 식별 기록 요약 목록, 최신순 (NM-552)
+    case pillHistories(limit: Int, cursor: String?)
+    // GET /api/v0/pill-histories/{historyId} — 식별 기록 한 건 (NM-552)
+    case pillHistory(historyId: String)
+    // PUT /api/v0/pill-histories/{historyId} — 식별 기록 저장, 같은 id 면 통째로 바꾼다 (NM-552)
+    case savePillHistory(historyId: String, request: PillHistorySaveRequest)
+    // DELETE /api/v0/pill-histories/{historyId} — 식별 기록 삭제, 이미 없어도 204 (NM-552)
+    case deletePillHistory(historyId: String)
 }
 
 extension PillAPI: BaseAPI {
@@ -44,13 +52,21 @@ extension PillAPI: BaseAPI {
             return "/pill-details/\(encoded)"
         case .pillAttributesUsage: return "/pill-attributes/usage"
         case .pillImagesUploadUrl: return "/pill-images/upload-url"
+        case .pillHistories:       return "/pill-histories"
+        case .pillHistory(let historyId),
+             .savePillHistory(let historyId, _),
+             .deletePillHistory(let historyId):
+            return "/pill-histories/\(historyId)"
         }
     }
 
     public var method: Moya.Method {
         switch self {
         case .pillAttributes, .pillCandidates, .pillImagesUploadUrl:          return .post
-        case .pillDetails, .pillAttributesUsage, .pillCandidateItems:         return .get
+        case .pillDetails, .pillAttributesUsage, .pillCandidateItems,
+             .pillHistories, .pillHistory:                                    return .get
+        case .savePillHistory:                                                return .put
+        case .deletePillHistory:                                              return .delete
         }
     }
 
@@ -64,7 +80,14 @@ extension PillAPI: BaseAPI {
             // style: form, explode: false — 한 파라미터에 쉼표로 잇는다(pillCodes=a,b).
             return .requestParameters(parameters: ["pillCodes": pillCodes.joined(separator: ",")],
                                       encoding: URLEncoding.queryString)
-        case .pillDetails, .pillAttributesUsage, .pillImagesUploadUrl:
+        case .pillHistories(let limit, let cursor):
+            var parameters: [String: Any] = ["limit": limit]
+            parameters["cursor"] = cursor
+            return .requestParameters(parameters: parameters, encoding: URLEncoding.queryString)
+        case .savePillHistory(_, let request):
+            return .requestJSONEncodable(request)
+        case .pillDetails, .pillAttributesUsage, .pillImagesUploadUrl,
+             .pillHistory, .deletePillHistory:
             return .requestPlain
         }
     }
