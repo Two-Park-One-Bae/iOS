@@ -47,18 +47,9 @@ public final class TimerListVC: UIViewController {
 
     private let emptyView = TimerEmptyView().then { $0.isHidden = true }
 
-    private let fab = UIButton(type: .system).then {
-        $0.backgroundColor = DSColor.Primary._500
-        $0.layer.cornerRadius = 28
-        $0.setImage(
-            UIImage(systemName: "plus", withConfiguration: UIImage.SymbolConfiguration(pointSize: 22, weight: .medium)),
-            for: .normal
-        )
-        $0.tintColor = DSColor.Neutral._0
-        $0.layer.shadowColor = DSColor.Primary._600.cgColor
-        $0.layer.shadowOpacity = 0.4
-        $0.layer.shadowOffset = CGSize(width: 0, height: 4)
-        $0.layer.shadowRadius = 16
+    // 띄운 버튼 — 파랗게 물든 유리 원(56).
+    private let fab = FloatingButton(icon: .plus).then {
+        $0.accessibilityLabel = "타이머 추가"
     }
 
     // MARK: - Init
@@ -84,7 +75,7 @@ public final class TimerListVC: UIViewController {
     // MARK: - Setup
 
     private func setUI() {
-        view.backgroundColor = DSColor.bgApp
+        view.backgroundColor = DSColor.surface
         fab.addAction(UIAction { [weak self] _ in self?.onAddTapped?() }, for: .touchUpInside)
         emptyView.onStart = { [weak self] in self?.onAddTapped?() }
     }
@@ -179,7 +170,6 @@ public final class TimerListVC: UIViewController {
                     guard let current = self?.viewModel.currentTimers.first(where: { $0.id == timer.id }) else { return }
                     self?.viewModel.pauseOrResume(current)
                 }
-                card.onExtend = { [weak self] in self?.viewModel.extendOneMinute(id: timer.id) }
                 card.onStop = { [weak self] in self?.viewModel.remove(id: timer.id) }
                 card.onMemoSave = { [weak self] memo in self?.viewModel.updateMemo(id: timer.id, memo: memo) }
                 card.render(timer)

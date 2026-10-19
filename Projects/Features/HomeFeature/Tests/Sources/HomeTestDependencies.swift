@@ -59,6 +59,7 @@ final class StubTimerUseCase: TimerUseCase {
     func addPreset(label: String, category: TimerCategory, duration: Int) {}
     func updatePreset(_ preset: TimerPresetModel) {}
     func deletePreset(id: UUID) {}
+    func movePreset(id: UUID, to index: Int) {}
     func requestAlarmPermission() {}
     func fetchAlarmPermission() {}
 }

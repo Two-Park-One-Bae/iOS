@@ -17,7 +17,7 @@ final class PresetDeleteConfirmView: UIView {
     required init?(coder: NSCoder) { fatalError() }
 
     private func setup() {
-        backgroundColor = DSColor.Neutral._0
+        backgroundColor = DSColor.surface
         layer.cornerRadius = 16
         layer.masksToBounds = false
         layer.shadowColor = UIColor.black.cgColor

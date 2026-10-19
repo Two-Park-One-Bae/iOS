@@ -144,6 +144,9 @@ public final class TimerCoordinator: BaseCoordinator {
             guard let sheet else { return }
             self?.showDeleteConfirm(preset: preset, over: sheet)
         }
+        sheet.onMovePreset = { [weak self] preset, index in
+            self?.viewModel?.movePreset(id: preset.id, to: index)
+        }
         presentAsSheet(sheet, height: nil)
     }
 

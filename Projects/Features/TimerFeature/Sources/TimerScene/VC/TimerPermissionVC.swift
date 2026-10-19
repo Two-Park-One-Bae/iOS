@@ -39,7 +39,7 @@ public final class TimerPermissionVC: UIViewController {
     // MARK: - Layout
 
     private func setLayout() {
-        view.backgroundColor = DSColor.Neutral._0
+        view.backgroundColor = DSColor.surface
 
         let isPrompt = mode == .prompt
 
@@ -49,10 +49,7 @@ public final class TimerPermissionVC: UIViewController {
             $0.layer.cornerRadius = 32
         }
         let icon = UIImageView().then {
-            $0.image = UIImage(
-                systemName: isPrompt ? "bell.fill" : "bell.slash.fill",
-                withConfiguration: UIImage.SymbolConfiguration(pointSize: 26, weight: .regular)
-            )
+            $0.image = (isPrompt ? DSIcon.bell : DSIcon.bellOff).uiImage
             $0.tintColor = isPrompt ? DSColor.Primary._600 : DSColor.Error._600
             $0.contentMode = .scaleAspectFit
         }
