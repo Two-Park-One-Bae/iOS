@@ -14,7 +14,8 @@ public enum StoreReviewMoment: Equatable {
 /// 요청 판단에 쓰는 기록 — 기기에만 둔다. 재설치하면 처음부터 센다.
 public struct StoreReviewRecord: Codable, Equatable {
     public var firstLaunchAt: Date?
-    /// 앱을 연 날(그날 0시). 최근 7일 판단에만 쓰므로 그보다 오래된 날은 버린다.
+    /// 앱 · 위젯 · 워치를 쓴 날(그날 0시). 최근 7일 판단에만 쓰므로 그보다 오래된 날은 버린다.
+    /// 위젯 · 워치만 쓴 날도 센다 — 앱을 며칠 만에 열어도 실제로 쓴 날로 남는다.
     public var activeDays: [Date] = []
     /// 기록 저장에 성공한 식별 수.
     public var identificationCount = 0
@@ -111,12 +112,9 @@ public final class StoreReview {
 
     /// 앱이 활성화될 때마다 — 첫 실행 시각과 앱을 연 날을 남긴다.
     public func recordAppActive() {
-        let today = calendar.startOfDay(for: now())
         var record = record
         if record.firstLaunchAt == nil { record.firstLaunchAt = now() }
-        if !record.activeDays.contains(today) { record.activeDays.append(today) }
-        let oldest = calendar.date(byAdding: .day, value: -(StoreReviewPolicy.recentWindowDays - 1), to: today) ?? today
-        record.activeDays.removeAll { $0 < oldest }
+        addUsedDays([now()], to: &record)
         self.record = record
     }
 
@@ -124,9 +122,15 @@ public final class StoreReview {
         record.identificationCount += 1
     }
 
-    public func recordTimerStarted(count: Int = 1) {
-        guard count > 0 else { return }
-        record.timerStartCount += count
+    /// 타이머를 시작했다 — 앱 · 워치는 지금, 위젯(앱 밖)은 큐에 남은 시작 시각들로 부른다.
+    /// 시작한 날도 쓴 날로 남긴다.
+    public func recordTimerStarted(at dates: [Date]? = nil) {
+        let dates = dates ?? [now()]
+        guard !dates.isEmpty else { return }
+        var record = record
+        record.timerStartCount += dates.count
+        addUsedDays(dates, to: &record)
+        self.record = record
     }
 
     public func recordLimitAlertShown() {
@@ -134,8 +138,23 @@ public final class StoreReview {
     }
 
     /// 앱 밖(시스템 알람 · 워치)에서 타이머를 끝냈다 — 앱이 앞에 없어 바로 요청할 수 없다.
-    public func recordTimerCompletedOutsideApp() {
+    /// 끝낸 날도 쓴 날로 남긴다(큐에서 꺼낸 완료는 그 시각들로 부른다).
+    public func recordTimerCompletedOutsideApp(at dates: [Date]? = nil) {
+        var record = record
         record.hasPendingTimerMoment = true
+        addUsedDays(dates ?? [now()], to: &record)
+        self.record = record
+    }
+
+    /// 쓴 날을 더하고 최근 7일보다 오래된 날은 버린다.
+    private func addUsedDays(_ dates: [Date], to record: inout StoreReviewRecord) {
+        let today = calendar.startOfDay(for: now())
+        let oldest = calendar.date(byAdding: .day, value: -(StoreReviewPolicy.recentWindowDays - 1), to: today) ?? today
+        for day in dates.map({ calendar.startOfDay(for: $0) }) where !record.activeDays.contains(day) {
+            record.activeDays.append(day)
+        }
+        record.activeDays.removeAll { $0 < oldest }
+        record.activeDays.sort()
     }
 
     // MARK: - 요청

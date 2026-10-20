@@ -128,6 +128,22 @@ final class StoreReviewPolicyTests: XCTestCase {
     }
 
     @MainActor
+    func test_위젯만_3일_쓰고_4일째_앱을_열면_쓴_날이_4일이다() {
+        let defaults = UserDefaults(suiteName: #function)!
+        defaults.removePersistentDomain(forName: #function)
+        let review = StoreReview(defaults: defaults, now: { self.now }, calendar: calendar, present: { _ in })
+
+        review.recordAppActive()
+        // 큐에 남은 위젯 시작 · 앱 밖 완료 — 1 · 2 · 3일 전, 그리고 7일보다 오래된 것 하나
+        review.recordTimerStarted(at: [daysAgo(3), daysAgo(2), daysAgo(1), daysAgo(9)])
+        review.recordTimerCompletedOutsideApp(at: [daysAgo(1)])
+
+        XCTAssertEqual(review.record.activeDays, [3, 2, 1, 0].map { calendar.startOfDay(for: daysAgo($0)) })
+        XCTAssertEqual(review.record.timerStartCount, 4)
+        XCTAssertTrue(StoreReviewPolicy.shouldRequest(review.record, moment: .timerCompleted, now: now, calendar: calendar))
+    }
+
+    @MainActor
     func test_앱_밖에서_끝낸_타이머는_띄울_씬이_없으면_다음_활성화까지_남긴다() {
         let defaults = UserDefaults(suiteName: #function)!
         defaults.removePersistentDomain(forName: #function)
