@@ -13,6 +13,8 @@ public enum StoreReviewMoment: Equatable {
 
 /// 요청 판단에 쓰는 기록 — 기기에만 둔다. 재설치하면 처음부터 센다.
 public struct StoreReviewRecord: Codable, Equatable {
+    /// 처음 쓴 시각 — 앱을 연 때뿐 아니라 위젯 · 워치로 타이머를 쓴 때도 포함한다.
+    /// (저장 키를 지키려고 이름은 그대로 둔다)
     public var firstLaunchAt: Date?
     /// 앱 · 위젯 · 워치를 쓴 날(그날 0시). 최근 7일 판단에만 쓰므로 그보다 오래된 날은 버린다.
     /// 위젯 · 워치만 쓴 날도 센다 — 앱을 며칠 만에 열어도 실제로 쓴 날로 남는다.
@@ -51,7 +53,7 @@ public enum StoreReviewPolicy {
         if let elapsed = days(since: record.lastRequestedAt), elapsed < requestInterval { return false }
         let launchedDaysAgo = days(since: record.firstLaunchAt) ?? 0
 
-        // 묶음 1 — 식별 누적 3회 · 첫 실행 후 3일 · 수정 없이 고름 · 오늘 한도 안내를 보지 않음.
+        // 묶음 1 — 식별 누적 3회 · 첫 사용 후 3일 · 수정 없이 고름 · 오늘 한도 안내를 보지 않음.
         if case .identificationSaved(let allUnedited) = moment,
            record.identificationCount >= 3,
            launchedDaysAgo >= 3,
@@ -69,7 +71,7 @@ public enum StoreReviewPolicy {
             return true
         }
 
-        // 묶음 3 — 첫 실행 후 3일 · 타이머 누적 5회. 타이머를 끝냈을 때만 본다.
+        // 묶음 3 — 첫 사용 후 3일 · 타이머 누적 5회. 타이머를 끝냈을 때만 본다.
         return moment == .timerCompleted && launchedDaysAgo >= 3 && record.timerStartCount >= 5
     }
 }
@@ -113,7 +115,6 @@ public final class StoreReview {
     /// 앱이 활성화될 때마다 — 첫 실행 시각과 앱을 연 날을 남긴다.
     public func recordAppActive() {
         var record = record
-        if record.firstLaunchAt == nil { record.firstLaunchAt = now() }
         addUsedDays([now()], to: &record)
         self.record = record
     }
@@ -146,8 +147,12 @@ public final class StoreReview {
         self.record = record
     }
 
-    /// 쓴 날을 더하고 최근 7일보다 오래된 날은 버린다.
+    /// 쓴 날을 더하고 최근 7일보다 오래된 날은 버린다. 가장 이른 사용이 처음 쓴 시각보다 앞서면 당긴다 —
+    /// 위젯으로 먼저 쓰고 앱은 나중에 열어도 그 위젯 사용이 첫 사용이다.
     private func addUsedDays(_ dates: [Date], to record: inout StoreReviewRecord) {
+        if let earliest = dates.min(), earliest < (record.firstLaunchAt ?? .distantFuture) {
+            record.firstLaunchAt = earliest
+        }
         let today = calendar.startOfDay(for: now())
         let oldest = calendar.date(byAdding: .day, value: -(StoreReviewPolicy.recentWindowDays - 1), to: today) ?? today
         for day in dates.map({ calendar.startOfDay(for: $0) }) where !record.activeDays.contains(day) {
