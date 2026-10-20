@@ -38,12 +38,17 @@ public struct CroppedDetection: Identifiable {
     public let image: UIImage
     public let score: Float
     public let pixelSize: CGSize
+    /// 크롭을 잘라 낸 자리 — 세운(upright) 원본의 픽셀 좌표. 크기는 `pixelSize` 와 같다.
+    public let rect: CGRect
 }
 
 public final class RFDetrSegmentor: @unchecked Sendable {
     public static let inputSize  = 576
     public static let queryCount = 100
     public static let maskSize   = 144
+    /// 이 분할기가 쓰는 모델 버전 — ML 레포 모델 폴더 이름(`models/seg/{modelVersion}`).
+    /// 학습용 라벨의 `segModel` 로 보낸다 (NM-568). 모델을 바꾸면 models.lock 과 함께 고친다.
+    public static let modelVersion = "20260610-rfdetr-seg-small"
 
     private let model: MLModel
 
@@ -54,14 +59,25 @@ public final class RFDetrSegmentor: @unchecked Sendable {
     /// N배 스파이크를 냈다. 이제 원본 정규화는 1회, 각 크롭은 autoreleasepool로 감싸 대형 임시
     /// 비트맵이 즉시 해제되게 한다.
     public static func croppedImages(from original: UIImage, detections: [RFDetection]) -> [UIImage?] {
+        crops(from: original, detections: detections).map { $0?.image }
+    }
+
+    /// `croppedImages` 와 같고, 잘라 낸 자리(`rect`)까지 돌려준다 — 학습용 라벨의 `box` (NM-568).
+    public static func crops(from original: UIImage, detections: [RFDetection]) -> [CroppedDetection?] {
         // 추론(makeInputArray)은 orientation을 세운 upright 이미지에서 box·mask를 계산한다.
         // 크롭도 반드시 같은 정규화 이미지에서 잘라야 좌표가 일치한다.
         guard let cgImage = normalizedCGImage(from: original) else {
             return Array(repeating: nil, count: detections.count)
         }
         return detections.map { detection in
-            autoreleasepool { cropWithMask(cgImage: cgImage, detection: detection)?.image }
+            autoreleasepool { cropWithMask(cgImage: cgImage, detection: detection) }
         }
+    }
+
+    /// 추론 · 크롭이 보는 것과 같은 픽셀의 세운 이미지(scale 1). 원본 업로드도 이걸 써야 `rect` 가 업로드본 좌표가 된다.
+    public static func uprightImage(_ image: UIImage) -> UIImage? {
+        if image.imageOrientation == .up, image.scale == 1 { return image }
+        return normalizedCGImage(from: image).map { UIImage(cgImage: $0, scale: 1, orientation: .up) }
     }
 
     private static func cropWithMask(cgImage: CGImage, detection: RFDetection) -> CroppedDetection? {
@@ -130,7 +146,12 @@ public final class RFDetrSegmentor: @unchecked Sendable {
                 bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
                 provider: provider, decode: nil, shouldInterpolate: true, intent: .defaultIntent
               ) else { return nil }
-        return CroppedDetection(image: UIImage(cgImage: result), score: detection.score, pixelSize: CGSize(width: cropW, height: cropH))
+        return CroppedDetection(
+            image: UIImage(cgImage: result),
+            score: detection.score,
+            pixelSize: CGSize(width: cropW, height: cropH),
+            rect: CGRect(x: px0, y: py0, width: cropW, height: cropH)
+        )
     }
 
     public init() throws {
@@ -261,7 +282,10 @@ public final class RFDetrSegmentor: @unchecked Sendable {
 
     private static func normalizedCGImage(from image: UIImage) -> CGImage? {
         if image.imageOrientation == .up, let cg = image.cgImage { return cg }
-        return UIGraphicsImageRenderer(size: image.size)
+        // 화면 배율이 아니라 이미지 배율로 그린다 — 픽셀 수가 원본과 같아야 한다.
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = image.scale
+        return UIGraphicsImageRenderer(size: image.size, format: format)
             .image { _ in image.draw(in: CGRect(origin: .zero, size: image.size)) }
             .cgImage
     }

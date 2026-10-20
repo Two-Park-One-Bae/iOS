@@ -30,6 +30,11 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
     /// 지금 식별의 기록 id — 결과 화면이 열릴 때 만들어 저장 · 다시 시도까지 같은 값을 쓴다
     /// (같은 id 로 다시 보내면 통째로 바뀌어 중복 기록이 생기지 않는다 — spec: domains/history.md).
     private var historyId: String?
+    /// 지금 사진의 학습용 라벨 키(UUID v7, NM-568) — 사진을 고를 때 만들고 다시 분석해도 같은 값을 쓴다.
+    /// 학습 데이터를 보내지 않는 빌드(내부 빌드)면 nil 이고, 원본 업로드 · 라벨을 모두 건너뛴다.
+    private var imageId: String?
+    /// 수동 추가 알약의 라벨 번호(100부터) — 결과 화면의 알약 index → pillIndex. 다시 고쳐 `선택` 해도 같은 번호로 보낸다.
+    private var manualLabelIndexes: [Int: Int] = [:]
 
     /// 알약별 체류시간 누적기 — `PillEditVC` 가 매번 새로 만들어져도 값이 이어지도록 여기서 소유한다.
     /// 이 Coordinator 는 탭당 하나로 앱 수명 내내 살아 있어서, 새 인식 세션마다 `reset()` 해야
@@ -141,6 +146,7 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
 
     @Injected private var pillUseCase: PillUseCase
     @Injected private var historyUseCase: PillHistoryUseCase
+    @Injected private var labelUseCase: PillLabelUseCase
     private var cancelBag = Set<AnyCancellable>()
 
     // MARK: - ② 미리보기
@@ -198,6 +204,8 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
     // MARK: - ④ 로딩 → ⑤/⑥/⑦
 
     private func startIdentification(image: UIImage) {
+        // 사진 한 장에 id 하나 — 같은 값을 원본 업로드와 속성 추출에 보낸다(spec label.md 단위와 키).
+        imageId = AppEnvironment.collectsTrainingData ? PillImageId.make() : nil
         navigationController.pushViewController(makeLoadingVC(image: image), animated: true)
     }
 
@@ -207,7 +215,8 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
     /// 재시도가 같은 사진으로 분석을 처음부터(온디바이스 탐지 + 서버 왕복) 다시 돌려야 하는데,
     /// VM 은 이미 종료 상태를 방출한 뒤라 재사용할 수 없다.
     private func makeLoadingVC(image: UIImage) -> PillLoadingVC {
-        let viewModel = DrugIdentificationViewModel(image: image)
+        // 재시도도 같은 imageId — 서버는 아직 UNCONFIRMED 인 행과 위치만 덮어쓴다.
+        let viewModel = DrugIdentificationViewModel(image: image, imageId: imageId)
         let loadingVC = PillLoadingVC(image: image, viewModel: viewModel)
 
         // loadingVC 를 강하게 캡처하면 loadingVC → 클로저 → loadingVC 사이클로 안 죽는다.
@@ -244,6 +253,7 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
     private func showResult(pills: [IdentifiedPill], image: UIImage, replacing loadingVC: UIViewController) {
         // 새 인식 세션 — 이전 사진의 알약별 누적 체류시간을 비운다.
         dwellTracker.reset()
+        manualLabelIndexes = [:]
         // 기록 id 는 앱이 만든다 — 응답은 소문자라 처음부터 소문자로 둔다 (spec: domains/history.md).
         historyId = UUID().uuidString.lowercased()
         let vc = DrugIdentificationVC(pills: pills, image: image)
@@ -303,9 +313,11 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
             thumbnail: pill.thumbnail,
             isManual: isManual
         )
+        var latest = viewModel.conditions
         let vc = PillEditVC(viewModel: viewModel)
         vc.dwellTracker = dwellTracker
         vc.onConditionsChanged = { [weak resultVC] conditions in
+            latest = conditions
             resultVC?.store(conditions, for: pill.index)
         }
         vc.onEditRecordChanged = { [weak resultVC] record in
@@ -319,6 +331,7 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
                 pillIndex: pill.index,
                 candidate: candidate
             )
+            self?.sendLabel(index: pill.index, modelPill: isManual ? nil : pill, candidate: candidate, conditions: latest)
             self?.navigationController.popViewController(animated: true)
         }
         // ⑧ 후보 ⓘ → ⑩ 세부정보 진입 (NM-317)
@@ -355,6 +368,7 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
         vc.onConfirm = { [weak self] candidate in
             self?.resultVC?.addManualPill(index: index, candidate: candidate)
             self?.resultVC?.store(latest, for: index)   // 다시 열면 고친 조건 그대로
+            self?.sendLabel(index: index, modelPill: nil, candidate: candidate, conditions: latest)
             self?.navigationController.popViewController(animated: true)
         }
         vc.onSelectDetail = { [weak self] pillCode, licenseStatus in
@@ -438,12 +452,58 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
         }
         entry = .pillTab
         historyId = nil
+        imageId = nil
+    }
+
+    // MARK: - 학습용 라벨 (NM-568)
+
+    /// 후보를 `선택` 하고 돌아올 때 그 알약 하나를 보낸다. 베스트 에포트 — 실패해도 화면에 아무것도 띄우지 않는다.
+    ///
+    /// - Parameters:
+    ///   - index: 결과 화면의 알약 index.
+    ///   - modelPill: 모델이 찾은 알약이면 그 알약. 수동 추가 알약이면 nil.
+    ///   - conditions: 마지막으로 찾은 조건 — 그 후보 조회 요청이 `userInput` 이다.
+    private func sendLabel(index: Int, modelPill: IdentifiedPill?, candidate: PillCandidateModel, conditions: PillConditions) {
+        guard let imageId else { return }
+
+        let pillIndex: Int
+        let model: PillCandidateQuery?
+        if let modelPill {
+            // 속성 추출에 보낸 pillId 그대로 — 카드를 지워 화면 번호가 당겨져도 바뀌지 않는다.
+            guard let id = Int(modelPill.pillId), PillLabelIndex.model.contains(id) else { return }
+            pillIndex = id
+            // 첫 후보 조회 요청 = 모델 출력으로 연 조건의 요청(사용자가 아무것도 고치기 전).
+            model = PillConditions(model: modelPill.modelOutput).query
+        } else {
+            let next = PillLabelIndex.manual.lowerBound + manualLabelIndexes.count
+            let assigned = manualLabelIndexes[index] ?? next
+            guard PillLabelIndex.manual.contains(assigned) else { return }
+            manualLabelIndexes[index] = assigned
+            pillIndex = assigned
+            model = nil
+        }
+
+        labelUseCase.sendLabel(
+            imageId: imageId,
+            pillIndex: pillIndex,
+            label: PillLabelModel(
+                pillCode: candidate.pillCode,
+                manual: modelPill == nil,
+                model: model,
+                userInput: conditions.query
+            )
+        )
     }
 
     // MARK: - ⑤ 완료 → 기록 저장 (NM-552)
 
     /// 확정한 품목을 화면 순서대로 저장한다. 성공하면 들어온 화면으로, 실패하면 화면에 남아 모달을 띄운다.
     private func saveHistory(from vc: DrugIdentificationVC) {
+        // 지운 번호는 `완료` 때만 보낸다 — 저장하지 않고 나간 사진은 비어(null) 있어 끝까지 본 사진인지 가른다(NM-568).
+        // 기록 저장과는 따로 가는 베스트 에포트다. 다시 시도로 또 와도 서버가 덮어쓴다.
+        if let imageId {
+            labelUseCase.sendDeletedIndexes(imageId: imageId, deletedIndexes: vc.deletedModelPillIds())
+        }
         let pillCodes = vc.finalizedResults().map(\.candidate.pillCode)
         guard let historyId, !pillCodes.isEmpty else {
             exitToEntry()

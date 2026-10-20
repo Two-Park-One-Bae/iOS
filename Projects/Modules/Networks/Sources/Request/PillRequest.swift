@@ -19,24 +19,49 @@ public struct PillImageRequest: Encodable {
 }
 
 // POST /api/v1/pill-attributes 요청 바디 — 크롭만 전달한다.
-// 원본은 /api/v0/pill-images/upload-url로 S3에 직접 업로드하며 식별 요청과 분리된다 (NM-348).
+// 원본은 /api/v0/pill-images/upload-url로 S3에 직접 업로드하며 식별과 분리된다 (NM-348).
+// imageId 부터는 학습용 라벨 값(NM-568) — 보내면 서버가 응답 뒤 크롭 · 알약 행 · 알약 위치 행을 저장한다.
+// nil 이면 키째 빠져 지금과 같다(내부 빌드는 보내지 않는다).
 public struct PillAttributeRequest: Encodable {
     public let items: [PillAttributeItemRequest]
+    // 앱이 만든 UUID v7 — upload-url 에 보낸 값과 같다
+    public let imageId: String?
+    // 업로드한 원본 픽셀 크기
+    public let imageWidth: Int?
+    public let imageHeight: Int?
+    // 알약 찾기 모델 버전(ML 레포 모델 폴더 이름)
+    public let segModel: String?
 
-    public init(items: [PillAttributeItemRequest]) {
+    public init(
+        items: [PillAttributeItemRequest],
+        imageId: String? = nil,
+        imageWidth: Int? = nil,
+        imageHeight: Int? = nil,
+        segModel: String? = nil
+    ) {
         self.items = items
+        self.imageId = imageId
+        self.imageWidth = imageWidth
+        self.imageHeight = imageHeight
+        self.segModel = segModel
     }
 }
 
 // 검출된 알약 1개 (온디바이스 크롭)
 public struct PillAttributeItemRequest: Encodable {
-    // 세션 내 로컬 식별자. 응답의 pillId와 매핑 키로 사용
+    // 세션 내 로컬 식별자. 응답의 pillId와 매핑 키로 사용. 라벨을 보낼 때는 0~99 정수 문자열(= pillIndex)
     public let pillId: String
     public let croppedImage: PillImageRequest      // 크롭 이미지 객체
+    // 라벨용(NM-568) — 크롭 위치 [x, y, 너비, 높이], 업로드한 원본 픽셀 기준. 너비 · 높이 = 크롭 크기
+    public let box: [Int]?
+    // 라벨용(NM-568) — 알약 찾기 점수(0~1)
+    public let score: Double?
 
-    public init(pillId: String, croppedImage: PillImageRequest) {
+    public init(pillId: String, croppedImage: PillImageRequest, box: [Int]? = nil, score: Double? = nil) {
         self.pillId = pillId
         self.croppedImage = croppedImage
+        self.box = box
+        self.score = score
     }
 }
 
@@ -106,5 +131,42 @@ public struct PillHistorySaveRequest: Encodable {
 
     public init(pillCodes: [String]) {
         self.pillCodes = pillCodes
+    }
+}
+
+/// `POST /api/v0/pill-images/upload-url` 본문 — 앱이 만든 UUID v7 을 원본 키의 uuid 로 쓴다 (NM-568).
+public struct PillImageUploadURLRequest: Encodable {
+    public let imageId: String
+
+    public init(imageId: String) {
+        self.imageId = imageId
+    }
+}
+
+/// `PUT /api/v0/pill-images/{imageId}/labels/{pillIndex}` 본문 — 「선택」한 알약 하나의 라벨 (NM-568).
+/// model · userInput 은 후보 조회 요청 본문 그대로다.
+public struct PillLabelRequest: Encodable {
+    public let pillCode: String
+    // 수동 추가 알약 — model 이 없다
+    public let manual: Bool
+    // 첫 후보 조회 요청. 수동 추가는 nil(보내면 400)
+    public let model: PillCandidateRequest?
+    // 마지막 후보 조회 요청
+    public let userInput: PillCandidateRequest
+
+    public init(pillCode: String, manual: Bool, model: PillCandidateRequest?, userInput: PillCandidateRequest) {
+        self.pillCode = pillCode
+        self.manual = manual
+        self.model = model
+        self.userInput = userInput
+    }
+}
+
+/// `PATCH /api/v0/pill-images/{imageId}/segmentation` 본문 — `완료` 때 사용자가 지운 알약 번호 (NM-568).
+public struct PillSegmentationSaveRequest: Encodable {
+    public let deletedIndexes: [Int]
+
+    public init(deletedIndexes: [Int]) {
+        self.deletedIndexes = deletedIndexes
     }
 }

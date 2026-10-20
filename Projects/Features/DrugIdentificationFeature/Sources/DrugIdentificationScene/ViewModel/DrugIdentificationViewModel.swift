@@ -32,6 +32,8 @@ public final class DrugIdentificationViewModel {
     @Injected private var pillUseCase: PillUseCase
 
     private let image: UIImage
+    /// 이 사진의 학습용 라벨 키(UUID v7, NM-568). 학습 데이터를 보내지 않는 빌드면 nil — 원본 업로드도 하지 않는다.
+    private let imageId: String?
     private let scoreThreshold: Float = 0.5
     private var cancelBag = Set<AnyCancellable>()
 
@@ -46,8 +48,9 @@ public final class DrugIdentificationViewModel {
 
     // MARK: - Init
 
-    init(image: UIImage) {
+    init(image: UIImage, imageId: String?) {
         self.image = image
+        self.imageId = imageId
     }
 
     // MARK: - Transform
@@ -86,8 +89,11 @@ public final class DrugIdentificationViewModel {
                 return
             }
 
+            // 추론 · 크롭 · 원본 업로드가 같은 픽셀을 봐야 라벨의 box 가 업로드본 좌표가 된다.
+            let upright = RFDetrSegmentor.uprightImage(self.image) ?? self.image
+
             do {
-                let result = try segmentor.run(image: self.image)
+                let result = try segmentor.run(image: upright)
                 let detections = result.detections
                     .filter { $0.score >= self.scoreThreshold }
                     .sorted { $0.box.minX < $1.box.minX }
@@ -97,9 +103,11 @@ public final class DrugIdentificationViewModel {
                     return
                 }
 
-                let pills = self.makeIdentifiedPills(from: detections)
-                self.pending = (pills, self.buildItems(from: pills))
-                self.requestAttributes(items: self.pending?.items ?? [])
+                let crops = RFDetrSegmentor.crops(from: upright, detections: detections)
+                let pills = self.makeIdentifiedPills(from: detections, crops: crops)
+                let items = self.buildItems(from: detections, crops: crops)
+                self.pending = (pills, items)
+                self.requestAttributes(items: items, upright: upright)
                 // 서버 응답을 기다리는 동안 기기에서 각인·마크를 읽는다(이 백그라운드 스레드를 막는다).
                 self.faceModelsSubject.send(self.analyzeFaces(pills))
             } catch {
@@ -109,16 +117,16 @@ public final class DrugIdentificationViewModel {
     }
 
     // 세그멘테이션으로 얻은 크롭 결과를 임시 보관 (속성 응답과 결합)
-    private var pending: (pills: [IdentifiedPill], items: [(pillId: String, croppedImage: String)])?
+    private var pending: (pills: [IdentifiedPill], items: [PillAttributeInput])?
 
-    private func makeIdentifiedPills(from detections: [RFDetection]) -> [IdentifiedPill] {
-        // 크롭은 원본 정규화 1회로 일괄 생성(detection마다 재렌더하던 것 제거).
-        let crops = RFDetrSegmentor.croppedImages(from: image, detections: detections)
-        return detections.enumerated().map { offset, detection in
+    /// - Parameter crops: 원본 정규화 1회로 일괄 생성한 크롭(detection마다 재렌더하던 것 제거). detections 와 1:1.
+    private func makeIdentifiedPills(from detections: [RFDetection], crops: [CroppedDetection?]) -> [IdentifiedPill] {
+        detections.enumerated().map { offset, detection in
             IdentifiedPill(
                 index: offset + 1,
-                pillId: "\(detection.id)",   // 검출 질의 번호 — 한 사진 안에서 고유
-                thumbnail: crops[offset],
+                // 검출 질의 번호(0~99) — 한 사진 안에서 고유하고, 그대로 라벨의 pillIndex 다(NM-568)
+                pillId: "\(detection.id)",
+                thumbnail: crops[offset]?.image,
                 boundingBox: detection.box,
                 attribute: nil
             )
@@ -141,12 +149,22 @@ public final class DrugIdentificationViewModel {
     }
 
     private func buildItems(
-        from pills: [IdentifiedPill]
-    ) -> [(pillId: String, croppedImage: String)] {
-        pills.map { pill in
+        from detections: [RFDetection],
+        crops: [CroppedDetection?]
+    ) -> [PillAttributeInput] {
+        zip(detections, crops).map { detection, crop in
             // 인코딩 임시 버퍼(PNG Data·base64 String)를 즉시 해제.
-            let base64 = autoreleasepool { pill.thumbnail?.pngData()?.base64EncodedString() ?? "" }
-            return (pillId: pill.pillId, croppedImage: base64)
+            let base64 = autoreleasepool { crop?.image.pngData()?.base64EncodedString() ?? "" }
+            // 라벨의 box = 크롭을 잘라 낸 자리. 크롭은 원본 해상도에서 이 크기 그대로 잘렸다(spec label.md).
+            let box = crop.map {
+                PillBox(x: Int($0.rect.minX), y: Int($0.rect.minY), width: Int($0.rect.width), height: Int($0.rect.height))
+            }
+            return PillAttributeInput(
+                pillId: "\(detection.id)",
+                croppedImage: base64,
+                box: box,
+                score: Double(detection.score)
+            )
         }
     }
 
@@ -173,15 +191,26 @@ public final class DrugIdentificationViewModel {
     }
 
     private func requestAttributes(
-        items: [(pillId: String, croppedImage: String)]
+        items: [PillAttributeInput],
+        upright: UIImage
     ) {
         // 원본은 학습데이터용으로 S3에 별도 업로드(베스트 에포트, NM-348) — 식별과 분리·병렬, 실패 무시.
-        // 내부 빌드(개발자 테스트)는 학습 데이터셋 오염 방지를 위해 업로드하지 않는다.
-        if !AppEnvironment.isInternal,
-           let jpeg = autoreleasepool(invoking: { image.jpegData(compressionQuality: 0.9) }) {
-            pillUseCase.uploadOriginalImage(jpeg)
+        // 학습 데이터를 보내지 않는 빌드(내부 빌드)는 imageId 가 없어 업로드도 라벨도 하지 않는다.
+        guard let imageId, let cgImage = upright.cgImage else {
+            pillUseCase.fetchPillAttributes(items: items, capture: nil)
+            return
         }
-        pillUseCase.fetchPillAttributes(items: items)
+        if let jpeg = autoreleasepool(invoking: { upright.jpegData(compressionQuality: 0.9) }) {
+            pillUseCase.uploadOriginalImage(jpeg, imageId: imageId)
+        }
+        // 원본 업로드와 속성 추출은 순서가 없다 — 둘 다 같은 imageId 를 들고 동시에 나간다(spec label.md).
+        let capture = PillImageCapture(
+            imageId: imageId,
+            imageWidth: cgImage.width,
+            imageHeight: cgImage.height,
+            segModel: RFDetrSegmentor.modelVersion
+        )
+        pillUseCase.fetchPillAttributes(items: items, capture: capture)
     }
 
     private func bindUseCase() {
