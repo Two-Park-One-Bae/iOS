@@ -26,6 +26,17 @@ public enum AppEnvironment {
         #endif
     }
 
+    /// 학습 데이터(원본 업로드 · 라벨 — NM-348 · NM-568)를 보내는지.
+    ///
+    /// 내부 빌드는 보내지 않는다 — 학습 버킷이 하나뿐이라 테스트 사진이 데이터셋에 섞인다.
+    /// 디버그 빌드에서 라벨 흐름을 확인할 때만 환경 변수 `COLLECT_TRAINING_DATA=1` 로 켠다.
+    public static var collectsTrainingData: Bool {
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["COLLECT_TRAINING_DATA"] == "1" { return true }
+        #endif
+        return !isInternal
+    }
+
     /// Firebase Analytics 수집 여부.
     ///
     /// 단일 소스는 빌드 구성의 `FIREBASE_ANALYTICS_ENABLED`(→ Info.plist

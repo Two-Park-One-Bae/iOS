@@ -21,7 +21,11 @@ public protocol PillService {
     func fetchPillDetail(pillCode: String) -> AnyPublisher<PillDetailEntity, Error>
     func fetchPillUsage() -> AnyPublisher<PillUsageEntity, Error>
     // 원본 이미지 S3 업로드용 presigned URL 발급 (NM-348). 식별과 분리된 베스트 에포트.
-    func issuePillImageUploadURL() -> AnyPublisher<PillImageUploadURLEntity, Error>
+    // imageId(UUID v7)를 주면 원본 키의 uuid 로 쓴다 (NM-568).
+    func issuePillImageUploadURL(imageId: String?) -> AnyPublisher<PillImageUploadURLEntity, Error>
+    // 학습용 라벨 · 지운 번호 (NM-568). 204. 베스트 에포트라 상위에서 결과를 버린다.
+    func savePillLabel(imageId: String, pillIndex: Int, request: PillLabelRequest) -> AnyPublisher<Void, Error>
+    func savePillSegmentation(imageId: String, deletedIndexes: [Int]) -> AnyPublisher<Void, Error>
     // 식별 기록 요약 목록, 최신순 (NM-552)
     func fetchPillHistories(limit: Int, cursor: String?) -> AnyPublisher<PillHistoryPageEntity, Error>
     func fetchPillHistory(historyId: String) -> AnyPublisher<PillHistoryEntity, Error>
@@ -70,8 +74,18 @@ extension DefaultPillService: PillService {
     }
 
     // 발급 실패(401·500)는 베스트 에포트라 상위에서 무시된다 — 일반 요청 헬퍼로 충분.
-    public func issuePillImageUploadURL() -> AnyPublisher<PillImageUploadURLEntity, Error> {
-        requestObjectInCombine(.pillImagesUploadUrl)
+    public func issuePillImageUploadURL(imageId: String?) -> AnyPublisher<PillImageUploadURLEntity, Error> {
+        requestObjectInCombine(.pillImagesUploadUrl(imageId: imageId))
+    }
+
+    public func savePillLabel(imageId: String, pillIndex: Int, request: PillLabelRequest) -> AnyPublisher<Void, Error> {
+        requestNoContentWithNetworkErrorInCombine(.savePillLabel(imageId: imageId, pillIndex: pillIndex, request: request))
+    }
+
+    public func savePillSegmentation(imageId: String, deletedIndexes: [Int]) -> AnyPublisher<Void, Error> {
+        requestNoContentWithNetworkErrorInCombine(
+            .savePillSegmentation(imageId: imageId, request: PillSegmentationSaveRequest(deletedIndexes: deletedIndexes))
+        )
     }
 
     public func fetchPillDetail(pillCode: String) -> AnyPublisher<PillDetailEntity, Error> {

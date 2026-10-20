@@ -19,16 +19,26 @@ public final class PillRepository: PillRepositoryProtocol {
     }
 
     public func fetchPillAttributes(
-        items: [(pillId: String, croppedImage: String)]
+        items: [PillAttributeInput],
+        capture: PillImageCapture?
     ) -> AnyPublisher<PillAttributeResultModel, Error> {
         // OpenAPI 스키마에 맞춰 이미지를 {mimeType, data}로 감싼다 — 크롭은 마스크를 알파에 담은 PNG (spec Image: image/png 만 허용).
         // 원본은 이 요청에 싣지 않는다 — pill-images/upload-url로 S3 직접 업로드(NM-348).
-        let request = PillAttributeRequest(items: items.map {
-            PillAttributeItemRequest(
-                pillId: $0.pillId,
-                croppedImage: PillImageRequest(mimeType: "image/png", data: $0.croppedImage)
-            )
-        })
+        // 라벨 값(NM-568)은 capture 가 있을 때만 싣는다 — 없으면 지금과 같은 본문이다.
+        let request = PillAttributeRequest(
+            items: items.map {
+                PillAttributeItemRequest(
+                    pillId: $0.pillId,
+                    croppedImage: PillImageRequest(mimeType: "image/png", data: $0.croppedImage),
+                    box: capture == nil ? nil : $0.box.map { [$0.x, $0.y, $0.width, $0.height] },
+                    score: capture == nil ? nil : $0.score
+                )
+            },
+            imageId: capture?.imageId,
+            imageWidth: capture?.imageWidth,
+            imageHeight: capture?.imageHeight,
+            segModel: capture?.segModel
+        )
 
         return service.fetchPillAttributes(request: request)
             .map { $0.toDomain() }
@@ -36,10 +46,10 @@ public final class PillRepository: PillRepositoryProtocol {
             .eraseToAnyPublisher()
     }
 
-    public func uploadOriginalImage(_ jpegData: Data) -> AnyPublisher<Void, Error> {
+    public func uploadOriginalImage(_ jpegData: Data, imageId: String?) -> AnyPublisher<Void, Error> {
         // presigned URL 발급 → 그 URL로 S3에 원본 JPEG을 직접 PUT. (NM-348)
         // API 베이스가 아닌 임의 presigned URL이라 Moya가 아닌 URLSession으로 올린다(App Check 불필요).
-        service.issuePillImageUploadURL()
+        service.issuePillImageUploadURL(imageId: imageId)
             .flatMap { issued -> AnyPublisher<Void, Error> in
                 guard let url = URL(string: issued.uploadUrl) else {
                     return Fail(error: URLError(.badURL)).eraseToAnyPublisher()

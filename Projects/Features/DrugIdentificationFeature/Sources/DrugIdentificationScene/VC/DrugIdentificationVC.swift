@@ -410,6 +410,12 @@ public final class DrugIdentificationVC: UIViewController {
         }
     }
 
+    /// 사용자가 지운 모델 알약의 번호(속성 추출 `pillId`) — `완료` 때 학습용 라벨로 보낸다(NM-568).
+    /// 수동 추가 알약은 넣지 않는다(위치 행에 없는 번호라 서버가 400).
+    func deletedModelPillIds() -> [Int] {
+        pills.filter { deletedIndices.contains($0.index) }.compactMap { Int($0.pillId) }.sorted()
+    }
+
     /// 완주/이탈 분석용 카운트 요약.
     func identificationSummary() -> PillIdentificationSummary {
         let detected = pills.count

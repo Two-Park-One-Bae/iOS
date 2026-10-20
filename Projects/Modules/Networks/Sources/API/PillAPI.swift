@@ -20,8 +20,12 @@ public enum PillAPI {
     // GET /api/v0/pill-attributes/usage — 잔여 식별 횟수 조회 (NM-331). 조회 전용 · 카운트 미증가
     case pillAttributesUsage
     // POST /api/v0/pill-images/upload-url — 원본 이미지 S3 업로드용 presigned URL 발급 (NM-348).
-    // 본문 없음 · App Check만 · usage 무관. 식별과 분리된 베스트 에포트.
-    case pillImagesUploadUrl
+    // 본문 imageId(앱이 만든 UUID v7)는 선택 — 없으면 서버가 만든다 (NM-568). App Check만 · usage 무관. 베스트 에포트.
+    case pillImagesUploadUrl(imageId: String?)
+    // PUT /api/v0/pill-images/{imageId}/labels/{pillIndex} — 「선택」한 알약 하나의 라벨, 204 (NM-568)
+    case savePillLabel(imageId: String, pillIndex: Int, request: PillLabelRequest)
+    // PATCH /api/v0/pill-images/{imageId}/segmentation — `완료` 때 지운 알약 번호, 204 (NM-568)
+    case savePillSegmentation(imageId: String, request: PillSegmentationSaveRequest)
     // GET /api/v0/pill-histories?limit&cursor — 식별 기록 요약 목록, 최신순 (NM-552)
     case pillHistories(limit: Int, cursor: String?)
     // GET /api/v0/pill-histories/{historyId} — 식별 기록 한 건 (NM-552)
@@ -57,6 +61,10 @@ extension PillAPI: BaseAPI {
              .savePillHistory(let historyId, _),
              .deletePillHistory(let historyId):
             return "/pill-histories/\(historyId)"
+        case .savePillLabel(let imageId, let pillIndex, _):
+            return "/pill-images/\(imageId)/labels/\(pillIndex)"
+        case .savePillSegmentation(let imageId, _):
+            return "/pill-images/\(imageId)/segmentation"
         }
     }
 
@@ -65,7 +73,8 @@ extension PillAPI: BaseAPI {
         case .pillAttributes, .pillCandidates, .pillImagesUploadUrl:          return .post
         case .pillDetails, .pillAttributesUsage, .pillCandidateItems,
              .pillHistories, .pillHistory:                                    return .get
-        case .savePillHistory:                                                return .put
+        case .savePillHistory, .savePillLabel:                                return .put
+        case .savePillSegmentation:                                           return .patch
         case .deletePillHistory:                                              return .delete
         }
     }
@@ -86,7 +95,13 @@ extension PillAPI: BaseAPI {
             return .requestParameters(parameters: parameters, encoding: URLEncoding.queryString)
         case .savePillHistory(_, let request):
             return .requestJSONEncodable(request)
-        case .pillDetails, .pillAttributesUsage, .pillImagesUploadUrl,
+        case .pillImagesUploadUrl(let imageId?):
+            return .requestJSONEncodable(PillImageUploadURLRequest(imageId: imageId))
+        case .savePillLabel(_, _, let request):
+            return .requestJSONEncodable(request)
+        case .savePillSegmentation(_, let request):
+            return .requestJSONEncodable(request)
+        case .pillDetails, .pillAttributesUsage, .pillImagesUploadUrl(nil),
              .pillHistory, .deletePillHistory:
             return .requestPlain
         }

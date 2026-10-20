@@ -38,10 +38,11 @@ final class MockPillUseCase: PillUseCase {
     }
 
     func fetchPillAttributes(
-        items: [(pillId: String, croppedImage: String)]
+        items: [PillAttributeInput],
+        capture: PillImageCapture?
     ) {}
 
-    func uploadOriginalImage(_ jpegData: Data) {}
+    func uploadOriginalImage(_ jpegData: Data, imageId: String?) {}
 
     func fetchPillCandidates(query: PillCandidateQuery) -> AnyPublisher<PillCandidateResultModel, Error> {
         Empty().eraseToAnyPublisher()

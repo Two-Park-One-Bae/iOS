@@ -70,6 +70,9 @@ enum RegisterDependencies {
             #endif
             return repository
         }
+        container.register(PillLabelRepositoryProtocol.self) {
+            PillLabelRepository(service: pillService)
+        }
         container.register(TimerRepositoryProtocol.self) {
             TimerRepository()
         }
@@ -102,6 +105,9 @@ enum RegisterDependencies {
         }
         container.register(PillHistoryUseCase.self) {
             DefaultPillHistoryUseCase(repository: container.resolve(PillHistoryRepositoryProtocol.self))
+        }
+        container.register(PillLabelUseCase.self) {
+            DefaultPillLabelUseCase(repository: container.resolve(PillLabelRepositoryProtocol.self))
         }
 
         container.register(AuthUseCase.self) {

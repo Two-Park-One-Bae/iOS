@@ -23,7 +23,8 @@ final class PillAPIVersionTests: XCTestCase {
     }
 
     func test_나머지는_api_v0_에_남는다() {
-        let v0: [PillAPI] = [.pillAttributesUsage, .pillDetails(pillCode: "A"), .pillImagesUploadUrl]
+        let v0: [PillAPI] = [.pillAttributesUsage, .pillDetails(pillCode: "A"), .pillImagesUploadUrl(imageId: nil),
+                            .savePillSegmentation(imageId: "id", request: PillSegmentationSaveRequest(deletedIndexes: []))]
         for api in v0 {
             XCTAssertTrue(api.baseURL.absoluteString.hasSuffix("/api/v0"), "\(api)")
         }
