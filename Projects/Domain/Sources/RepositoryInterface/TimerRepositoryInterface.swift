@@ -43,6 +43,16 @@ public protocol TimerAlarmScheduling {
     func resumeAlarm(id: UUID, label: String, categoryName: String, body: String, fireDate: Date)
     /// 남은 시간을 바꿔 정지 상태로 다시 예약 — 정지된 알람의 남은 시간은 바꿀 수 없어서(정지 중 연장).
     func reschedulePausedAlarm(id: UUID, label: String, categoryName: String, body: String, remaining: Int)
+    /// 시스템에 살아 있는 알람 id — 앱 밖(잠금화면 · Dynamic Island · 워치)에서 끈 알람은 여기서 빠진다.
+    /// nil = 알 수 없음. 그때는 타이머를 정리하지 않는다 (NM-635).
+    func liveAlarmIDs() -> Set<UUID>?
+    /// 시스템 알람 목록이 바뀔 때마다 — 앱 밖에서 끈 경우를 앱이 떠 있는 동안 바로 반영한다 (NM-635).
+    var alarmsChanged: AnyPublisher<Void, Never> { get }
+}
+
+public extension TimerAlarmScheduling {
+    func liveAlarmIDs() -> Set<UUID>? { nil }
+    var alarmsChanged: AnyPublisher<Void, Never> { Empty().eraseToAnyPublisher() }
 }
 
 public enum TimerAlarmAuthorizationStatus: Equatable, Sendable {

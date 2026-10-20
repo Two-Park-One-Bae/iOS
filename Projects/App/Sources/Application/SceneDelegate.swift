@@ -33,6 +33,7 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     private var appGate: AppGate?
     /// 위젯에서 온 프리셋 시작의 알람 권한 게이트 구독 보관함 (NM-360).
     private var permissionBag = Set<AnyCancellable>()
+    private var alarmBag = Set<AnyCancellable>()
     
     /*
      ┌─────────────────────────────────┬───────────────────────────────────────┐
@@ -78,6 +79,13 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         window.makeKeyAndVisible()
 
         appGate = AppGate(windowScene: windowScene)
+
+        // 앱이 떠 있는 동안 앱 밖(잠금화면 · Dynamic Island · 워치)에서 알람을 끄면 바로 반영한다 —
+        // 예전엔 만료 카드가 남아 [완료]를 한 번 더 눌러야 사라졌다 (NM-635).
+        DIContainer.shared.resolve(TimerAlarmScheduling.self).alarmsChanged
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] in self?.syncTimersWhileActive() }
+            .store(in: &alarmBag)
 
         // 콜드런치 딥링크는 저장만 — 탭바가 뜬 뒤(onTabBarReady) 처리한다.
         // 미로그인 상태면 로그인·동의를 마치고 탭바가 뜰 때 실행된다 (NM-410).
@@ -318,6 +326,7 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         // App Intent(AlarmKit)가 App Group 저장소를 직접 바꿨을 수 있음 — 먼저 재동기화.
         useCase.reload() // 1. 디스크 → 메모리 다시 읽기
         useCase.refresh()  // 2. 현재 시각 기준으로 상태 재계산
+        useCase.syncWithSystemAlarms() // 2-1. 앱 밖에서 끈 알람의 타이머 정리 (NM-635)
         // 3. 알람 권한 캐시 갱신(NM-360) — 위젯 무음-시작 라우팅과 워치 시작 게이트가 읽는
         //    alarmAuthorized 플래그를 실제 권한으로 최신화하고 워치에 즉시 재동기화한다.
         //    이게 없으면 플래그가 미기록(nil)으로 남아 워치가 권한 없이도 시작을 허용한다.
@@ -326,6 +335,39 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         // 스토어 리뷰 요청 조건 — 첫 실행 시각 · 앱을 연 날 (NM-560).
         StoreReview.shared.recordAppActive()
 
+        drainOutsideTimerEvents()
+        if appCoordinator?.isTabBarShown == true {
+            StoreReview.shared.requestPendingTimerMomentIfNeeded(in: scene as? UIWindowScene)
+        }
+
+        // Remote Config 최신값 fetch 후 강제 업데이트/점검 게이트 갱신(포그라운드 복귀 포함).
+        //
+        // fetch 만으로는 부족하다 — 릴리즈는 캐시가 12시간이라 그 안에는 서버로 가지 않는다.
+        // 점검 모드를 켜야 하는 순간의 사용자들은 전부 캐시를 갖고 있어 옛 값을 본다.
+        // 그래서 **사용 중 실시간 청취**를 함께 켠다(Firebase 권장 구조).
+        Task { @MainActor in
+            await RemoteConfigService.shared.fetchAndActivate()
+            appGate?.evaluate()
+            RemoteConfigService.shared.startListening()
+        }
+    }
+
+    /// 앱이 앞에 있을 때 시스템 알람이 바뀌었다 — 앱 밖에서 끈 알람의 타이머를 지우고, 리뷰 요청도 지금 본다.
+    /// 뒤에 있을 때는 다음 활성화(sceneDidBecomeActive)가 같은 일을 한다.
+    private func syncTimersWhileActive() {
+        guard let scene = window?.windowScene, scene.activationState == .foregroundActive else { return }
+        let useCase = DIContainer.shared.resolve(TimerUseCase.self)
+        useCase.reload()
+        useCase.refresh()
+        useCase.syncWithSystemAlarms()
+        drainOutsideTimerEvents()
+        if appCoordinator?.isTabBarShown == true {
+            StoreReview.shared.requestPendingTimerMomentIfNeeded(in: scene)
+        }
+    }
+
+    /// 앱 밖(위젯 · 알람 완료 인텐트)에서 쌓아 둔 타이머 이벤트를 꺼내 보낸다.
+    private func drainOutsideTimerEvents() {
         // 위젯이 앱 밖(백그라운드 AppIntent, iOS 26.1+ 승인)에서 시작한 타이머 지연 집계.
         // 위젯 프로세스는 Firebase 를 링크하지 않아 timer_start 를 직접 못 보낸다(§위젯 지연로깅).
         let widgetStarts = WidgetAnalyticsQueue.drainTimerStarts()
@@ -350,20 +392,6 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         // 앱 밖(시스템 알람 · 워치)에서 끝낸 타이머 → 지금이 다음에 앱을 연 때다(NM-560).
         // 콜드런치는 스플래시가 떠 있으니 탭바가 뜬 뒤(onTabBarReady) 요청한다.
         if !outsideCompletes.isEmpty { StoreReview.shared.recordTimerCompletedOutsideApp() }
-        if appCoordinator?.isTabBarShown == true {
-            StoreReview.shared.requestPendingTimerMomentIfNeeded(in: scene as? UIWindowScene)
-        }
-
-        // Remote Config 최신값 fetch 후 강제 업데이트/점검 게이트 갱신(포그라운드 복귀 포함).
-        //
-        // fetch 만으로는 부족하다 — 릴리즈는 캐시가 12시간이라 그 안에는 서버로 가지 않는다.
-        // 점검 모드를 켜야 하는 순간의 사용자들은 전부 캐시를 갖고 있어 옛 값을 본다.
-        // 그래서 **사용 중 실시간 청취**를 함께 켠다(Firebase 권장 구조).
-        Task { @MainActor in
-            await RemoteConfigService.shared.fetchAndActivate()
-            appGate?.evaluate()
-            RemoteConfigService.shared.startListening()
-        }
     }
 
     /*
