@@ -140,6 +140,8 @@ final class StoreReviewPolicyTests: XCTestCase {
 
         XCTAssertEqual(review.record.activeDays, [3, 2, 1, 0].map { calendar.startOfDay(for: daysAgo($0)) })
         XCTAssertEqual(review.record.timerStartCount, 4)
+        // 처음 쓴 시각도 위젯 사용(9일 전)으로 당겨진다.
+        XCTAssertEqual(review.record.firstLaunchAt, daysAgo(9))
         XCTAssertTrue(StoreReviewPolicy.shouldRequest(review.record, moment: .timerCompleted, now: now, calendar: calendar))
     }
 
