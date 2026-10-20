@@ -21,6 +21,8 @@ public struct TimerEndInfo: Sendable {
     public let durationSec: Int
     public let elapsedSec: Int
     public let remainingSec: Int
+    /// 앱 밖(잠금화면 · Dynamic Island · 워치 알람)에서 끈 알람을 앱이 뒤늦게 정리했다 (NM-635).
+    public var endedOutsideApp = false
 }
 
 public protocol TimerUseCase {
@@ -37,6 +39,8 @@ public protocol TimerUseCase {
     func refresh()
     /// 외부 프로세스(App Intent 등)가 App Group 저장소를 직접 바꾼 뒤 재동기화
     func reload()
+    /// 시스템 알람과 맞춘다 — 만료됐는데 알람이 없으면 앱 밖에서 끈 것이라 지운다 (NM-635)
+    func syncWithSystemAlarms()
     /// 워치에서 온 명령 실행 — 알람 예약은 폰 단독이라 워치는 명령만 보낸다(NM-269)
     func handleWatchCommand(_ command: TimerWatchCommand)
 
@@ -206,6 +210,39 @@ public final class DefaultTimerUseCase: TimerUseCase {
 
     public func reload() {
         timers.send(repository.loadTimers())
+    }
+
+    /*
+     시스템 알람(AlarmKit)이 만료 카드의 기준이다 (NM-635).
+
+     알람을 앱 밖(잠금화면 · Dynamic Island · 워치)에서 끄면 시스템에서 사라진다. 완료 인텐트가
+     저장소를 지우지만, 인텐트가 실행되지 않는 경로가 있으면(위젯이 예약한 알람 — 인텐트가 앱에 없었다)
+     타이머가 남아 앱에서 [완료]를 한 번 더 눌러야 사라졌다.
+
+     그래서 만료 시각이 지났는데 알람이 없는 타이머는 앱 밖에서 끝낸 것으로 보고 지운다.
+     울리기 전(카운트다운) · 일시정지 타이머는 알람이 살아 있어야 정상이라 건드리지 않는다 —
+     없다면 다른 문제이고, 이 규칙으로 덮을 일이 아니다.
+     */
+    public func syncWithSystemAlarms() {
+        guard let live = alarmScheduler.liveAlarmIDs() else { return }
+        let stopped = timers.value.filter { timer in
+            let expired = timer.state == .ringing || (timer.state == .running && timer.remainingSeconds() == 0)
+            return expired && !live.contains(timer.id)
+        }
+        guard !stopped.isEmpty else { return }
+        for t in stopped {
+            var info = TimerEndInfo(
+                reason: .completed,
+                category: t.category,
+                durationSec: t.duration,
+                elapsedSec: t.duration,
+                remainingSec: 0
+            )
+            info.endedOutsideApp = true
+            timerEnded.send(info)
+        }
+        let ids = Set(stopped.map(\.id))
+        mutate { $0.removeAll { ids.contains($0.id) } }
     }
 
     public func handleWatchCommand(_ command: TimerWatchCommand) {

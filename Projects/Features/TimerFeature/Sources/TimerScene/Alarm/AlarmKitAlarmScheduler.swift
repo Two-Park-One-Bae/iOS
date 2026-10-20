@@ -8,12 +8,35 @@ import TimerShared
 
 // iOS 26 AlarmKit 알람 스케줄러 — Clock 앱 동급 시스템 알람.
 // 강제종료/잠금/무음/Focus 모두 뚫고 풀스크린+루핑으로 울림(AlarmManager가 시스템 수준 관리).
-// [완료](stop)는 시스템 자동 처리 + TimerStopIntent가 모델 삭제.
+// [완료](stop)는 시스템 자동 처리 + TimerStopIntent가 모델 삭제. 인텐트가 못 지운 타이머는
+// 앱이 알람 목록과 맞춰 정리한다(liveAlarmIDs · alarmsChanged, NM-635).
 // (AlarmPresentation.Alert 의 비권장 init이 iOS 26.1+ 이므로 26.1 게이트)
 @available(iOS 26.1, *)
 public final class AlarmKitAlarmScheduler: TimerAlarmScheduling {
 
-    public init() {}
+    private let alarmsChangedSubject = PassthroughSubject<Void, Never>()
+    private var updatesTask: Task<Void, Never>?
+
+    public init() {
+        // 앱 밖(잠금화면 · Dynamic Island · 워치)에서 끈 알람도 여기로 들어온다 (NM-635).
+        updatesTask = Task { [weak self] in
+            for await _ in AlarmManager.shared.alarmUpdates {
+                await MainActor.run { self?.alarmsChangedSubject.send() }
+            }
+        }
+    }
+
+    deinit { updatesTask?.cancel() }
+
+    public var alarmsChanged: AnyPublisher<Void, Never> {
+        alarmsChangedSubject.eraseToAnyPublisher()
+    }
+
+    /// 위젯이 예약한 알람도 앱의 알람이라 함께 나온다.
+    public func liveAlarmIDs() -> Set<UUID>? {
+        guard let alarms = try? AlarmManager.shared.alarms else { return nil }
+        return Set(alarms.map(\.id))
+    }
 
     public func requestAuthorization() -> AnyPublisher<Bool, Never> {
         Future { promise in

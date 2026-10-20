@@ -55,6 +55,7 @@ final class StubTimerUseCase: TimerUseCase {
     func updateMemo(id: UUID, memo: String?) {}
     func refresh() {}
     func reload() {}
+    func syncWithSystemAlarms() {}
     func handleWatchCommand(_ command: TimerWatchCommand) {}
     func addPreset(label: String, category: TimerCategory, duration: Int) {}
     func updatePreset(_ preset: TimerPresetModel) {}

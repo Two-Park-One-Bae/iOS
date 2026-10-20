@@ -193,6 +193,8 @@ enum RegisterDependencies {
                             category: info.category.displayName,
                             durationSec: info.durationSec
                         ))
+                        // 앱 밖에서 끈 알람을 앱이 정리했다 — 리뷰 요청은 앱 밖 완료로 본다(NM-635 · NM-560).
+                        if info.endedOutsideApp { StoreReview.shared.recordTimerCompletedOutsideApp() }
                     case .cancelled:
                         AppAnalytics.track(.timerCancel(
                             category: info.category.displayName,
