@@ -32,6 +32,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         container.register(PillHistoryUseCase.self) {
             DemoPillHistoryUseCase()
         }
+        container.register(PillLabelUseCase.self) {
+            DemoPillLabelUseCase()
+        }
         container.register(DrugIdentificationFeatureBuildable.self) {
             DrugIdentificationBuilder()
         }
@@ -91,5 +94,15 @@ final class DemoPillHistoryUseCase: PillHistoryUseCase {
     }
     func deleteHistory(historyId: String) -> AnyPublisher<Void, Error> {
         Just(()).setFailureType(to: Error.self).eraseToAnyPublisher()
+    }
+}
+
+/// 학습용 라벨 스텁 — 보낸 값을 콘솔에만 찍는다.
+final class DemoPillLabelUseCase: PillLabelUseCase {
+    func sendLabel(imageId: String, pillIndex: Int, label: PillLabelModel) {
+        print("[label] \(imageId)/\(pillIndex) \(label.pillCode) manual=\(label.manual)")
+    }
+    func sendDeletedIndexes(imageId: String, deletedIndexes: [Int]) {
+        print("[label] \(imageId) deleted=\(deletedIndexes)")
     }
 }

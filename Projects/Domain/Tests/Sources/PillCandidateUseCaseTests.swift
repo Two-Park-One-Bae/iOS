@@ -63,8 +63,8 @@ private final class CandidateRepositorySpy: PillRepositoryProtocol {
     }
 
     func fetchPillCandidateItems(pillCodes: [String]) -> AnyPublisher<PillCandidateItemsModel, Error> { Empty().eraseToAnyPublisher() }
-    func fetchPillAttributes(items: [(pillId: String, croppedImage: String)]) -> AnyPublisher<PillAttributeResultModel, Error> { Empty().eraseToAnyPublisher() }
-    func uploadOriginalImage(_ jpegData: Data) -> AnyPublisher<Void, Error> { Empty().eraseToAnyPublisher() }
+    func fetchPillAttributes(items: [PillAttributeInput], capture: PillImageCapture?) -> AnyPublisher<PillAttributeResultModel, Error> { Empty().eraseToAnyPublisher() }
+    func uploadOriginalImage(_ jpegData: Data, imageId: String?) -> AnyPublisher<Void, Error> { Empty().eraseToAnyPublisher() }
     func fetchPillDetail(pillCode: String) -> AnyPublisher<PillDetailModel, Error> { Empty().eraseToAnyPublisher() }
     func fetchPillUsage() -> AnyPublisher<PillUsageModel, Error> { Empty().eraseToAnyPublisher() }
 }
