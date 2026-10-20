@@ -329,7 +329,8 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         // 위젯이 앱 밖(백그라운드 AppIntent, iOS 26.1+ 승인)에서 시작한 타이머 지연 집계.
         // 위젯 프로세스는 Firebase 를 링크하지 않아 timer_start 를 직접 못 보낸다(§위젯 지연로깅).
         let widgetStarts = WidgetAnalyticsQueue.drainTimerStarts()
-        StoreReview.shared.recordTimerStarted(count: widgetStarts.count)
+        // 앱을 며칠 만에 열어도 위젯으로 쓴 날은 그날로 센다 — 시작 시각을 그대로 넘긴다.
+        StoreReview.shared.recordTimerStarted(at: widgetStarts.map(\.startedAt))
         for pending in widgetStarts {
             AppAnalytics.track(.timerStart(
                 source: "widget",
@@ -349,7 +350,9 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         }
         // 앱 밖(시스템 알람 · 워치)에서 끝낸 타이머 → 지금이 다음에 앱을 연 때다(NM-560).
         // 콜드런치는 스플래시가 떠 있으니 탭바가 뜬 뒤(onTabBarReady) 요청한다.
-        if !outsideCompletes.isEmpty { StoreReview.shared.recordTimerCompletedOutsideApp() }
+        if !outsideCompletes.isEmpty {
+            StoreReview.shared.recordTimerCompletedOutsideApp(at: outsideCompletes.map(\.completedAt))
+        }
         if appCoordinator?.isTabBarShown == true {
             StoreReview.shared.requestPendingTimerMomentIfNeeded(in: scene as? UIWindowScene)
         }
