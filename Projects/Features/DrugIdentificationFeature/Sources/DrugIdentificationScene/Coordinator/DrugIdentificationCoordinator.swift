@@ -188,6 +188,8 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
     /// (마지막 1회를 쓴 요청의 성공 응답)에 `DrugIdentificationViewModel` 이 발사한다 —
     /// 막힌 시도를 세면 재시도하지 않은 사용자가 빠지고 재시도한 사용자는 중복으로 잡힌다.
     private func presentLimitAlert(usage: PillUsageModel?) {
+        // 한도 안내를 본 날은 스토어 리뷰를 요청하지 않는다(NM-560).
+        StoreReview.shared.recordLimitAlertShown()
         // 루트(네비게이션 컨트롤러) 뷰에 붙으므로 push·pop 과 무관하게 남는다.
         DSAlertCardView.presentOverWindow(
             title: PillLimitAlertText.title,
@@ -473,7 +475,11 @@ public final class DrugIdentificationCoordinator: BaseCoordinator {
                         unconfirmedCount: s.unconfirmedCount,
                         deletedCount: s.deletedCount, manualAddedCount: s.manualAddedCount))
                 }
+                let allUnedited = vc?.allConfirmedUnedited() ?? false
+                StoreReview.shared.recordIdentificationSaved()
                 self.exitToEntry()
+                // 들어온 화면으로 돌아온 직후 — 스토어 리뷰 요청(NM-560).
+                StoreReview.shared.requestIfEligible(.identificationSaved(allUnedited: allUnedited))
             }
             .store(in: &cancelBag)
     }

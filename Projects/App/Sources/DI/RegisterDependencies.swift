@@ -155,8 +155,19 @@ enum RegisterDependencies {
                         durationSec: preset.duration
                     ))
                 }
+                // 워치에서 울리던 타이머를 끝냈다 — 앱 밖에서 끝낸 것이라 다음에 앱을 열 때 리뷰 요청을 판단한다(NM-560).
+                if case let .remove(id) = command,
+                   let timer = useCase.timers.value.first(where: { $0.id == id }),
+                   timer.state == .ringing || timer.remainingSeconds() == 0 {
+                    StoreReview.shared.recordTimerCompletedOutsideApp()
+                }
                 useCase.handleWatchCommand(command)
             }
+
+            // 시작한 타이머 수 — 스토어 리뷰 요청 조건(NM-560). 앱 밖 위젯 시작은 SceneDelegate 가 큐에서 센다.
+            useCase.timerStarted
+                .sink { StoreReview.shared.recordTimerStarted() }
+                .store(in: &Self.analyticsBag)
 
             /*
              타이머 완료/취소 → 분석 이벤트 번역.

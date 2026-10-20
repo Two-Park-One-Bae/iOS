@@ -72,6 +72,8 @@ public final class DefaultTimerUseCase: TimerUseCase {
     /// 타이머 종료(완료/취소) 신호 — Core(분석) 의존 없이 순수 도메인 이벤트만 방출.
     /// 조립 계층(RegisterDependencies)이 구독해 timer_complete/timer_cancel 로 번역한다.
     public let timerEnded = PassthroughSubject<TimerEndInfo, Never>()
+    /// 타이머 시작 신호 — 앱 · 워치 · 위젯 딥링크 시작이 모두 여기를 지난다(스토어 리뷰 요청 조건 NM-560).
+    public let timerStarted = PassthroughSubject<Void, Never>()
     /// 알람 권한 프롬프트 응답(true=granted) — 조립 계층이 permission_result 로 번역.
     public let alarmPermissionPrompted = PassthroughSubject<Bool, Never>()
 
@@ -112,6 +114,7 @@ public final class DefaultTimerUseCase: TimerUseCase {
         )
         mutate { $0.append(timer) }
         alarmScheduler.scheduleAlarm(id: timer.id, label: timer.label, categoryName: timer.category.displayName, body: alarmBody(duration: timer.duration), fireDate: endAt)
+        timerStarted.send()
     }
 
     public func pause(id: UUID) {
