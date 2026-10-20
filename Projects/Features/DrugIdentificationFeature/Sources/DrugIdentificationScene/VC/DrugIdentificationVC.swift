@@ -400,6 +400,16 @@ public final class DrugIdentificationVC: UIViewController {
         }
     }
 
+    /// 확정한 알약을 모두 사용자 수정 없이 골랐나 — 속성 칸이 모두 모델값(손대지 않았거나 되돌림).
+    /// 수동 추가한 알약은 사용자가 모든 칸을 입력하므로 수정으로 본다 (스토어 리뷰 요청 NM-560).
+    func allConfirmedUnedited() -> Bool {
+        finalizedResults().allSatisfy { pill, _ in
+            guard !isManual(pill.index) else { return false }
+            let conditions = conditions(of: pill)
+            return conditions == PillConditions(model: conditions.model)
+        }
+    }
+
     /// 사용자가 지운 모델 알약의 번호(속성 추출 `pillId`) — `완료` 때 학습용 라벨로 보낸다(NM-568).
     /// 수동 추가 알약은 넣지 않는다(위치 행에 없는 번호라 서버가 400).
     func deletedModelPillIds() -> [Int] {

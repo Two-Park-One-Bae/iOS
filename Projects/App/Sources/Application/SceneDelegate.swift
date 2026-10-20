@@ -68,7 +68,10 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         let navigationController = UINavigationController()
         appCoordinator = AppCoordinator(navigationController: navigationController)
         // 콜드런치 딥링크는 탭바가 준비된 뒤에 처리한다 (NM-372). start() 보다 먼저 걸어둔다.
-        appCoordinator?.onTabBarReady = { [weak self] in self?.flushPendingURL() }
+        appCoordinator?.onTabBarReady = { [weak self] in
+            self?.flushPendingURL()
+            StoreReview.shared.requestPendingTimerMomentIfNeeded(in: self?.window?.windowScene)
+        }
         appCoordinator?.start()
 
         window.rootViewController = navigationController
@@ -320,9 +323,15 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         //    이게 없으면 플래그가 미기록(nil)으로 남아 워치가 권한 없이도 시작을 허용한다.
         useCase.fetchAlarmPermission()
 
+        // 스토어 리뷰 요청 조건 — 첫 실행 시각 · 앱을 연 날 (NM-560).
+        StoreReview.shared.recordAppActive()
+
         // 위젯이 앱 밖(백그라운드 AppIntent, iOS 26.1+ 승인)에서 시작한 타이머 지연 집계.
         // 위젯 프로세스는 Firebase 를 링크하지 않아 timer_start 를 직접 못 보낸다(§위젯 지연로깅).
-        for pending in WidgetAnalyticsQueue.drainTimerStarts() {
+        let widgetStarts = WidgetAnalyticsQueue.drainTimerStarts()
+        // 앱을 며칠 만에 열어도 위젯으로 쓴 날은 그날로 센다 — 시작 시각을 그대로 넘긴다.
+        StoreReview.shared.recordTimerStarted(at: widgetStarts.map(\.startedAt))
+        for pending in widgetStarts {
             AppAnalytics.track(.timerStart(
                 source: "widget",
                 presetLabel: pending.presetLabel,
@@ -332,11 +341,20 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         }
         // 앱 밖 AlarmKit [완료](iOS 26.1+ stop 인텐트)로 완료된 타이머 지연 집계.
         // 26.1+ 완료는 useCase.remove 를 안 타므로 여기서만 잡힌다(중복 없음).
-        for pending in WidgetAnalyticsQueue.drainTimerCompletes() {
+        let outsideCompletes = WidgetAnalyticsQueue.drainTimerCompletes()
+        for pending in outsideCompletes {
             AppAnalytics.track(.timerComplete(
                 category: pending.category,
                 durationSec: pending.durationSec
             ))
+        }
+        // 앱 밖(시스템 알람 · 워치)에서 끝낸 타이머 → 지금이 다음에 앱을 연 때다(NM-560).
+        // 콜드런치는 스플래시가 떠 있으니 탭바가 뜬 뒤(onTabBarReady) 요청한다.
+        if !outsideCompletes.isEmpty {
+            StoreReview.shared.recordTimerCompletedOutsideApp(at: outsideCompletes.map(\.completedAt))
+        }
+        if appCoordinator?.isTabBarShown == true {
+            StoreReview.shared.requestPendingTimerMomentIfNeeded(in: scene as? UIWindowScene)
         }
 
         // Remote Config 최신값 fetch 후 강제 업데이트/점검 게이트 갱신(포그라운드 복귀 포함).

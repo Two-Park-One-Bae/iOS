@@ -4,6 +4,7 @@ import SnapKit
 import Then
 import DSKit
 import Domain
+import Core
 
 // C1 타이머 리스트 — 헤더(제목+상태 카운트), 만료 카드 맨 위, 진행 카드들, 빈 상태, FAB
 public final class TimerListVC: UIViewController {
@@ -162,7 +163,11 @@ public final class TimerListVC: UIViewController {
         for timer in sorted {
             if timer.state == .ringing {
                 let card = RingingTimerCardView(timer: timer)
-                card.onComplete = { [weak self] in self?.viewModel.remove(id: timer.id) }
+                card.onComplete = { [weak self] in
+                    self?.viewModel.remove(id: timer.id)
+                    // 앱 안에서 타이머를 끝낸 직후 — 스토어 리뷰 요청(NM-560).
+                    StoreReview.shared.requestIfEligible(.timerCompleted)
+                }
                 cardsStack.addArrangedSubview(card)
             } else {
                 let card = TimerCardView(timerID: timer.id)
