@@ -90,6 +90,13 @@ final class StoreReviewPolicyTests: XCTestCase {
         XCTAssertFalse(shouldRequest(record, .timerCompleted))
     }
 
+    func test_묶음3은_식별_시점에_쓰지_않음() {
+        var record = StoreReviewRecord()
+        record.firstLaunchAt = daysAgo(3)
+        record.timerStartCount = 5
+        XCTAssertFalse(shouldRequest(record, .identificationSaved(allUnedited: true)))
+    }
+
     // MARK: - 공통
 
     func test_마지막_요청_후_30일이_안_됐으면_어느_묶음도_요청하지_않음() {

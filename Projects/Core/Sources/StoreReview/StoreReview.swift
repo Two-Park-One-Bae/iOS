@@ -68,8 +68,8 @@ public enum StoreReviewPolicy {
             return true
         }
 
-        // 묶음 3 — 첫 실행 후 3일 · 타이머 누적 5회.
-        return launchedDaysAgo >= 3 && record.timerStartCount >= 5
+        // 묶음 3 — 첫 실행 후 3일 · 타이머 누적 5회. 타이머를 끝냈을 때만 본다.
+        return moment == .timerCompleted && launchedDaysAgo >= 3 && record.timerStartCount >= 5
     }
 }
 
