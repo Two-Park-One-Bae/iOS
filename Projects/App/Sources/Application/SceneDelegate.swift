@@ -70,7 +70,7 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         // 콜드런치 딥링크는 탭바가 준비된 뒤에 처리한다 (NM-372). start() 보다 먼저 걸어둔다.
         appCoordinator?.onTabBarReady = { [weak self] in
             self?.flushPendingURL()
-            StoreReview.shared.requestPendingTimerMomentIfNeeded()
+            StoreReview.shared.requestPendingTimerMomentIfNeeded(in: self?.window?.windowScene)
         }
         appCoordinator?.start()
 
@@ -350,7 +350,9 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         // 앱 밖(시스템 알람 · 워치)에서 끝낸 타이머 → 지금이 다음에 앱을 연 때다(NM-560).
         // 콜드런치는 스플래시가 떠 있으니 탭바가 뜬 뒤(onTabBarReady) 요청한다.
         if !outsideCompletes.isEmpty { StoreReview.shared.recordTimerCompletedOutsideApp() }
-        if appCoordinator?.isTabBarShown == true { StoreReview.shared.requestPendingTimerMomentIfNeeded() }
+        if appCoordinator?.isTabBarShown == true {
+            StoreReview.shared.requestPendingTimerMomentIfNeeded(in: scene as? UIWindowScene)
+        }
 
         // Remote Config 최신값 fetch 후 강제 업데이트/점검 게이트 갱신(포그라운드 복귀 포함).
         //

@@ -128,14 +128,15 @@ final class StoreReviewPolicyTests: XCTestCase {
     }
 
     @MainActor
-    func test_앱_밖에서_끝낸_타이머는_다음_판단에서_한_번만_쓴다() {
+    func test_앱_밖에서_끝낸_타이머는_띄울_씬이_없으면_다음_활성화까지_남긴다() {
         let defaults = UserDefaults(suiteName: #function)!
         defaults.removePersistentDomain(forName: #function)
         let review = StoreReview(defaults: defaults, now: { self.now }, calendar: calendar, present: { _ in })
 
         review.recordTimerCompletedOutsideApp()
         XCTAssertTrue(review.record.hasPendingTimerMoment)
-        review.requestPendingTimerMomentIfNeeded()
-        XCTAssertFalse(review.record.hasPendingTimerMoment)
+        // 호스트 앱 없는 테스트라 앞에 떠 있는 씬이 없다.
+        review.requestPendingTimerMomentIfNeeded(in: nil)
+        XCTAssertTrue(review.record.hasPendingTimerMoment)
     }
 }

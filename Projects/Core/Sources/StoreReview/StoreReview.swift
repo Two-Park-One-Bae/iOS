@@ -141,21 +141,28 @@ public final class StoreReview {
     // MARK: - 요청
 
     /// 조건을 보고 요청한다. 화면 전환이 끝난 뒤에 띄우도록 다음 런루프로 미룬다.
-    public func requestIfEligible(_ moment: StoreReviewMoment) {
-        guard StoreReviewPolicy.shouldRequest(record, moment: moment, now: now(), calendar: calendar) else { return }
-        let scene = MainActor.assumeIsolated {
-            UIApplication.shared.connectedScenes
-                .first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene
-        }
-        guard let scene else { return }
+    /// - Parameter scene: 창을 띄울 씬. 없으면 앞에 떠 있는 씬을 찾는다.
+    public func requestIfEligible(_ moment: StoreReviewMoment, in scene: UIWindowScene? = nil) {
+        guard StoreReviewPolicy.shouldRequest(record, moment: moment, now: now(), calendar: calendar),
+              let scene = scene ?? foregroundScene() else { return }
         record.lastRequestedAt = now()
         DispatchQueue.main.async { [present] in present(scene) }
     }
 
     /// 다음에 앱을 열 때 — 앱 밖에서 끝낸 타이머가 있으면 그 순간으로 판단한다.
-    public func requestPendingTimerMomentIfNeeded() {
-        guard record.hasPendingTimerMoment else { return }
+    ///
+    /// 활성화된 씬을 넘겨받아 그 씬에 띄운다 — 씬 목록을 뒤지다 전환 중이라 못 찾는 일을 막는다.
+    /// 씬이 없으면 표시를 남겨 다음 활성화 때 다시 본다.
+    public func requestPendingTimerMomentIfNeeded(in scene: UIWindowScene?) {
+        guard record.hasPendingTimerMoment, let scene = scene ?? foregroundScene() else { return }
         record.hasPendingTimerMoment = false
-        requestIfEligible(.timerCompleted)
+        requestIfEligible(.timerCompleted, in: scene)
+    }
+
+    private func foregroundScene() -> UIWindowScene? {
+        MainActor.assumeIsolated {
+            UIApplication.shared.connectedScenes
+                .first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene
+        }
     }
 }

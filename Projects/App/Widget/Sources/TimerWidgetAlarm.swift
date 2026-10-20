@@ -7,7 +7,9 @@ import TimerShared
 #endif
 
 // 위젯에서 시작한 타이머의 [완료](stop) — App Group 에서 타이머를 삭제한다.
-// 앱의 TimerStopIntent 과 동일 효과(App Group 저장소에서 제거), 별도 프로세스에서 실행.
+// 앱의 TimerStopIntent 과 동일 효과(App Group 저장소에서 제거).
+// LiveActivityIntent 는 앱 프로세스에서 실행되므로 앱에도 같은 이름의 정의가 있다
+// (App/Sources/Widget/TimerWidgetStopIntent.swift) — 이름 · 매개변수를 함께 바꾼다.
 @available(iOS 26.0, *)
 struct TimerWidgetStopIntent: LiveActivityIntent {
     static var title: LocalizedStringResource = "타이머 완료"
